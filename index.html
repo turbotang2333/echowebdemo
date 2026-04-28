@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0c0814" />
+  <title>echo · 体验 demo</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="orientation-gate">
+    <p>请将设备横置以体验</p>
+  </div>
+
+  <div id="stage" class="stage">
+    <div class="stage-bg" id="stage-bg"></div>
+
+    <div class="art-layer" id="art-layer"></div>
+
+    <div class="character-layer" id="character-layer">
+      <svg class="character" id="character" viewBox="0 0 200 480" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
+        <defs>
+          <radialGradient id="char-light" cx="50%" cy="22%" r="60%">
+            <stop offset="0%" stop-color="rgba(255,225,200,0.42)" />
+            <stop offset="60%" stop-color="rgba(255,225,200,0.10)" />
+            <stop offset="100%" stop-color="rgba(255,225,200,0.00)" />
+          </radialGradient>
+          <linearGradient id="char-body" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stop-color="rgba(200,180,225,0.30)" />
+            <stop offset="100%" stop-color="rgba(120,100,160,0.18)" />
+          </linearGradient>
+        </defs>
+        <ellipse cx="100" cy="120" rx="180" ry="120" fill="url(#char-light)" />
+        <g id="char-fig">
+          <path id="char-ear-l" d="M62 38 Q56 12 78 30 Q82 42 76 58 Z" fill="rgba(220,200,235,0.55)" />
+          <path id="char-ear-r" d="M138 38 Q144 12 122 30 Q118 42 124 58 Z" fill="rgba(220,200,235,0.55)" />
+          <ellipse id="char-head" cx="100" cy="78" rx="34" ry="40" fill="rgba(235,222,242,0.78)" />
+          <path id="char-body-shape"
+                d="M60 130 Q100 110 140 130 L155 320 Q140 460 100 470 Q60 460 45 320 Z"
+                fill="url(#char-body)" />
+          <path id="char-tail" d="M150 240 Q210 260 195 360 Q175 410 150 380 Z"
+                fill="rgba(235,222,242,0.35)" opacity="0.85" />
+        </g>
+      </svg>
+    </div>
+
+    <div class="anchor" id="journal-anchor" aria-label="历史锚点"></div>
+    <div class="microtrace" id="microtrace" aria-label="奖励微痕" hidden></div>
+
+    <button class="play-skip" id="play-skip" type="button" hidden>跳到下一次输入 ›</button>
+
+    <div class="ring-zone" id="ring-zone">
+      <svg class="ring" id="ring" viewBox="-160 -160 320 320" aria-hidden="true">
+        <!-- 画内 quarter-arc: from 12 o'clock (0,-130) curving through upper-left to 9 o'clock (-130,0).
+             Sweep=0 keeps the arc on the screen-facing side. -->
+        <path id="ring-half" class="ring-half"
+              d="M 0,-130 A 130,130 0 0,0 -130,0"
+              fill="none" stroke="rgba(255,255,255,0.45)" stroke-width="2"
+              stroke-linecap="round" vector-effect="non-scaling-stroke" />
+        <path class="ring-ripple ripple-1"
+              d="M 0,-130 A 130,130 0 0,0 -130,0"
+              fill="none" stroke="rgba(255,235,210,0.9)" stroke-width="2"
+              stroke-linecap="round" vector-effect="non-scaling-stroke" />
+        <path class="ring-ripple ripple-2"
+              d="M 0,-130 A 130,130 0 0,0 -130,0"
+              fill="none" stroke="rgba(255,235,210,0.9)" stroke-width="2"
+              stroke-linecap="round" vector-effect="non-scaling-stroke" />
+        <path class="ring-ripple ripple-3"
+              d="M 0,-130 A 130,130 0 0,0 -130,0"
+              fill="none" stroke="rgba(255,235,210,0.9)" stroke-width="2"
+              stroke-linecap="round" vector-effect="non-scaling-stroke" />
+        <circle id="ring-light" class="ring-light" r="4"
+                fill="rgba(255,225,200,0.0)" />
+      </svg>
+    </div>
+
+    <div class="ink-zone" id="ink-zone" hidden>
+      <div class="ink-text" id="ink-text"></div>
+      <div class="ink-line" id="ink-line"></div>
+    </div>
+
+    <div class="subtitle-zone" id="subtitle-zone"></div>
+    <div class="narration-zone" id="narration-zone"></div>
+    <div class="inner-zone" id="inner-zone"></div>
+    <div class="heavy-zone" id="heavy-zone"></div>
+    <div class="npc-zone" id="npc-zone"></div>
+    <div class="opening-zone" id="opening-zone" hidden>
+      <button class="opening-skip" id="opening-skip" type="button">跳过开场 ›</button>
+      <div class="opening-glow" id="opening-glow" hidden>
+        <div class="opening-glow-core"></div>
+        <div class="opening-glow-hint">长按 · 唤醒</div>
+      </div>
+      <div class="opening-text" id="opening-text"></div>
+    </div>
+
+    <div class="run-anchor" id="run-anchor" hidden></div>
+
+    <div class="endmark" id="endmark" hidden>
+      <div class="endmark-text">第一章 完</div>
+      <div class="endmark-hint" id="endmark-hint">试着从左上角拉开这一段的回忆</div>
+    </div>
+
+    <div class="blink-veil" id="blink-veil"></div>
+    <div class="white-veil" id="white-veil"></div>
+
+    <div class="journal" id="journal" hidden>
+      <div class="journal-paper">
+        <button class="journal-close" id="journal-close" type="button" aria-label="收回事记">
+          <span class="journal-close-arrow"></span>
+          <span class="journal-close-label">收回</span>
+        </button>
+        <div class="journal-scroll" id="journal-scroll"></div>
+        <div class="journal-hint">点左上角 / 向左上滑动 — 收回</div>
+      </div>
+    </div>
+
+    <div class="finale" id="finale" hidden>
+      <p>demo 结束</p>
+      <p class="finale-sub">刷新页面可重头再来</p>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

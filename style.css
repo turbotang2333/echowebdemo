@@ -1,0 +1,883 @@
+:root {
+  --bg: #0c0814;
+  --bg-current: #0c0814;
+  --serif: 'Source Han Serif SC', 'Songti SC', 'STSong', 'SimSun', serif;
+  --sans: 'Source Han Sans SC', 'PingFang SC', 'HarmonyOS Sans SC', sans-serif;
+  --subtitle: rgba(255, 255, 255, 0.85);
+  --narration: rgba(255, 255, 255, 0.40);
+  --reward: rgba(255, 200, 150, 0.85);
+  --paper: rgba(238, 228, 210, 0.96);
+  --paper-text: #2a2218;
+  --paper-mark-you: #6e5b3a;
+  --paper-mark-him: #8a7245;
+  --paper-italic: #75603e;
+  --ease-drift: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-paper: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+* { box-sizing: border-box; }
+
+/* Make sure the `hidden` HTML attribute always wins over our display rules. */
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background: #000;
+  color: #fff;
+  font-family: var(--sans);
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  cursor: default;
+  overscroll-behavior: none;
+}
+
+/* All interactive elements: kill iOS native long-press menu / scrolling intercepts */
+.ring-zone, .opening-glow, .run-anchor, .anchor, .journal, .journal * {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.ring-zone, .opening-glow, .run-anchor, .anchor {
+  touch-action: none;
+}
+
+#orientation-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #0c0814;
+  color: rgba(255,255,255,0.55);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--sans);
+  font-size: 14px;
+  letter-spacing: 0.1em;
+}
+
+@media (orientation: portrait) and (max-width: 900px) {
+  #orientation-gate { display: flex; }
+  #stage { display: none; }
+}
+
+/* ----------------------------- stage ----------------------------- */
+
+.stage {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.stage-bg {
+  position: absolute;
+  inset: 0;
+  background: var(--bg-current);
+  transition: background 1.6s var(--ease-drift);
+}
+.stage-bg::after {
+  /* soft vignette to reinforce darkness */
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 60%, rgba(0,0,0,0) 35%, rgba(0,0,0,0.45) 100%);
+  pointer-events: none;
+}
+
+/* ----------------------------- character ----------------------------- */
+
+.character-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  display: flex;
+  align-items: flex-end;
+}
+.character {
+  position: absolute;
+  left: 18%;
+  bottom: 0;
+  width: 30vh;
+  max-width: 320px;
+  height: 92vh;
+  opacity: 0;
+  transform: translateX(40px);
+  transition: opacity 1.4s var(--ease-drift), transform 1.4s var(--ease-drift);
+  filter: drop-shadow(0 0 24px rgba(255, 220, 200, 0.10));
+  overflow: visible;
+}
+.character.visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+#char-fig {
+  transform-origin: 100px 470px;
+  animation: charBreath 4.6s ease-in-out infinite;
+}
+@keyframes charBreath {
+  0%,100% { transform: scale(1.0) translateY(0); }
+  50%     { transform: scale(1.012) translateY(-2px); }
+}
+
+/* pose modifiers — tweaked via class on .character-layer */
+.pose-tilt #char-fig { transform: rotate(-6deg); transform-origin: 100px 80px; animation: charBreath 5s ease-in-out infinite; }
+.pose-step-back .character { transform: translateX(40px); opacity: 0.85; }
+.pose-lean-in .character { transform: translateX(-40px) scale(1.08); }
+.pose-crouch #char-fig { transform: translateY(60px) scaleY(0.78); }
+.pose-crouch-eye #char-fig { transform: translateY(70px) scaleY(0.74); }
+.pose-turn-back #char-fig { transform: scaleX(-1); transform-origin: 100px 240px; }
+.pose-attack #char-fig { transform: translateX(-12px) rotate(-3deg) scale(1.06); }
+.pose-eat #char-fig { transform: translateY(80px) scaleY(0.7) translateX(-10px); }
+
+.char-flash {
+  animation: charFlash 0.5s ease-out;
+}
+@keyframes charFlash {
+  0%   { filter: drop-shadow(0 0 24px rgba(255,220,200,0.10)) brightness(1); }
+  40%  { filter: drop-shadow(0 0 64px rgba(255,240,210,0.55)) brightness(1.4); }
+  100% { filter: drop-shadow(0 0 24px rgba(255,220,200,0.10)) brightness(1); }
+}
+
+/* ----------------------------- art layer ----------------------------- */
+
+.art-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+.art-element {
+  position: absolute;
+  opacity: 0;
+  animation: artFadeIn 1.6s var(--ease-drift) forwards, artFloat 7s ease-in-out infinite;
+}
+.art-element.removing {
+  animation: artFadeOut 1.4s var(--ease-drift) forwards;
+}
+@keyframes artFadeIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.92); }
+  to   { opacity: var(--art-opacity, 0.7); transform: translateY(0) scale(1); }
+}
+@keyframes artFadeOut {
+  to { opacity: 0; transform: translateY(-6px); }
+}
+@keyframes artFloat {
+  0%,100% { translate: 0 0; }
+  50%     { translate: 0 -10px; }
+}
+.art-element.leaf svg { width: 28px; height: 28px; }
+.art-element.lightpoint svg { width: 14px; height: 14px; }
+.art-element.flame svg { width: 24px; height: 32px; }
+.art-element.water svg { width: 18px; height: 18px; }
+.art-element.thread svg { width: 60px; height: 6px; }
+.art-element.flower svg { width: 16px; height: 16px; }
+.art-element.branch svg { width: 70px; height: 70px; }
+
+/* ----------------------------- anchor + microtrace ----------------------------- */
+
+.anchor {
+  position: absolute;
+  top: 22px;
+  left: 26px;
+  width: 22px;
+  height: 22px;
+  z-index: 8;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.anchor::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(255,225,200,0.85) 0%, rgba(255,225,200,0.0) 70%);
+  border-radius: 50%;
+  animation: anchorBreath 5s ease-in-out infinite;
+}
+.anchor::after {
+  content: '';
+  position: absolute;
+  left: 7px; top: 7px;
+  width: 8px; height: 8px;
+  background: rgba(255,225,200,0.7);
+  border-radius: 50%;
+  filter: blur(0.4px);
+}
+@keyframes anchorBreath {
+  0%,100% { opacity: 0.45; transform: scale(0.95); }
+  50%     { opacity: 0.85; transform: scale(1.1); }
+}
+.anchor.attention::before {
+  animation: anchorAttn 1.6s ease-in-out 3;
+}
+@keyframes anchorAttn {
+  0%,100% { opacity: 0.45; transform: scale(0.95); }
+  50%     { opacity: 1; transform: scale(1.6); }
+}
+
+.microtrace {
+  position: absolute;
+  top: 28px;
+  right: 32px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--reward);
+  box-shadow: 0 0 24px rgba(255,200,150,0.7);
+  animation: microPulse 3.5s ease-in-out infinite;
+  z-index: 8;
+}
+@keyframes microPulse {
+  0%,100% { opacity: 0.6; transform: scale(0.9); }
+  50%     { opacity: 1;   transform: scale(1.15); }
+}
+
+/* ----------------------------- ring ----------------------------- */
+
+/* Ring lives at the bottom-right corner. With width=320 + right:-160, the SVG
+   user-coord origin (0,0) sits at the viewport corner — so the quarter-arc's
+   endpoints fall exactly on the right and bottom screen edges. */
+.ring-zone {
+  position: absolute;
+  right: -160px;
+  bottom: -160px;
+  width: 320px;
+  height: 320px;
+  z-index: 9;
+  cursor: pointer;
+  touch-action: none;
+}
+.ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible; /* let ripples scale past the SVG bounds */
+}
+.ring-half {
+  animation: ringBreath 4s ease-in-out infinite;
+  transition: stroke 0.4s var(--ease-drift), stroke-width 0.4s var(--ease-drift);
+  transform-origin: center;
+  transform-box: view-box;
+}
+@keyframes ringBreath {
+  0%,100% { opacity: 0.22; }
+  50%     { opacity: 1; }
+}
+
+/* Ripples — concentric outward expansion of the same arc geometry, scaled
+   from the SVG center (which is the viewport corner). */
+.ring-ripple {
+  opacity: 0;
+  transform-origin: center;
+  pointer-events: none;
+}
+.ring-zone.state-recording .ring-half {
+  animation: ringRecordBreath 1.6s ease-in-out infinite;
+  stroke: rgba(255,240,215,0.95);
+}
+@keyframes ringRecordBreath {
+  0%,100% { opacity: 0.9; }
+  50%     { opacity: 1; }
+}
+.ring-zone.state-recording .ring-ripple {
+  animation: rippleOut 1.8s ease-out infinite;
+}
+.ring-zone.state-recording .ripple-1 { animation-delay: 0s; }
+.ring-zone.state-recording .ripple-2 { animation-delay: 0.6s; }
+.ring-zone.state-recording .ripple-3 { animation-delay: 1.2s; }
+@keyframes rippleOut {
+  0%   { transform: scale(1);    opacity: 0.75; }
+  80%  { opacity: 0.08; }
+  100% { transform: scale(2);    opacity: 0; }
+}
+
+.ring-zone.state-thinking .ring-half {
+  animation: ringBreath 7.5s ease-in-out infinite;
+  stroke: rgba(255,255,255,0.35);
+}
+.ring-zone.state-responding .ring-half { opacity: 0.08; animation: none; }
+.ring-zone.state-input .ring-half { stroke: rgba(255,225,200,0.7); }
+.ring-zone.state-delivering .ring-half { animation: none; opacity: 0; }
+.ring-zone.state-delivering .ring-light { fill: rgba(255,225,200,0.95); }
+
+/* Invitation: arc pulses with a scale-up + glow rhythm — no text hint. */
+.ring-zone.state-invitation .ring-half {
+  animation: ringInvitePulse 1.5s ease-in-out infinite;
+  stroke: rgba(255,240,215,1);
+  filter: drop-shadow(0 0 14px rgba(255,225,200,0.75));
+}
+@keyframes ringInvitePulse {
+  0%,100% { transform: scale(1);     opacity: 0.65; }
+  50%     { transform: scale(1.08);  opacity: 1; }
+}
+
+/* ----------------------------- ink zone (typewriter) ----------------------------- */
+
+.ink-zone {
+  position: absolute;
+  right: 40px;
+  bottom: 168px;
+  max-width: 56vw;
+  z-index: 7;
+  text-align: right;
+  pointer-events: none;
+}
+.ink-zone.visible { pointer-events: auto; }
+.ink-text {
+  font-family: var(--serif);
+  font-size: 16px;
+  color: rgba(255,235,210,0.92);
+  letter-spacing: 0.08em;
+  line-height: 1.7;
+  margin-bottom: 10px;
+  min-height: 1.7em;
+  text-shadow: 0 0 12px rgba(255,225,200,0.18);
+}
+.ink-line {
+  height: 1px;
+  width: 0;
+  margin-left: auto;
+  background: linear-gradient(to right, rgba(255,225,200,0), rgba(255,225,200,0.85), rgba(255,225,200,0));
+  transition: width 0.5s var(--ease-drift), opacity 0.5s var(--ease-drift);
+  opacity: 0;
+}
+.ink-zone.visible .ink-line { width: 100%; opacity: 1; }
+
+.ink-zone.dissolving .ink-text { animation: inkDissolve 0.8s ease-out forwards; }
+.ink-zone.dissolving .ink-line { animation: inkLineRetract 0.6s ease-in forwards; }
+@keyframes inkDissolve {
+  to { opacity: 0; letter-spacing: 0.4em; filter: blur(2px); }
+}
+@keyframes inkLineRetract {
+  to { width: 0; opacity: 0; }
+}
+
+/* ----------------------------- subtitle / narration / npc / heavy ----------------------------- */
+
+.subtitle-zone {
+  position: absolute;
+  left: 38%;
+  top: 38%;
+  max-width: 42vw;
+  z-index: 6;
+  pointer-events: none;
+}
+.subtitle {
+  font-family: var(--serif);
+  font-size: 16px;
+  color: var(--subtitle);
+  line-height: 1.7;
+  letter-spacing: 0.06em;
+  margin: 4px 0;
+  opacity: 0;
+  text-shadow: 0 0 16px rgba(0,0,0,0.4);
+  transition: opacity 0.6s var(--ease-drift);
+}
+.subtitle.visible { opacity: 1; }
+.subtitle.drifting {
+  animation: driftToTopLeft 0.9s var(--ease-drift) forwards;
+}
+
+.narration-zone {
+  position: absolute;
+  left: 50%;
+  top: 14%;
+  transform: translateX(-50%);
+  max-width: 60vw;
+  text-align: center;
+  z-index: 5;
+  pointer-events: none;
+}
+.narration {
+  font-family: var(--serif);
+  font-size: 13px;
+  font-style: italic;
+  color: var(--narration);
+  letter-spacing: 0.12em;
+  line-height: 1.8;
+  margin: 6px 0;
+  opacity: 0;
+  transition: opacity 0.7s var(--ease-drift);
+  text-shadow: 0 0 12px rgba(0,0,0,0.4);
+}
+.narration.visible { opacity: 1; }
+.narration.drifting {
+  animation: driftToTopLeft 0.9s var(--ease-drift) forwards;
+}
+
+/* Inner monologue lives near the user's input zone (bottom-right), since
+   it's the protagonist/your voice — distinct from environment narration. */
+.inner-zone {
+  position: absolute;
+  right: 56px;
+  bottom: 220px;
+  max-width: 46vw;
+  text-align: right;
+  z-index: 6;
+  pointer-events: none;
+}
+.inner {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 14px;
+  color: rgba(220,210,255,0.7);
+  letter-spacing: 0.1em;
+  line-height: 1.8;
+  margin: 4px 0;
+  opacity: 0;
+  transition: opacity 0.7s var(--ease-drift);
+  text-shadow: 0 0 14px rgba(0,0,0,0.5);
+}
+.inner.visible { opacity: 1; }
+.inner.drifting {
+  animation: driftToTopLeft 0.9s var(--ease-drift) forwards;
+}
+
+.heavy-zone {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 64vw;
+  text-align: center;
+  z-index: 6;
+  pointer-events: none;
+}
+.heavy {
+  font-family: var(--serif);
+  font-size: 18px;
+  color: rgba(255,240,225,0.92);
+  letter-spacing: 0.16em;
+  line-height: 1.9;
+  opacity: 0;
+  text-shadow: 0 0 18px rgba(0,0,0,0.65), 0 0 40px rgba(255,200,160,0.2);
+  transition: opacity 0.8s var(--ease-drift);
+  padding: 14px 0;
+  position: relative;
+}
+.heavy::before, .heavy::after {
+  content: '── ── ── ── ── ──';
+  display: block;
+  font-size: 11px;
+  color: rgba(255,220,200,0.4);
+  letter-spacing: 0.4em;
+  margin: 8px 0;
+}
+.heavy.visible { opacity: 1; }
+.heavy.drifting { animation: driftToTopLeft 1.1s var(--ease-drift) forwards; }
+
+.npc-zone {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+.npc-text {
+  position: absolute;
+  font-family: var(--serif);
+  font-size: 14px;
+  color: rgba(255,210,200,0.7);
+  letter-spacing: 0.18em;
+  white-space: nowrap;
+  opacity: 0;
+}
+.npc-text.from-top {
+  top: 8%;
+  left: 50%;
+  transform: translateX(-50%);
+  animation: npcTop 4.5s ease-in-out forwards;
+}
+.npc-text.from-right {
+  top: 50%;
+  right: 4%;
+  animation: npcRight 4.5s ease-in-out forwards;
+}
+@keyframes npcTop {
+  0%   { opacity: 0; transform: translate(-50%, -20px); }
+  20%  { opacity: 1; transform: translate(-50%, 0); }
+  70%  { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, 12px); }
+}
+@keyframes npcRight {
+  0%   { opacity: 0; transform: translateX(40px); }
+  20%  { opacity: 0.85; transform: translateX(0); }
+  70%  { opacity: 0.85; transform: translateX(-30px); }
+  100% { opacity: 0; transform: translateX(-160px); }
+}
+
+/* Short drift toward upper-left — text just edges away and fades, doesn't
+   travel all the way to the journal anchor. */
+@keyframes driftToTopLeft {
+  0%   { opacity: var(--drift-from-opacity, 0.85); transform: translate(0,0); }
+  100% {
+    opacity: 0;
+    transform: translate(-32px, -22px) scale(0.96);
+    filter: blur(0.6px);
+  }
+}
+
+/* ----------------------------- opening (Scene 0) ----------------------------- */
+
+.opening-zone {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  background: #000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+.opening-skip {
+  position: absolute;
+  top: 18px;
+  right: 22px;
+  background: transparent;
+  border: 1px solid rgba(255,225,200,0.25);
+  border-radius: 14px;
+  color: rgba(255,225,200,0.55);
+  font-family: var(--sans);
+  font-size: 11px;
+  letter-spacing: 0.25em;
+  padding: 6px 14px 6px 16px;
+  cursor: pointer;
+  transition: opacity 0.4s ease, color 0.3s ease, border-color 0.3s ease;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+  z-index: 31;
+}
+.opening-skip:hover, .opening-skip:active {
+  color: rgba(255,235,210,0.85);
+  border-color: rgba(255,235,210,0.55);
+}
+
+/* Persistent skip button during gameplay — fast-forwards to the next user input */
+.play-skip {
+  position: absolute;
+  top: 18px;
+  right: 22px;
+  background: transparent;
+  border: 1px solid rgba(255,225,200,0.18);
+  border-radius: 14px;
+  color: rgba(255,225,200,0.45);
+  font-family: var(--sans);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  padding: 6px 14px 6px 16px;
+  cursor: pointer;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+  z-index: 25;
+  opacity: 0.55;
+  transition: opacity 0.3s, color 0.3s, border-color 0.3s, background 0.2s;
+}
+.play-skip:hover, .play-skip:active {
+  opacity: 1;
+  color: rgba(255,235,210,0.95);
+  border-color: rgba(255,235,210,0.6);
+}
+.play-skip.busy {
+  background: rgba(255,225,200,0.12);
+  border-color: rgba(255,235,210,0.55);
+  color: rgba(255,245,225,1);
+  opacity: 1;
+}
+.opening-text {
+  font-family: var(--serif);
+  font-size: 19px;
+  color: rgba(255,235,225,0.78);
+  letter-spacing: 0.18em;
+  line-height: 2.1;
+  text-align: center;
+  max-width: 60vw;
+}
+.opening-line {
+  display: block;
+  opacity: 0;
+  transition: opacity 1.4s var(--ease-drift);
+}
+.opening-line.visible { opacity: 0.92; }
+.opening-line.fading  { opacity: 0; }
+
+.opening-glow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  cursor: pointer;
+  user-select: none;
+}
+.opening-glow-core {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%,
+    rgba(255,235,210,0.7) 0%,
+    rgba(255,225,200,0.25) 40%,
+    rgba(255,225,200,0) 70%);
+  animation: openingBreath 4.2s ease-in-out infinite;
+}
+.opening-glow.holding .opening-glow-core {
+  animation: openingHold 1.4s ease-out forwards;
+}
+@keyframes openingBreath {
+  0%,100% { transform: scale(1);   opacity: 0.85; }
+  50%     { transform: scale(1.1); opacity: 1; }
+}
+@keyframes openingHold {
+  to { transform: scale(7); opacity: 1; filter: blur(8px); }
+}
+.opening-glow-hint {
+  font-family: var(--serif);
+  font-size: 12px;
+  color: rgba(255,235,225,0.55);
+  letter-spacing: 0.45em;
+  padding-left: 0.45em;
+}
+
+/* ----------------------------- scene 6 run anchor ----------------------------- */
+
+.run-anchor {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,240,220,0.95) 0%, rgba(255,200,160,0.4) 50%, rgba(255,200,160,0) 80%);
+  cursor: pointer;
+  z-index: 20;
+  animation: runAnchorPulse 1s ease-in-out infinite;
+}
+@keyframes runAnchorPulse {
+  0%,100% { transform: translate(-50%, -50%) scale(1);   opacity: 0.85; }
+  50%     { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+}
+
+/* ----------------------------- transitions ----------------------------- */
+
+.blink-veil, .white-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s ease-in;
+}
+.blink-veil { background: #000; }
+.white-veil { background: rgba(255,245,225,1); }
+.blink-veil.dark { opacity: 1; }
+.white-veil.lit  { opacity: 1; transition-duration: 0.6s; }
+
+.shake { animation: shake 0.4s ease-in-out; }
+@keyframes shake {
+  0%,100% { translate: 0 0; }
+  25% { translate: -6px 2px; }
+  50% { translate: 4px -2px; }
+  75% { translate: -3px 1px; }
+}
+
+/* ----------------------------- end mark ----------------------------- */
+
+.endmark {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 18;
+  pointer-events: none;
+  background: rgba(0,0,0,0.55);
+  opacity: 0;
+  transition: opacity 1.6s var(--ease-drift);
+}
+.endmark.visible { opacity: 1; }
+.endmark-text {
+  font-family: var(--serif);
+  font-size: 22px;
+  color: rgba(255,235,210,0.92);
+  letter-spacing: 0.6em;
+  padding-left: 0.6em;
+}
+.endmark-hint {
+  margin-top: 28px;
+  font-family: var(--serif);
+  font-size: 13px;
+  color: rgba(255,225,200,0.5);
+  letter-spacing: 0.25em;
+  opacity: 0;
+  transition: opacity 1.4s ease-in 1.2s;
+}
+.endmark.visible .endmark-hint { opacity: 1; }
+
+/* ----------------------------- journal ----------------------------- */
+
+.journal {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+}
+.journal.visible { pointer-events: auto; }
+.journal-paper {
+  position: absolute;
+  inset: 0;
+  background: var(--paper);
+  transform: translate(-100%, -100%);
+  transition: transform 0.5s var(--ease-paper);
+  display: flex;
+  flex-direction: column;
+}
+
+.journal-close {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  color: var(--paper-mark-you);
+  font-family: var(--serif);
+  font-size: 13px;
+  letter-spacing: 0.25em;
+  cursor: pointer;
+  z-index: 3;
+  border-radius: 14px;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+  transition: background 0.2s, color 0.2s;
+}
+.journal-close:hover, .journal-close:active {
+  background: rgba(110,91,58,0.08);
+  color: var(--paper-text);
+}
+.journal-close-arrow {
+  width: 14px;
+  height: 14px;
+  border-left: 1.5px solid currentColor;
+  border-top: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  margin-right: 2px;
+}
+.journal-close-label {
+  padding-left: 0.25em; /* offset for letter-spacing */
+}
+.journal.visible .journal-paper { transform: translate(0, 0); }
+
+.journal-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 64px 14vw 80px;
+  font-family: var(--serif);
+  color: var(--paper-text);
+  font-size: 15px;
+  line-height: 2;
+  letter-spacing: 0.06em;
+  /* let browser only handle vertical scrolling here — diagonal / horizontal
+     gestures are released to JS so the swipe-to-close can detect them */
+  touch-action: pan-y;
+}
+.journal-scroll::-webkit-scrollbar { width: 4px; }
+.journal-scroll::-webkit-scrollbar-thumb { background: rgba(110,91,58,0.3); border-radius: 2px; }
+
+.journal-scroll .j-entry { margin: 6px 0; }
+.journal-scroll .j-tag {
+  display: inline-block;
+  width: 1.6em;
+  margin-right: 0.4em;
+  text-align: center;
+  font-size: 12px;
+  letter-spacing: 0;
+}
+.journal-scroll .j-you  { color: var(--paper-mark-you); }
+.journal-scroll .j-him  { color: var(--paper-mark-him); }
+.journal-scroll .j-narration {
+  color: var(--paper-italic);
+  font-style: italic;
+  padding-left: 2em;
+  font-size: 14px;
+}
+.journal-scroll .j-inner {
+  color: var(--paper-italic);
+  font-style: italic;
+  padding-left: 2em;
+  font-size: 14px;
+}
+.journal-scroll .j-heavy {
+  text-align: center;
+  margin: 22px 0;
+  font-size: 16px;
+  color: var(--paper-text);
+}
+.journal-scroll .j-heavy::before,
+.journal-scroll .j-heavy::after {
+  content: '── ── ── ── ── ──';
+  display: block;
+  color: rgba(110,91,58,0.5);
+  letter-spacing: 0.3em;
+  margin: 6px 0;
+}
+
+.journal-hint {
+  text-align: center;
+  padding: 14px;
+  font-family: var(--sans);
+  font-size: 11px;
+  color: rgba(110,91,58,0.5);
+  letter-spacing: 0.3em;
+}
+
+/* ----------------------------- finale ----------------------------- */
+
+.finale {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  background: #000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--serif);
+  color: rgba(255,225,200,0.7);
+  font-size: 18px;
+  letter-spacing: 0.3em;
+  padding-left: 0.3em;
+  gap: 20px;
+  opacity: 0;
+  transition: opacity 1.6s var(--ease-drift);
+  pointer-events: none;
+}
+.finale.visible { opacity: 1; pointer-events: auto; }
+.finale-sub {
+  font-size: 12px;
+  color: rgba(255,225,200,0.35);
+  letter-spacing: 0.2em;
+}
