@@ -1,4 +1,4 @@
-import { $, wait } from '../../js/util.js';
+import { $, wait } from './util.js';
 
 const POSE_CLASSES = [
   'pose-tilt', 'pose-step-back', 'pose-lean-in',

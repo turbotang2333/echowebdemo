@@ -1,0 +1,696 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+<meta name="theme-color" content="#0c0814" />
+<title>echo · 输入交互方案 v3</title>
+<style>
+:root {
+  --ease-drift: cubic-bezier(0.4, 0, 0.2, 1);
+  --serif: 'Source Han Serif SC', 'Songti SC', 'STSong', 'SimSun', serif;
+  --sans: 'Source Han Sans SC', 'PingFang SC', 'Helvetica Neue', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  width: 100%; height: 100%; background: #000; color: #fff;
+  font-family: var(--sans); overflow: hidden; user-select: none;
+  -webkit-user-select: none; touch-action: manipulation;
+}
+.stage {
+  position: relative; width: 100vw; height: 100vh; height: 100dvh;
+  background: linear-gradient(175deg, #0e0a1a 0%, #0c0814 40%, #10091e 100%);
+  overflow: hidden;
+}
+
+.hint-zone {
+  position: absolute; top: 10%; left: 0; right: 0;
+  text-align: center; pointer-events: none; z-index: 20;
+}
+.hint-zone p {
+  font-family: var(--serif); font-style: italic;
+  font-size: 14px; color: rgba(255,255,255,0.5);
+  letter-spacing: 0.14em; line-height: 1.9;
+  opacity: 0; transition: opacity 0.6s var(--ease-drift);
+}
+.hint-zone p.visible { opacity: 1; }
+
+.edge-veil {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 100vh;
+  pointer-events: none;
+  background: linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0) 70%);
+  opacity: 0; transition: opacity 1s var(--ease-drift); z-index: 1;
+}
+.state-invitation .edge-veil { opacity: 0.6; }
+.state-typing .edge-veil    { opacity: 0.75; }
+.state-recording .edge-veil { opacity: 1; }
+.state-delivering .edge-veil { opacity: 0.6; }
+
+.edge-zone {
+  position: absolute; inset: auto 0 0 0; width: 100vw; height: 33vh;
+  min-height: 200px; z-index: 10; cursor: pointer; touch-action: none;
+}
+.state-typing .edge-zone { z-index: 14; }
+
+.edge-arc-host {
+  position: absolute; pointer-events: none;
+  left: 0; right: 0; bottom: 12vh; height: 14vh; min-height: 80px;
+  transform-origin: center bottom; transform: scale(1);
+  transition: bottom 0.6s var(--ease-drift), transform 0.45s var(--ease-drift);
+}
+.state-typing .edge-arc-host {
+  bottom: 26vh;
+  transform: scale(1);
+  transition: bottom 0.55s var(--ease-drift), transform 0.35s var(--ease-drift);
+}
+.state-settled .edge-arc-host {
+  bottom: 12vh;
+  transform: scale(1);
+  transition: bottom 0.5s var(--ease-drift), transform 0.35s var(--ease-drift);
+}
+.state-recording .edge-arc-host {
+  transform: scale(1.7);
+  transition: transform 0.32s var(--ease-drift);
+}
+
+.edge-svg {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  pointer-events: none; overflow: visible; transform-origin: center bottom;
+}
+.edge-arc-main {
+  opacity: 0; transition: opacity 0.8s var(--ease-drift);
+}
+.state-idle .edge-arc-main { opacity: 0; }
+.state-invitation .edge-arc-main {
+  opacity: 1; stroke: rgba(255,240,215,0.95); stroke-width: 2.8;
+  transition: opacity 0.8s var(--ease-drift), stroke 0.4s, stroke-width 0.4s;
+}
+.state-typing .edge-arc-main,
+.state-settled .edge-arc-main {
+  opacity: 1; stroke: rgba(255,240,215,0.9); stroke-width: 1.4;
+  filter: drop-shadow(0 0 10px rgba(255,235,200,0.5));
+  transition: opacity 0.5s var(--ease-drift), stroke 0.5s, stroke-width 0.5s;
+}
+.state-recording .edge-arc-main {
+  opacity: 1; stroke: rgba(255,250,225,1); stroke-width: 3.2;
+  filter: drop-shadow(0 0 36px rgba(255,235,200,1));
+}
+
+.state-invitation .edge-svg {
+  animation: edgeBreath 4.2s ease-in-out infinite;
+}
+.state-typing .edge-svg,
+.state-settled .edge-svg { animation: none; }
+
+.state-settled .type-text .caret { display: none; }
+
+@keyframes edgeBreath {
+  0%, 100% { transform: scale(0.88); opacity: 0.45; filter: drop-shadow(0 0 6px rgba(255,225,200,0.15)); }
+  50%      { transform: scale(1.22); opacity: 1;    filter: drop-shadow(0 0 32px rgba(255,235,210,0.9)); }
+}
+
+.edge-ripple { opacity: 0; }
+.state-recording .edge-ripple { animation: edgeRipple 1.8s ease-out infinite; }
+.state-recording .ripple-1 { animation-delay: 0s; }
+.state-recording .ripple-2 { animation-delay: 0.6s; }
+.state-recording .ripple-3 { animation-delay: 1.2s; }
+@keyframes edgeRipple {
+  0%   { opacity: 0.7; transform: translateY(0); }
+  80%  { opacity: 0.05; }
+  100% { opacity: 0; transform: translateY(-22vh); }
+}
+
+/* ---- typing area: text above the line, send btn below ---- */
+.type-area {
+  position: absolute; left: 8vw; right: 8vw; bottom: 32vh;
+  display: flex; flex-direction: row; align-items: flex-end; justify-content: center;
+  gap: 14px;
+  pointer-events: none; z-index: 16;
+  opacity: 0; transform: translateY(8px);
+  transition: opacity 0.4s var(--ease-drift), transform 0.4s var(--ease-drift);
+}
+.type-area.visible {
+  opacity: 1; transform: translateY(0); pointer-events: auto;
+}
+
+.type-text {
+  font-family: var(--serif);
+  font-size: 17px; color: rgba(255,235,210,0.95);
+  letter-spacing: 0.08em; line-height: 1.7;
+  text-align: center;
+  min-height: 1.7em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  flex: 0 1 auto;
+  max-width: 70vw;
+}
+.type-text .caret {
+  display: inline-block; width: 1.5px; height: 1.1em;
+  background: rgba(255,235,210,0.85); vertical-align: text-bottom;
+  margin-left: 2px;
+  animation: caretBlink 0.9s steps(1) infinite;
+}
+@keyframes caretBlink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+.send-btn {
+  background: none; border: none; outline: none;
+  width: 28px; height: 26px;
+  padding: 0; cursor: pointer; pointer-events: auto;
+  opacity: 0.2;
+  transition: opacity 0.25s var(--ease-drift), filter 0.25s var(--ease-drift);
+  flex-shrink: 0;
+  align-self: flex-end;
+}
+.send-btn:disabled { opacity: 0.15; cursor: default; }
+.send-btn:not(:disabled) { opacity: 0.65; }
+.send-btn:not(:disabled):hover, .send-btn:not(:disabled):active {
+  opacity: 1; filter: drop-shadow(0 0 8px rgba(255,235,200,0.5));
+}
+.send-btn svg { width: 100%; height: 100%; }
+
+/* ---- bubble ---- */
+.bubble-zone {
+  position: absolute; inset: 0; z-index: 6; pointer-events: none; overflow: hidden;
+}
+.bubble {
+  position: absolute; left: 50%; bottom: 50vh;
+  transform: translateX(-50%);
+  max-width: 70vw; padding: 11px 18px; border-radius: 16px;
+  font-family: var(--serif); font-size: 17px; line-height: 1.5;
+  letter-spacing: 0.06em; text-align: center;
+  background: rgba(46, 34, 18, 0.86);
+  color: #f0d09a; border: 1px solid rgba(240, 208, 154, 0.25);
+  text-shadow: 0 0 8px rgba(0,0,0,0.7);
+  opacity: 0; transition: opacity 0.45s var(--ease-drift);
+  box-shadow: 0 6px 22px rgba(0,0,0,0.35);
+  --drift-from-opacity: 1;
+}
+.bubble.visible { opacity: 1; }
+.bubble.drifting { animation: bubbleDrift 1s var(--ease-drift) forwards; }
+@keyframes bubbleDrift {
+  0%   { opacity: 1; transform: translateX(-50%) translateY(0); filter: blur(0); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-14px); filter: blur(0.8px); }
+}
+
+.press-hint {
+  position: absolute; bottom: 6vh; left: 0; right: 0;
+  text-align: center; z-index: 9; pointer-events: none;
+  font-family: var(--serif); font-size: 12px;
+  color: rgba(255,225,200,0.45); letter-spacing: 0.3em;
+  opacity: 0; transition: opacity 0.6s var(--ease-drift);
+}
+.press-hint.visible { opacity: 1; }
+
+.hidden-input {
+  position: fixed; top: -100px; left: -100px;
+  width: 1px; height: 1px; opacity: 0;
+  font-size: 16px;
+}
+#hidden-input-host {
+  position: fixed; top: -200px; left: -200px; width: 0; height: 0; overflow: hidden;
+}
+</style>
+</head>
+<body>
+<div id="stage" class="stage state-idle">
+  <div class="hint-zone" id="hint-zone">
+    <p id="hint-text">远处传来一声水响</p>
+    <p id="hint-text2">他没有回头</p>
+  </div>
+
+  <div class="edge-veil" id="edge-veil"></div>
+
+  <div class="edge-zone" id="edge-zone">
+    <div class="edge-arc-host" id="edge-arc-host">
+      <svg class="edge-svg edge-svg-portrait" viewBox="0 0 1000 220" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="edge-fade-h" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%"   stop-color="white" stop-opacity="0"/>
+            <stop offset="20%"  stop-color="white" stop-opacity="1"/>
+            <stop offset="80%"  stop-color="white" stop-opacity="1"/>
+            <stop offset="100%" stop-color="white" stop-opacity="0"/>
+          </linearGradient>
+          <mask id="edge-mask-h">
+            <rect width="1000" height="220" fill="url(#edge-fade-h)"/>
+          </mask>
+        </defs>
+        <g mask="url(#edge-mask-h)">
+          <path class="edge-arc-main"
+                d="M 60 190 Q 500 30 940 190"
+                fill="none" stroke="rgba(255,235,210,0.7)" stroke-width="2.5"
+                stroke-linecap="round" vector-effect="non-scaling-stroke" />
+        </g>
+        <g mask="url(#edge-mask-h)">
+          <path class="edge-ripple ripple-1"
+                d="M 60 190 Q 500 30 940 190"
+                fill="none" stroke="rgba(255,235,210,0.85)" stroke-width="2.5"
+                stroke-linecap="round" vector-effect="non-scaling-stroke" />
+          <path class="edge-ripple ripple-2"
+                d="M 60 190 Q 500 30 940 190"
+                fill="none" stroke="rgba(255,235,210,0.85)" stroke-width="2.5"
+                stroke-linecap="round" vector-effect="non-scaling-stroke" />
+          <path class="edge-ripple ripple-3"
+                d="M 60 190 Q 500 30 940 190"
+                fill="none" stroke="rgba(255,235,210,0.85)" stroke-width="2.5"
+                stroke-linecap="round" vector-effect="non-scaling-stroke" />
+        </g>
+      </svg>
+    </div>
+  </div>
+
+  <div class="type-area" id="type-area">
+    <div class="type-text" id="type-text"><span class="caret"></span></div>
+    <button class="send-btn" id="send-btn" disabled>
+      <svg viewBox="0 0 30 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M5 4C5 2.89543 5.89543 2 7 2H23C24.1046 2 25 2.89543 25 4V17C25 18.1046 24.1046 19 23 19H10L5 23V4Z" stroke="rgba(255,235,210,0.9)" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round"/>
+        <circle cx="11" cy="10.5" r="1.2" fill="rgba(255,235,210,0.9)"/>
+        <circle cx="15" cy="10.5" r="1.2" fill="rgba(255,235,210,0.9)"/>
+        <circle cx="19" cy="10.5" r="1.2" fill="rgba(255,235,210,0.9)"/>
+      </svg>
+    </button>
+  </div>
+
+  <div id="hidden-input-host"></div>
+
+  <div class="bubble-zone" id="bubble-zone"></div>
+
+  <div class="press-hint" id="press-hint">长按说话 · 点击输入</div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const stage = $('#stage');
+const arcMain = $('.edge-arc-main');
+const ripples = document.querySelectorAll('.edge-ripple');
+const typeArea = $('#type-area');
+const typeText = $('#type-text');
+const sendBtn = $('#send-btn');
+const pressHint = $('#press-hint');
+const inputHost = $('#hidden-input-host');
+const bubbleZone = $('#bubble-zone');
+
+const ARC_CURVE = 'M 60 190 Q 500 30 940 190';
+const ARC_LINE  = 'M 100 160 Q 500 155 900 160';
+
+// --- keyboard offset: dynamically adjust type-area & arc-host position ---
+let keyboardOffset = 0;
+let lastKeyboardOffset = 0; // last *positive* offset, used to pre-apply on reopen
+let suppressShrinkUntil = 0; // during this window, ignore visualViewport offsets smaller than current
+const TYPE_AREA_BASE_BOTTOM_VH = 32;
+
+function adjustForKeyboard() {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  const vh = window.innerHeight;
+  const keyboardHeight = vh - vv.height;
+  const newOffset = Math.max(0, keyboardHeight);
+  // During reopen, the keyboard pops up gradually and visualViewport fires
+  // resize for each intermediate height. Without this guard, those small
+  // intermediate values would temporarily pull type-area back down toward
+  // the keyboard before climbing again.
+  if (Date.now() < suppressShrinkUntil && newOffset > 0 && newOffset < keyboardOffset) {
+    return;
+  }
+  const wasUp = keyboardOffset > 0;
+  keyboardOffset = newOffset;
+  if (keyboardOffset > 0) lastKeyboardOffset = keyboardOffset;
+  if (currentState === 'typing') {
+    typeArea.style.transform = `translateY(-${keyboardOffset}px)`;
+    const arcHost = $('#edge-arc-host');
+    if (arcHost) arcHost.style.transform = `translateY(-${keyboardOffset}px)`;
+  }
+  // Fallback: keyboard dismiss might not always fire blur on the input
+  // (platform-dependent). When keyboard goes from up to down while still
+  // in typing state, trigger the same flow blur would.
+  if (wasUp && newOffset === 0 && currentState === 'typing') {
+    onBlur();
+  }
+}
+
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', adjustForKeyboard);
+  window.visualViewport.addEventListener('scroll', adjustForKeyboard);
+}
+
+// --- hidden input: destroyed & recreated each open to flush IME buffer ---
+let currentInput = null;
+let inputAccepting = false;
+let isComposing = false;
+
+function createInput() {
+  if (currentInput) { currentInput.blur(); currentInput.remove(); }
+  const inp = document.createElement('input');
+  inp.type = 'text';
+  inp.className = 'hidden-input';
+  inp.autocomplete = 'off';
+  inp.autocapitalize = 'off';
+  inp.setAttribute('autocorrect', 'off');
+  inp.setAttribute('autocomplete', 'off');
+  inp.setAttribute('spellcheck', 'false');
+  inputHost.appendChild(inp);
+  inp.addEventListener('input', onInput);
+  inp.addEventListener('keydown', onKeyDown);
+  inp.addEventListener('blur', onBlur);
+  inp.addEventListener('compositionstart', () => { isComposing = true; });
+  inp.addEventListener('compositionend', onCompositionEnd);
+  currentInput = inp;
+  return inp;
+}
+
+function destroyInput() {
+  if (currentInput) {
+    currentInput.removeEventListener('input', onInput);
+    currentInput.removeEventListener('keydown', onKeyDown);
+    currentInput.removeEventListener('blur', onBlur);
+    // compositionstart was bound as an anonymous lambda; we don't keep a
+    // ref to remove. The element is about to be removed anyway, which
+    // detaches all its listeners.
+    currentInput.removeEventListener('compositionend', onCompositionEnd);
+    currentInput.blur();
+    currentInput.remove();
+    currentInput = null;
+  }
+  isComposing = false;
+  inputAccepting = false;
+}
+
+// --- state ---
+let animFrame = null;
+let currentState = 'idle';
+let longPressTimer = null;
+let isPressing = false;
+let typedText = '';
+let blurTimeout = null;
+
+function setState(s) {
+  currentState = s;
+  stage.className = 'stage state-' + s;
+}
+
+function animatePath(targetD, duration) {
+  if (animFrame) cancelAnimationFrame(animFrame);
+  const startD = arcMain.getAttribute('d');
+  const startVals = startD.match(/[\d.]+/g).map(Number);
+  const endVals = targetD.match(/[\d.]+/g).map(Number);
+  const startTime = performance.now();
+  function tick(now) {
+    const t = Math.min(1, (now - startTime) / duration);
+    const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    const vals = startVals.map((s, i) => s + (endVals[i] - s) * e);
+    const d = `M ${vals[0].toFixed(1)} ${vals[1].toFixed(1)} Q ${vals[2].toFixed(1)} ${vals[3].toFixed(1)} ${vals[4].toFixed(1)} ${vals[5].toFixed(1)}`;
+    arcMain.setAttribute('d', d);
+    ripples.forEach(r => r.setAttribute('d', d));
+    if (t < 1) animFrame = requestAnimationFrame(tick);
+  }
+  animFrame = requestAnimationFrame(tick);
+}
+
+function updateTypeText() {
+  if (typedText) {
+    typeText.innerHTML = typedText + '<span class="caret"></span>';
+    sendBtn.disabled = false;
+  } else {
+    typeText.innerHTML = '<span class="caret"></span>';
+    sendBtn.disabled = true;
+  }
+}
+
+function showBubble(text) {
+  const node = document.createElement('div');
+  node.className = 'bubble'; node.textContent = text;
+  bubbleZone.appendChild(node);
+  requestAnimationFrame(() => node.classList.add('visible'));
+  return node;
+}
+
+function driftBubble(node) {
+  node.classList.add('drifting'); node.classList.remove('visible');
+  setTimeout(() => node.remove(), 1100);
+}
+
+function startInvitation() {
+  animatePath(ARC_CURVE, 500);
+  setState('invitation');
+  // reset keyboard offset
+  typeArea.style.transform = '';
+  const arcHost = $('#edge-arc-host');
+  if (arcHost) arcHost.style.transform = '';
+  pressHint.classList.add('visible');
+  // Force the breathing animation to restart from 0%. Some browsers don't
+  // restart a CSS animation when the matching rule changes from
+  // `animation: none` (typing/settled) to a named animation (invitation).
+  const svg = document.querySelector('.edge-svg');
+  if (svg) {
+    svg.style.animation = 'none';
+    void svg.offsetWidth;
+    svg.style.animation = '';
+  }
+}
+
+function openTypeMode(opts = {}) {
+  const keepText = !!opts.keepText;
+  setState('typing');
+  animatePath(ARC_LINE, 500);
+  pressHint.classList.remove('visible');
+  if (!keepText) typedText = '';
+  updateTypeText();
+  typeArea.classList.add('visible');
+  // Pre-apply last known keyboard offset so type-area rises in sync with the
+  // popping keyboard, instead of sitting at base bottom and getting briefly
+  // covered while waiting for visualViewport resize to fire.
+  if (lastKeyboardOffset > 0) {
+    keyboardOffset = lastKeyboardOffset;
+    typeArea.style.transform = `translateY(-${lastKeyboardOffset}px)`;
+    const arcHost = $('#edge-arc-host');
+    if (arcHost) arcHost.style.transform = `translateY(-${lastKeyboardOffset}px)`;
+    // Ignore visualViewport's shrinking intermediate values during keyboard
+    // pop-up animation — they'd briefly drag type-area back down.
+    suppressShrinkUntil = Date.now() + 600;
+  }
+  // recreate input to clear any IME residue
+  inputAccepting = false;
+  isComposing = false;
+  createInput();
+  setTimeout(() => {
+    if (currentInput) {
+      currentInput.value = '';
+      currentInput.focus();
+    }
+    // grace period: ignore any stale input injected by mobile keyboard
+    setTimeout(() => {
+      if (currentInput) {
+        currentInput.value = '';
+        if (!keepText) {
+          typedText = '';
+          updateTypeText();
+        }
+        inputAccepting = true;
+      }
+      adjustForKeyboard();
+    }, 200);
+  }, 350);
+}
+
+function closeTypeMode() {
+  typeArea.classList.remove('visible');
+  typedText = '';
+  sendBtn.disabled = true;
+  destroyInput();
+  // reset keyboard offset
+  typeArea.style.transform = '';
+  const arcHost = $('#edge-arc-host');
+  if (arcHost) arcHost.style.transform = '';
+}
+
+function sendText() {
+  if (!typedText.trim()) return;
+  const text = typedText.trim();
+  closeTypeMode();
+  animatePath(ARC_CURVE, 500);
+  const bubble = showBubble(text);
+  setState('delivering');
+  setTimeout(() => { driftBubble(bubble); setState('thinking'); }, 1400);
+  setTimeout(() => setState('responding'), 2100);
+  setTimeout(() => setState('idle'), 2400);
+  setTimeout(() => startInvitation(), 4000);
+}
+
+function cancelType() {
+  closeTypeMode();
+  // Go straight back to invitation — the old idle+1.5s detour left the arc
+  // invisible during that window, looking like "didn't recover".
+  startInvitation();
+}
+
+function settleType() {
+  // Keyboard collapsed but typedText non-empty: stay visible, drop arc-host
+  // back to rest position, release the input so the next reopen starts clean.
+  setState('settled');
+  typeArea.style.transform = '';
+  const arcHost = $('#edge-arc-host');
+  if (arcHost) arcHost.style.transform = '';
+  destroyInput();
+  pressHint.classList.add('visible');
+}
+
+function onInput(e) {
+  if (!inputAccepting || isComposing) return;
+  // Non-composition path (typed letter / paste): drain into typedText and
+  // empty the input so the next chunk gets a clean slate. typedText is the
+  // source of truth — input is just a per-segment staging buffer.
+  if (currentInput.value) {
+    typedText += currentInput.value;
+    currentInput.value = '';
+    updateTypeText();
+  }
+}
+
+function onKeyDown(e) {
+  if (e.key === 'Enter' && !isComposing) { e.preventDefault(); if (typedText.trim()) sendText(); return; }
+  if (e.key === 'Escape') { e.preventDefault(); cancelType(); return; }
+  // Input is emptied right after each commit, so Backspace must pop from
+  // typedText (the real buffer) instead of trying to delete from the empty input.
+  if (e.key === 'Backspace' && !isComposing && currentInput.value === '' && typedText.length > 0) {
+    e.preventDefault();
+    typedText = typedText.slice(0, -1);
+    updateTypeText();
+  }
+}
+
+function onCompositionEnd(e) {
+  isComposing = false;
+  if (!inputAccepting) return;
+  // Drain committed composition into typedText, empty input for next round —
+  // sidesteps Chrome IME's selection-reset-to-0,0 quirk that prepends new
+  // compositions to existing text.
+  if (currentInput.value) {
+    typedText += currentInput.value;
+    currentInput.value = '';
+  }
+  updateTypeText();
+}
+
+function onBlur() {
+  if (currentState !== 'typing') return;
+  // Don't reset an already-scheduled timer — repeated blur (e.g. from
+  // keyboard transition focus jitter) would otherwise keep pushing it back
+  // and it'd never fire.
+  if (blurTimeout) return;
+  blurTimeout = setTimeout(() => {
+    blurTimeout = null;
+    if (currentState !== 'typing') return;
+    if (!typedText.trim()) {
+      cancelType();
+    } else {
+      settleType();
+    }
+  }, 300);
+}
+
+function startRecording() {
+  if (currentState === 'settled') {
+    // Voice overrides typed: clear text, hide type-area, line→arc.
+    typedText = '';
+    typeArea.classList.remove('visible');
+    sendBtn.disabled = true;
+    animatePath(ARC_CURVE, 500);
+  }
+  setState('recording'); pressHint.classList.remove('visible');
+}
+
+function releaseRecording() {
+  setState('delivering');
+  const bubble = showBubble('我……');
+  setTimeout(() => { animatePath(ARC_CURVE, 500); driftBubble(bubble); setState('thinking'); }, 1400);
+  setTimeout(() => setState('responding'), 2100);
+  setTimeout(() => setState('idle'), 2400);
+  setTimeout(() => startInvitation(), 4000);
+}
+
+// ---- touch / pointer ----
+const edgeZone = $('#edge-zone');
+edgeZone.addEventListener('pointerdown', (e) => {
+  if (currentState === 'typing') {
+    // Don't let the tap blur the input — keeps keyboard up and prevents
+    // the line from settling down.
+    e.preventDefault();
+    return;
+  }
+  if (currentState !== 'invitation' && currentState !== 'settled') return;
+  e.preventDefault(); isPressing = true;
+  longPressTimer = setTimeout(() => { longPressTimer = null; startRecording(); }, 250);
+});
+// Belt-and-suspenders for desktop: mousedown on a non-focusable div is what
+// actually transfers focus away from the input. Block it explicitly.
+edgeZone.addEventListener('mousedown', (e) => {
+  if (currentState === 'typing') e.preventDefault();
+});
+
+// Same treatment for the type-area: tapping the typed text shouldn't blur
+// the input (which would settle the line + hide the area). Send button is
+// excluded so its click still fires.
+function shouldKeepInputFocus(e) {
+  if (currentState !== 'typing') return false;
+  if (e.target && e.target.closest && e.target.closest('#send-btn')) return false;
+  return true;
+}
+typeArea.addEventListener('mousedown', (e) => {
+  if (shouldKeepInputFocus(e)) e.preventDefault();
+});
+typeArea.addEventListener('pointerdown', (e) => {
+  if (shouldKeepInputFocus(e)) e.preventDefault();
+});
+window.addEventListener('pointerup', () => {
+  if (!isPressing) return; isPressing = false;
+  if (currentState === 'recording') { releaseRecording(); }
+  else if (currentState === 'invitation' && longPressTimer) {
+    clearTimeout(longPressTimer); longPressTimer = null; openTypeMode();
+  }
+  else if (currentState === 'settled' && longPressTimer) {
+    clearTimeout(longPressTimer); longPressTimer = null; openTypeMode({ keepText: true });
+  }
+  if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+});
+window.addEventListener('pointercancel', () => {
+  if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+  isPressing = false; if (currentState === 'recording') releaseRecording();
+});
+
+// ---- keyboard shortcuts (desktop) ----
+let spaceHeld = false;
+window.addEventListener('keydown', (e) => {
+  if (e.repeat) return;
+  if (currentState === 'typing') return;
+  if (e.code === 'Space') {
+    if (currentState === 'invitation' || currentState === 'settled') {
+      e.preventDefault(); spaceHeld = true; startRecording();
+    }
+  }
+  if (e.code === 'KeyT') {
+    if (currentState === 'invitation') openTypeMode();
+    else if (currentState === 'settled') openTypeMode({ keepText: true });
+  }
+});
+window.addEventListener('keyup', (e) => {
+  if (e.code === 'Space' && spaceHeld) { spaceHeld = false; if (currentState === 'recording') releaseRecording(); }
+});
+
+typeArea.addEventListener('click', () => {
+  if (currentState === 'typing' && currentInput) {
+    currentInput.focus();
+  }
+});
+sendBtn.addEventListener('click', (e) => { e.stopPropagation(); if (typedText.trim()) sendText(); });
+
+// ---- start ----
+setTimeout(() => {
+  startInvitation();
+  document.querySelectorAll('.hint-zone p').forEach((p, i) => {
+    setTimeout(() => p.classList.add('visible'), 800 + i * 1200);
+  });
+}, 600);
+</script>
+</body>
+</html>

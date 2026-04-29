@@ -1,4 +1,4 @@
-import { $, wait } from '../../js/util.js';
+import { $, wait } from './util.js';
 import { addJournalEntry } from './journal.js';
 
 // User's spoken text — appears at touch height on the right side

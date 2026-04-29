@@ -3,9 +3,8 @@
   --bg-current: #0c0814;
   --serif: 'Source Han Serif SC', 'Songti SC', 'STSong', 'SimSun', serif;
   --sans: 'Source Han Sans SC', 'PingFang SC', 'HarmonyOS Sans SC', sans-serif;
-  --subtitle: rgba(255, 255, 255, 0.85);
-  --narration: rgba(255, 255, 255, 0.40);
-  --reward: rgba(255, 200, 150, 0.85);
+  --subtitle: rgba(255, 255, 255, 0.88);
+  --narration: rgba(255, 255, 255, 0.45);
   --paper: rgba(238, 228, 210, 0.96);
   --paper-text: #2a2218;
   --paper-mark-you: #6e5b3a;
@@ -16,8 +15,6 @@
 }
 
 * { box-sizing: border-box; }
-
-/* Make sure the `hidden` HTML attribute always wins over our display rules. */
 [hidden] { display: none !important; }
 
 html, body {
@@ -38,33 +35,32 @@ html, body {
   overscroll-behavior: none;
 }
 
-/* All interactive elements: kill iOS native long-press menu / scrolling intercepts */
-.ring-zone, .opening-glow, .run-anchor, .anchor, .journal, .journal * {
+.edge-zone, .opening-glow, .run-anchor, .anchor, .journal, .journal * {
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
 }
-.ring-zone, .opening-glow, .run-anchor, .anchor {
+.edge-zone, .opening-glow, .run-anchor, .anchor {
   touch-action: none;
 }
 
 #orientation-gate {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
+  position: fixed; inset: 0; z-index: 9999;
   background: #0c0814;
-  color: rgba(255,255,255,0.55);
-  display: none;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--sans);
-  font-size: 14px;
-  letter-spacing: 0.1em;
+  color: rgba(255,235,210,0.65);
+  display: flex;
+  align-items: center; justify-content: center;
+  text-align: center;
+  padding: 0 12vw;
+  line-height: 1.8;
+  font-family: var(--serif); font-size: 16px; letter-spacing: 0.16em;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.55s var(--ease-drift);
 }
-
-@media (orientation: portrait) and (max-width: 900px) {
-  #orientation-gate { display: flex; }
-  #stage { display: none; }
+#orientation-gate.visible {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 /* ----------------------------- stage ----------------------------- */
@@ -72,106 +68,294 @@ html, body {
 .stage {
   position: relative;
   width: 100vw;
-  height: 100vh;
+  height: 100vh; /* fallback */
+  height: 100dvh;
   overflow: hidden;
   background: var(--bg);
 }
 
 .stage-bg {
-  position: absolute;
-  inset: 0;
+  position: absolute; inset: 0;
   background: var(--bg-current);
   transition: background 1.6s var(--ease-drift);
 }
 .stage-bg::after {
-  /* soft vignette to reinforce darkness */
   content: '';
-  position: absolute;
-  inset: 0;
+  position: absolute; inset: 0;
   background: radial-gradient(ellipse at 50% 60%, rgba(0,0,0,0) 35%, rgba(0,0,0,0.45) 100%);
   pointer-events: none;
 }
 
-/* ----------------------------- character ----------------------------- */
+/* ----------------------------- scene-bg (masked image fragments) ----------------------------- */
+
+@property --r {
+  syntax: '<number>';
+  initial-value: 0.1;
+  inherits: false;
+}
+@property --feather {
+  syntax: '<number>';
+  initial-value: 0.15;
+  inherits: false;
+}
+@property --x {
+  syntax: '<number>';
+  initial-value: 0.5;
+  inherits: false;
+}
+@property --y {
+  syntax: '<number>';
+  initial-value: 0.5;
+  inherits: false;
+}
+@property --spot-opacity {
+  syntax: '<number>';
+  initial-value: 1;
+  inherits: false;
+}
+
+.scene-bg {
+  position: absolute; inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.scene-spot {
+  position: absolute; inset: 0;
+  background-image: var(--scene-img, none);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 0;
+  transform: scale(1);
+  transition:
+    opacity 1100ms var(--ease-drift),
+    -webkit-mask-image 700ms var(--ease-drift),
+    mask-image 700ms var(--ease-drift),
+    transform 700ms var(--ease-drift),
+    --r 700ms var(--ease-drift),
+    --feather 700ms var(--ease-drift),
+    --x 700ms var(--ease-drift),
+    --y 700ms var(--ease-drift),
+    --spot-opacity 1100ms var(--ease-drift);
+  will-change: opacity, mask-image, transform;
+}
+.scene-spot.entering { opacity: 0; transform: scale(0.92); }
+.scene-spot.shown    { opacity: var(--spot-opacity, 1); transform: scale(1); animation: sceneBreath 7.5s ease-in-out infinite; }
+.scene-spot.leaving  { opacity: 0; transform: scale(0.96); transition: opacity 800ms var(--ease-drift), transform 800ms var(--ease-drift); animation: none; }
+
+@keyframes sceneBreath {
+  0%, 100% { filter: brightness(1) saturate(1); }
+  50%      { filter: brightness(1.04) saturate(1.05); }
+}
+
+/* spot kind: band (linear gradient mask) */
+/* params via custom props: --amount (0..1), --feather (0..1), --side (top|bottom|left|right) */
+.scene-spot.kind-band-bottom {
+  -webkit-mask-image: linear-gradient(to top,
+    #000 0%,
+    #000 calc(var(--amount, 0.3) * 100%),
+    transparent calc((var(--amount, 0.3) + var(--feather, 0.35)) * 100%));
+  mask-image: linear-gradient(to top,
+    #000 0%,
+    #000 calc(var(--amount, 0.3) * 100%),
+    transparent calc((var(--amount, 0.3) + var(--feather, 0.35)) * 100%));
+}
+.scene-spot.kind-band-top {
+  -webkit-mask-image: linear-gradient(to bottom,
+    #000 0%,
+    #000 calc(var(--amount, 0.3) * 100%),
+    transparent calc((var(--amount, 0.3) + var(--feather, 0.35)) * 100%));
+  mask-image: linear-gradient(to bottom,
+    #000 0%,
+    #000 calc(var(--amount, 0.3) * 100%),
+    transparent calc((var(--amount, 0.3) + var(--feather, 0.35)) * 100%));
+}
+.scene-spot.kind-band-left {
+  -webkit-mask-image: linear-gradient(to right,
+    #000 0%,
+    #000 calc(var(--amount, 0.3) * 100%),
+    transparent calc((var(--amount, 0.3) + var(--feather, 0.35)) * 100%));
+  mask-image: linear-gradient(to right,
+    #000 0%,
+    #000 calc(var(--amount, 0.3) * 100%),
+    transparent calc((var(--amount, 0.3) + var(--feather, 0.35)) * 100%));
+}
+.scene-spot.kind-band-right {
+  -webkit-mask-image: linear-gradient(to left,
+    #000 0%,
+    #000 calc(var(--amount, 0.3) * 100%),
+    transparent calc((var(--amount, 0.3) + var(--feather, 0.35)) * 100%));
+  mask-image: linear-gradient(to left,
+    #000 0%,
+    #000 calc(var(--amount, 0.3) * 100%),
+    transparent calc((var(--amount, 0.3) + var(--feather, 0.35)) * 100%));
+}
+
+/* spot kind: spot (radial gradient mask, sized in vmin so r/feather are
+   fractions of the smaller viewport dimension, not the gradient's
+   farthest-corner extent which would balloon spots into half-screen reveals) */
+/* params: --x (0..1), --y (0..1), --r (0..1, core radius in vmin), --feather (0..1, fade extent in vmin) */
+.scene-spot.kind-spot {
+  -webkit-mask-image: radial-gradient(circle at calc(var(--x, 0.5) * 100%) calc(var(--y, 0.5) * 100%),
+    #000 0,
+    #000 calc(var(--r, 0.1) * 100vmin),
+    transparent calc((var(--r, 0.1) + var(--feather, 0.15)) * 100vmin));
+  mask-image: radial-gradient(circle at calc(var(--x, 0.5) * 100%) calc(var(--y, 0.5) * 100%),
+    #000 0,
+    #000 calc(var(--r, 0.1) * 100vmin),
+    transparent calc((var(--r, 0.1) + var(--feather, 0.15)) * 100vmin));
+}
+
+/* spot kind: wedge (diagonal sliver from a corner) */
+/* params: --angle (deg), --amount (0..1), --feather (0..1) */
+.scene-spot.kind-wedge {
+  -webkit-mask-image: linear-gradient(var(--angle, 135deg),
+    #000 0%,
+    #000 calc(var(--amount, 0.35) * 100%),
+    transparent calc((var(--amount, 0.35) + var(--feather, 0.3)) * 100%));
+  mask-image: linear-gradient(var(--angle, 135deg),
+    #000 0%,
+    #000 calc(var(--amount, 0.35) * 100%),
+    transparent calc((var(--amount, 0.35) + var(--feather, 0.3)) * 100%));
+}
+
+/* spot kind: stripe-h (horizontal thin line of reveal at given --y) */
+/* params: --y (0..1, center), --thickness (0..1, half-width), --feather (0..1) */
+.scene-spot.kind-stripe-h {
+  -webkit-mask-image: linear-gradient(to bottom,
+    transparent calc((var(--y, 0.5) - var(--thickness, 0.04) - var(--feather, 0.05)) * 100%),
+    #000 calc(var(--y, 0.5) * 100%),
+    transparent calc((var(--y, 0.5) + var(--thickness, 0.04) + var(--feather, 0.05)) * 100%));
+  mask-image: linear-gradient(to bottom,
+    transparent calc((var(--y, 0.5) - var(--thickness, 0.04) - var(--feather, 0.05)) * 100%),
+    #000 calc(var(--y, 0.5) * 100%),
+    transparent calc((var(--y, 0.5) + var(--thickness, 0.04) + var(--feather, 0.05)) * 100%));
+}
+
+/* spot kind: stripe-v (vertical thin line of reveal at given --x) */
+.scene-spot.kind-stripe-v {
+  -webkit-mask-image: linear-gradient(to right,
+    transparent calc((var(--x, 0.5) - var(--thickness, 0.04) - var(--feather, 0.05)) * 100%),
+    #000 calc(var(--x, 0.5) * 100%),
+    transparent calc((var(--x, 0.5) + var(--thickness, 0.04) + var(--feather, 0.05)) * 100%));
+  mask-image: linear-gradient(to right,
+    transparent calc((var(--x, 0.5) - var(--thickness, 0.04) - var(--feather, 0.05)) * 100%),
+    #000 calc(var(--x, 0.5) * 100%),
+    transparent calc((var(--x, 0.5) + var(--thickness, 0.04) + var(--feather, 0.05)) * 100%));
+}
+
+/* spot kind: full (whole image with edge feather to black) */
+/* params: --feather (0..1) — width of edge fade */
+.scene-spot.kind-full {
+  -webkit-mask-image: radial-gradient(ellipse at 50% 50%,
+    #000 0%,
+    #000 calc((1 - var(--feather, 0.25)) * 100%),
+    transparent 100%);
+  mask-image: radial-gradient(ellipse at 50% 50%,
+    #000 0%,
+    #000 calc((1 - var(--feather, 0.25)) * 100%),
+    transparent 100%);
+}
+
+/* ----------------------------- character (free positioning) ----------------------------- */
 
 .character-layer {
   position: absolute;
-  left: 0;
-  top: 0;
-  width: 100%;
-  height: 100%;
+  inset: 0;
   pointer-events: none;
-  display: flex;
-  align-items: flex-end;
 }
 .character {
   position: absolute;
-  left: 18%;
-  bottom: 0;
-  width: 30vh;
-  max-width: 320px;
-  height: 92vh;
+  /* 竖屏:立绘按 100vh 见方等比缩放,水平居中。
+     transform-origin 在 50% 20%(约肩部),使景别缩放以肩/胸为锚点。
+     far→mid→close 通过 top+scale 配合实现景别推移。 */
+  left: var(--char-x, calc(50vw - 50vh));
+  top: var(--char-y, 5vh);
+  width: var(--char-w, 100vh);
+  height: var(--char-h, 100vh);
   opacity: 0;
-  transform: translateX(40px);
-  transition: opacity 1.4s var(--ease-drift), transform 1.4s var(--ease-drift);
-  filter: drop-shadow(0 0 24px rgba(255, 220, 200, 0.10));
+  transform: translateX(40px) scale(var(--char-scale, 1));
+  transform-origin: 50% 20%;
+  transition:
+    opacity 1.4s var(--ease-drift),
+    transform 1.4s var(--ease-drift),
+    left 1.6s var(--ease-drift),
+    top 1.6s var(--ease-drift),
+    width 1.6s var(--ease-drift),
+    height 1.6s var(--ease-drift),
+    filter 1.4s var(--ease-drift);
+  filter: drop-shadow(0 0 32px rgba(120,100,180,0.18)) brightness(var(--char-brightness, 1));
   overflow: visible;
 }
 .character.visible {
-  opacity: 1;
-  transform: translateX(0);
+  opacity: var(--char-opacity, 1);
+  transform: translateX(0) scale(var(--char-scale, 1));
 }
-#char-fig {
-  transform-origin: 100px 470px;
+.char-fig {
+  width: 100%;
+  height: 100%;
+  transform-origin: 50% 100%;
+  transition: transform 0.7s var(--ease-drift);
+}
+.char-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center bottom;
+  display: block;
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
   animation: charBreath 4.6s ease-in-out infinite;
+  transform-origin: 50% 100%;
 }
 @keyframes charBreath {
   0%,100% { transform: scale(1.0) translateY(0); }
-  50%     { transform: scale(1.012) translateY(-2px); }
+  50%     { transform: scale(1.008) translateY(-2px); }
 }
 
-/* pose modifiers — tweaked via class on .character-layer */
-.pose-tilt #char-fig { transform: rotate(-6deg); transform-origin: 100px 80px; animation: charBreath 5s ease-in-out infinite; }
-.pose-step-back .character { transform: translateX(40px); opacity: 0.85; }
-.pose-lean-in .character { transform: translateX(-40px) scale(1.08); }
-.pose-crouch #char-fig { transform: translateY(60px) scaleY(0.78); }
-.pose-crouch-eye #char-fig { transform: translateY(70px) scaleY(0.74); }
-.pose-turn-back #char-fig { transform: scaleX(-1); transform-origin: 100px 240px; }
-.pose-attack #char-fig { transform: translateX(-12px) rotate(-3deg) scale(1.06); }
-.pose-eat #char-fig { transform: translateY(80px) scaleY(0.7) translateX(-10px); }
+.pose-tilt .char-fig { transform: rotate(-3deg); transform-origin: 50% 18%; }
+.pose-step-back .character { transform: translateX(40px) scale(calc(var(--char-scale, 1) * 0.95)); }
+.pose-lean-in .character { transform: translateX(-40px) scale(calc(var(--char-scale, 1) * 1.08)); }
+.pose-crouch .char-fig { transform: translateY(40px) scaleY(0.86); }
+.pose-crouch-eye .char-fig { transform: translateY(50px) scaleY(0.82); }
+.pose-turn-back .char-fig { transform: scaleX(-1); }
+.pose-attack .char-fig { transform: translateX(-8px) rotate(-2deg) scale(1.04); }
+.pose-eat .char-fig { transform: translateY(50px) scaleY(0.78) translateX(-6px); }
 
-.char-flash {
-  animation: charFlash 0.5s ease-out;
-}
+.char-flash { animation: charFlash 0.5s ease-out; }
 @keyframes charFlash {
-  0%   { filter: drop-shadow(0 0 24px rgba(255,220,200,0.10)) brightness(1); }
-  40%  { filter: drop-shadow(0 0 64px rgba(255,240,210,0.55)) brightness(1.4); }
-  100% { filter: drop-shadow(0 0 24px rgba(255,220,200,0.10)) brightness(1); }
+  0%   { filter: drop-shadow(0 0 32px rgba(120,100,180,0.18)) brightness(var(--char-brightness, 1)); }
+  40%  { filter: drop-shadow(0 0 64px rgba(255,240,210,0.55)) brightness(1.3); }
+  100% { filter: drop-shadow(0 0 32px rgba(120,100,180,0.18)) brightness(var(--char-brightness, 1)); }
+}
+
+.character.petable {
+  pointer-events: auto;
+  cursor: pointer;
+  animation: petHint 2.4s ease-in-out infinite;
+}
+@keyframes petHint {
+  0%,100% { filter: drop-shadow(0 0 32px rgba(120,100,180,0.18)) brightness(var(--char-brightness, 1)); }
+  50%     { filter: drop-shadow(0 0 48px rgba(255,200,160,0.35)) brightness(calc(var(--char-brightness, 1) * 1.08)); }
 }
 
 /* ----------------------------- art layer ----------------------------- */
 
-.art-layer {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 2;
-}
+.art-layer { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
 .art-element {
   position: absolute;
   opacity: 0;
   animation: artFadeIn 1.6s var(--ease-drift) forwards, artFloat 7s ease-in-out infinite;
 }
-.art-element.removing {
-  animation: artFadeOut 1.4s var(--ease-drift) forwards;
-}
+.art-element.removing { animation: artFadeOut 1.4s var(--ease-drift) forwards; }
 @keyframes artFadeIn {
   from { opacity: 0; transform: translateY(8px) scale(0.92); }
   to   { opacity: var(--art-opacity, 0.7); transform: translateY(0) scale(1); }
 }
-@keyframes artFadeOut {
-  to { opacity: 0; transform: translateY(-6px); }
-}
+@keyframes artFadeOut { to { opacity: 0; transform: translateY(-6px); } }
 @keyframes artFloat {
   0%,100% { translate: 0 0; }
   50%     { translate: 0 -10px; }
@@ -184,23 +368,20 @@ html, body {
 .art-element.flower svg { width: 16px; height: 16px; }
 .art-element.branch svg { width: 70px; height: 70px; }
 
-/* ----------------------------- anchor + microtrace ----------------------------- */
+/* ----------------------------- past anchor (top-left) ----------------------------- */
 
 .anchor {
   position: absolute;
-  top: 22px;
-  left: 26px;
-  width: 22px;
-  height: 22px;
-  z-index: 8;
+  top: 22px; left: 26px;
+  width: 22px; height: 22px;
+  z-index: 11;
   cursor: pointer;
   pointer-events: auto;
 }
 .anchor::before {
   content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at 50% 50%, rgba(255,225,200,0.85) 0%, rgba(255,225,200,0.0) 70%);
+  position: absolute; inset: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(255,225,200,0.75) 0%, rgba(255,225,200,0.0) 70%);
   border-radius: 50%;
   animation: anchorBreath 5s ease-in-out infinite;
 }
@@ -209,12 +390,12 @@ html, body {
   position: absolute;
   left: 7px; top: 7px;
   width: 8px; height: 8px;
-  background: rgba(255,225,200,0.7);
+  background: rgba(255,225,200,0.6);
   border-radius: 50%;
   filter: blur(0.4px);
 }
 @keyframes anchorBreath {
-  0%,100% { opacity: 0.45; transform: scale(0.95); }
+  0%,100% { opacity: 0.4;  transform: scale(0.95); }
   50%     { opacity: 0.85; transform: scale(1.1); }
 }
 .anchor.attention::before {
@@ -222,338 +403,560 @@ html, body {
 }
 @keyframes anchorAttn {
   0%,100% { opacity: 0.45; transform: scale(0.95); }
-  50%     { opacity: 1; transform: scale(1.6); }
+  50%     { opacity: 1;    transform: scale(1.6); }
 }
 
-.microtrace {
+/* ----------------------------- 软幕 · 边缘弧 -----------------------------
+   .edge-zone: 触控热区 (下 1/3 屏)
+   .edge-arc-host: 可见弧的容器 (底部, 长按时缩放展开)
+   ---------------------------------------------------------------- */
+
+.edge-zone {
   position: absolute;
-  top: 28px;
-  right: 32px;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--reward);
-  box-shadow: 0 0 24px rgba(255,200,150,0.7);
-  animation: microPulse 3.5s ease-in-out infinite;
-  z-index: 8;
-}
-@keyframes microPulse {
-  0%,100% { opacity: 0.6; transform: scale(0.9); }
-  50%     { opacity: 1;   transform: scale(1.15); }
-}
-
-/* ----------------------------- ring ----------------------------- */
-
-/* Ring lives at the bottom-right corner. With width=320 + right:-160, the SVG
-   user-coord origin (0,0) sits at the viewport corner — so the quarter-arc's
-   endpoints fall exactly on the right and bottom screen edges. */
-.ring-zone {
-  position: absolute;
-  right: -160px;
-  bottom: -160px;
-  width: 320px;
-  height: 320px;
-  z-index: 9;
+  inset: auto 0 0 0;
+  width: 100vw;
+  height: 33vh;
+  min-height: 200px;
+  z-index: 10;
   cursor: pointer;
   touch-action: none;
 }
-.ring {
+.edge-arc-host {
+  position: absolute;
+  pointer-events: none;
+  left: 0; right: 0; bottom: 12vh;
+  height: 14vh;
+  min-height: 80px;
+  transform-origin: center bottom;
+  transform: scale(1);
+  transition: transform 0.45s var(--ease-drift);
+}
+.edge-zone.state-recording .edge-arc-host {
+  transform: scale(1.7);
+  transition: transform 0.32s var(--ease-drift);
+}
+.edge-svg {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  overflow: visible; /* let ripples scale past the SVG bounds */
+  pointer-events: none;
+  overflow: visible;
+  transform-origin: center bottom;
 }
-.ring-half {
-  animation: ringBreath 4s ease-in-out infinite;
-  transition: stroke 0.4s var(--ease-drift), stroke-width 0.4s var(--ease-drift);
-  transform-origin: center;
-  transform-box: view-box;
+.edge-arc-main {
+  opacity: 0;
+  transition: opacity 0.8s var(--ease-drift);
 }
-@keyframes ringBreath {
-  0%,100% { opacity: 0.22; }
-  50%     { opacity: 1; }
+.edge-ripple {
+  opacity: 0;
 }
 
-/* Ripples — concentric outward expansion of the same arc geometry, scaled
-   from the SVG center (which is the viewport corner). */
-.ring-ripple {
+/* 底部输入区暗罩 — 与立绘/场景做区隔
+   linear-gradient 从底向上由暗到透;状态驱动 opacity */
+.edge-veil {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 100vh;
+  pointer-events: none;
+  background: linear-gradient(to top,
+    rgba(0, 0, 0, 0.95) 0%,
+    rgba(0, 0, 0, 0) 70%);
   opacity: 0;
-  transform-origin: center;
+  transition: opacity 1s var(--ease-drift);
+}
+.edge-zone.state-invitation .edge-veil { opacity: 0.75; }
+.edge-zone.state-input      .edge-veil { opacity: 0.75; }
+.edge-zone.state-recording  .edge-veil { opacity: 1; }
+.edge-zone.state-delivering .edge-veil { opacity: 0.75; }
+
+/* state-idle — invisible, peripheral */
+.edge-zone.state-idle .edge-arc-main { opacity: 0; }
+
+/* state-invitation — 整体缩放呼吸 + 同步明暗发光 */
+.edge-zone.state-invitation .edge-arc-main {
+  opacity: 1;
+  stroke: rgba(255,240,215,0.95);
+  stroke-width: 2.8;
+}
+.edge-zone.state-invitation .edge-svg {
+  animation: edgeBreath 4.2s ease-in-out infinite;
+}
+@keyframes edgeBreath {
+  0%, 100% {
+    transform: scale(0.88);
+    opacity: 0.45;
+    filter: drop-shadow(0 0 6px rgba(255,225,200,0.15));
+  }
+  50% {
+    transform: scale(1.22);
+    opacity: 1;
+    filter: drop-shadow(0 0 32px rgba(255,235,210,0.9));
+  }
+}
+
+/* state-recording — 弧整体放大,因 origin 在右侧,视觉上向画内"扩张"出来 */
+.edge-zone.state-recording .edge-arc-main {
+  opacity: 1;
+  stroke: rgba(255,250,225,1);
+  stroke-width: 3.2;
+  filter: drop-shadow(0 0 36px rgba(255,235,200,1));
+}
+.edge-zone.state-recording .edge-ripple {
+  animation: edgeRipple 1.8s ease-out infinite;
+}
+.edge-zone.state-recording .ripple-1 { animation-delay: 0s; }
+.edge-zone.state-recording .ripple-2 { animation-delay: 0.6s; }
+.edge-zone.state-recording .ripple-3 { animation-delay: 1.2s; }
+@keyframes edgeRipple {
+  0%   { opacity: 0.7; transform: translateY(0); }
+  80%  { opacity: 0.05; }
+  100% { opacity: 0; transform: translateY(-22vh); }
+}
+
+/* state-delivering — fade out fast, host snaps back */
+.edge-zone.state-delivering .edge-arc-main {
+  opacity: 0;
+  transition: opacity 0.6s ease-out;
+}
+
+/* state-thinking, state-responding — gone, stage belongs to her */
+.edge-zone.state-thinking .edge-arc-main,
+.edge-zone.state-responding .edge-arc-main {
+  opacity: 0;
+}
+
+/* state-input (short tap) — same as invitation, will fade after */
+.edge-zone.state-input .edge-arc-main {
+  opacity: 0.6;
+  stroke: rgba(255,225,200,0.7);
+}
+
+/* ---- 行动模式:弧线+遮罩→红色系 ---- */
+.edge-zone.mode-action .edge-veil {
+  background: linear-gradient(to top,
+    rgba(80, 10, 10, 0.92) 0%,
+    rgba(80, 10, 10, 0) 70%);
+}
+.edge-zone.mode-action .edge-arc-main {
+  stroke: rgba(255,120,110,0.95);
+}
+.edge-zone.mode-action .edge-ripple {
+  stroke: rgba(255,130,120,0.85);
+}
+.edge-zone.mode-action.state-invitation .edge-arc-main {
+  stroke: rgba(255,120,110,0.95);
+}
+.edge-zone.mode-action.state-invitation .edge-svg {
+  animation-name: edgeBreathAction;
+}
+@keyframes edgeBreathAction {
+  0%, 100% {
+    transform: scale(0.88);
+    opacity: 0.45;
+    filter: drop-shadow(0 0 6px rgba(255,80,70,0.2));
+  }
+  50% {
+    transform: scale(1.22);
+    opacity: 1;
+    filter: drop-shadow(0 0 32px rgba(255,90,80,0.9));
+  }
+}
+.edge-zone.mode-action.state-recording .edge-arc-main {
+  stroke: rgba(255,140,130,1);
+  stroke-width: 3.2;
+  filter: drop-shadow(0 0 36px rgba(255,80,70,1));
+}
+
+/* ============================================================
+   两套文字语言
+
+   说话(他 ↔ 你):.subtitle / .ink-text
+     17px / 衬线 / 暖白 / 打字机 / 离场轻轻向上散
+     差别只在锚点和展开方向
+
+   世界声音(旁白 / 内心 / NPC / 重旁白):.narration / .inner / .npc-text / .heavy
+     14px / 衬线斜体 / 白 50% / 字距统一
+     差别只在位置和入场方向
+   ============================================================ */
+
+.subtitle, .ink-text {
+  font-family: var(--serif);
+  font-size: 17px;
+  color: rgba(255, 235, 210, 0.95);
+  letter-spacing: 0.08em;
+  line-height: 1.7;
+  text-shadow: 0 0 14px rgba(255, 225, 200, 0.18);
+}
+
+.narration, .inner, .npc-text, .heavy {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.5);
+  letter-spacing: 0.14em;
+  line-height: 1.9;
+  text-shadow: 0 0 12px rgba(0, 0, 0, 0.5);
+}
+
+/* ----------------------------- 文字暗罩(横向 banner) -----------------------------
+   每段文字身后是一条跨屏幕的横向暗带,垂直方向"透明 → 暗 → 透明"渐变,
+   软淡入淡出避免硬边。文字本身保持 inline-block,暗带通过 ::before 把
+   pseudo-element 横向撑出 viewport (left:-50vw / right:-50vw) 来实现全宽覆盖。
+   ::before z-index:-1 让暗带在文字本体之下、zone 容器之内。
+   :not(:empty) 守住"文字真正存在时才上暗带", 避免空 div 阶段闪一条带。
+   ---------------------------------------------------------------- */
+
+.subtitle, .ink-text, .narration, .inner, .npc-text {
+  display: inline-block;
+  max-width: 100%;
+  position: relative;
+  z-index: 0;
+}
+
+.subtitle:not(:empty)::before,
+.ink-text:not(:empty)::before {
+  content: '';
+  position: absolute;
+  left: -50vw; right: -50vw;
+  top: -8px; bottom: -8px;
+  background: linear-gradient(to bottom,
+    rgba(0, 0, 0, 0)    0%,
+    rgba(0, 0, 0, 0.78) 22%,
+    rgba(0, 0, 0, 0.78) 78%,
+    rgba(0, 0, 0, 0)    100%);
+  z-index: -1;
   pointer-events: none;
 }
-.ring-zone.state-recording .ring-half {
-  animation: ringRecordBreath 1.6s ease-in-out infinite;
-  stroke: rgba(255,240,215,0.95);
-}
-@keyframes ringRecordBreath {
-  0%,100% { opacity: 0.9; }
-  50%     { opacity: 1; }
-}
-.ring-zone.state-recording .ring-ripple {
-  animation: rippleOut 1.8s ease-out infinite;
-}
-.ring-zone.state-recording .ripple-1 { animation-delay: 0s; }
-.ring-zone.state-recording .ripple-2 { animation-delay: 0.6s; }
-.ring-zone.state-recording .ripple-3 { animation-delay: 1.2s; }
-@keyframes rippleOut {
-  0%   { transform: scale(1);    opacity: 0.75; }
-  80%  { opacity: 0.08; }
-  100% { transform: scale(2);    opacity: 0; }
+
+.narration:not(:empty)::before,
+.inner:not(:empty)::before,
+.npc-text:not(:empty)::before {
+  content: '';
+  position: absolute;
+  left: -50vw; right: -50vw;
+  top: -6px; bottom: -6px;
+  background: linear-gradient(to bottom,
+    rgba(0, 0, 0, 0)    0%,
+    rgba(0, 0, 0, 0.55) 22%,
+    rgba(0, 0, 0, 0.55) 78%,
+    rgba(0, 0, 0, 0)    100%);
+  z-index: -1;
+  pointer-events: none;
 }
 
-.ring-zone.state-thinking .ring-half {
-  animation: ringBreath 7.5s ease-in-out infinite;
-  stroke: rgba(255,255,255,0.35);
+/* .heavy 自己的 ::before/::after 在画上下横线, 不能复用。
+   text.js 把 .heavy 包到 .heavy-wrap 里, banner 挂在 wrapper 上。 */
+.heavy-wrap {
+  display: inline-block;
+  position: relative;
+  z-index: 0;
+  opacity: 0;
+  transition: opacity 0.8s var(--ease-drift);
 }
-.ring-zone.state-responding .ring-half { opacity: 0.08; animation: none; }
-.ring-zone.state-input .ring-half { stroke: rgba(255,225,200,0.7); }
-.ring-zone.state-delivering .ring-half { animation: none; opacity: 0; }
-.ring-zone.state-delivering .ring-light { fill: rgba(255,225,200,0.95); }
+.heavy-wrap.visible { opacity: 1; }
+.heavy-wrap.drifting { animation: gentleUp 1.4s var(--ease-drift) forwards; }
+.heavy-wrap::before {
+  content: '';
+  position: absolute;
+  left: -50vw; right: -50vw;
+  top: -10px; bottom: -10px;
+  background: linear-gradient(to bottom,
+    rgba(0, 0, 0, 0)    0%,
+    rgba(0, 0, 0, 0.85) 22%,
+    rgba(0, 0, 0, 0.85) 78%,
+    rgba(0, 0, 0, 0)    100%);
+  z-index: -1;
+  pointer-events: none;
+}
 
-/* Invitation: arc pulses with a scale-up + glow rhythm — no text hint. */
-.ring-zone.state-invitation .ring-half {
-  animation: ringInvitePulse 1.5s ease-in-out infinite;
-  stroke: rgba(255,240,215,1);
-  filter: drop-shadow(0 0 14px rgba(255,225,200,0.75));
-}
-@keyframes ringInvitePulse {
-  0%,100% { transform: scale(1);     opacity: 0.65; }
-  50%     { transform: scale(1.08);  opacity: 1; }
+/* ----------------------------- 对话气泡 (角色 ↔ 你) -----------------------------
+   .bubble-zone 是覆盖整屏的定位容器,bubble 用 viewport % 定位。
+
+   .bubble-char (紫):跟随头部 — JS 在 left/top|bottom 上写 head.xPct/yPct,
+                     啾啾(::after)沿气泡边沿滑动以对准头(--tail-pos 由 JS 写)
+   .bubble-user (金):固定在底部弧线上方,啾啾朝下指向呼吸弧
+
+   .tail-top    啾啾长在气泡顶,向上指(气泡在头下方)
+   .tail-bottom 啾啾长在气泡底,向下指(气泡在头上方,或用户气泡指弧)
+   ---------------------------------------------------------------- */
+
+.bubble-zone {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  overflow: hidden;
 }
 
-/* ----------------------------- ink zone (typewriter) ----------------------------- */
+.bubble {
+  position: absolute;
+  transform: translateX(-50%);
+  max-width: 70vw;
+  padding: 11px 18px;
+  border-radius: 16px;
+  font-family: var(--serif);
+  font-size: 17px;
+  line-height: 1.5;
+  letter-spacing: 0.06em;
+  text-align: center;
+  white-space: normal;
+  word-break: break-word;
+  opacity: 0;
+  transition: opacity 0.45s var(--ease-drift);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  --tail-pos: 50%;
+}
+.bubble.visible { opacity: 1; }
+
+/* ---- 角色:暗紫底 + 浅紫文字 ---- */
+.bubble-char {
+  background: rgba(34, 24, 50, 0.82);
+  color: #d8c2f0;
+  border: 1px solid rgba(216, 194, 240, 0.22);
+  text-shadow: 0 0 8px rgba(0, 0, 0, 0.7);
+}
+.bubble-char.tail-top::after,
+.bubble-char.tail-bottom::after {
+  content: '';
+  position: absolute;
+  left: var(--tail-pos);
+  width: 12px; height: 12px;
+  background: rgba(34, 24, 50, 0.82);
+  border: 1px solid rgba(216, 194, 240, 0.22);
+  transform: translateX(-50%) rotate(45deg);
+}
+.bubble-char.tail-top::after {
+  top: -7px;
+  border-right: none;
+  border-bottom: none;
+}
+.bubble-char.tail-bottom::after {
+  bottom: -7px;
+  border-left: none;
+  border-top: none;
+}
+
+/* ---- 你:暗金底 + 淡金文字,固定在弧线上方 ---- */
+.bubble-user {
+  left: 50%;
+  bottom: 30vh;
+  background: rgba(46, 34, 18, 0.86);
+  color: #f0d09a;
+  border: 1px solid rgba(240, 208, 154, 0.25);
+  text-shadow: 0 0 8px rgba(0, 0, 0, 0.7);
+}
+.bubble-user.tail-bottom::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -7px;
+  width: 12px; height: 12px;
+  background: rgba(46, 34, 18, 0.86);
+  border: 1px solid rgba(240, 208, 154, 0.25);
+  border-left: none;
+  border-top: none;
+  transform: translateX(-50%) rotate(45deg);
+}
+
+/* ---- 行动:暗红底 + 浅红文字,无啾啾,文字加括号 ---- */
+.bubble-action {
+  left: 50%;
+  bottom: 30vh;
+  background: rgba(60, 16, 16, 0.88);
+  color: #f0a8a0;
+  border: 1px solid rgba(240, 120, 110, 0.3);
+  text-shadow: 0 0 8px rgba(0, 0, 0, 0.7);
+  border-radius: 20px;
+  font-style: italic;
+}
+
+/* ---- 漂散 ----
+   气泡有 transform: translateX(-50%) 把自己居中;通用的 gentleUp 只设
+   translate Y, 一启动会覆盖掉 translateX 让气泡突然向右弹半个宽。
+   专门给气泡一组 keyframe, 把 translateX(-50%) 保留进去。 */
+@keyframes bubbleDrift {
+  0%   { opacity: var(--drift-from-opacity, 0.85); transform: translateX(-50%) translateY(0);     filter: blur(0); }
+  100% { opacity: 0;                               transform: translateX(-50%) translateY(-14px); filter: blur(0.8px); }
+}
+.bubble.drifting {
+  animation: bubbleDrift 1.0s var(--ease-drift) forwards;
+}
+
+/* heavy-active 时压暗气泡,与 .subtitle 同步 */
+.stage.heavy-active .bubble {
+  filter: brightness(0.55);
+  transition: filter 0.7s var(--ease-drift);
+}
+
+/* ----------------------------- 你的话 (底部居中) ----------------------------- */
 
 .ink-zone {
   position: absolute;
-  right: 40px;
-  bottom: 168px;
-  max-width: 56vw;
+  left: 0;
+  right: 0;
+  top: auto;
+  bottom: 30vh;
+  transform: none;
+  max-width: 100vw;
+  padding: 0 8vw;
   z-index: 7;
-  text-align: right;
+  text-align: center;
   pointer-events: none;
 }
-.ink-zone.visible { pointer-events: auto; }
 .ink-text {
-  font-family: var(--serif);
-  font-size: 16px;
-  color: rgba(255,235,210,0.92);
-  letter-spacing: 0.08em;
-  line-height: 1.7;
-  margin-bottom: 10px;
-  min-height: 1.7em;
-  text-shadow: 0 0 12px rgba(255,225,200,0.18);
-}
-.ink-line {
-  height: 1px;
-  width: 0;
-  margin-left: auto;
-  background: linear-gradient(to right, rgba(255,225,200,0), rgba(255,225,200,0.85), rgba(255,225,200,0));
-  transition: width 0.5s var(--ease-drift), opacity 0.5s var(--ease-drift);
-  opacity: 0;
-}
-.ink-zone.visible .ink-line { width: 100%; opacity: 1; }
-
-.ink-zone.dissolving .ink-text { animation: inkDissolve 0.8s ease-out forwards; }
-.ink-zone.dissolving .ink-line { animation: inkLineRetract 0.6s ease-in forwards; }
-@keyframes inkDissolve {
-  to { opacity: 0; letter-spacing: 0.4em; filter: blur(2px); }
-}
-@keyframes inkLineRetract {
-  to { width: 0; opacity: 0; }
+  margin: 0;
+  opacity: 1;
 }
 
-/* ----------------------------- subtitle / narration / npc / heavy ----------------------------- */
+/* ----------------------------- 他的话 (横向居中, y 跟立绘走) ----------------------------- */
 
 .subtitle-zone {
   position: absolute;
-  left: 38%;
-  top: 38%;
-  max-width: 42vw;
+  left: 0;
+  right: 0;
+  top: var(--subtitle-y, 50%);
   z-index: 6;
   pointer-events: none;
+  text-align: center;
+  transition: top 0.6s var(--ease-drift);
 }
 .subtitle {
-  font-family: var(--serif);
-  font-size: 16px;
-  color: var(--subtitle);
-  line-height: 1.7;
-  letter-spacing: 0.06em;
   margin: 4px 0;
-  opacity: 0;
-  text-shadow: 0 0 16px rgba(0,0,0,0.4);
-  transition: opacity 0.6s var(--ease-drift);
+  opacity: 1;
 }
-.subtitle.visible { opacity: 1; }
-.subtitle.drifting {
-  animation: driftToTopLeft 0.9s var(--ease-drift) forwards;
-}
+
+/* ----------------------------- 旁白 (中下) ----------------------------- */
 
 .narration-zone {
   position: absolute;
   left: 50%;
-  top: 14%;
+  top: 10%;
   transform: translateX(-50%);
-  max-width: 60vw;
+  max-width: 50vw;
   text-align: center;
   z-index: 5;
   pointer-events: none;
 }
 .narration {
-  font-family: var(--serif);
-  font-size: 13px;
-  font-style: italic;
-  color: var(--narration);
-  letter-spacing: 0.12em;
-  line-height: 1.8;
   margin: 6px 0;
   opacity: 0;
   transition: opacity 0.7s var(--ease-drift);
-  text-shadow: 0 0 12px rgba(0,0,0,0.4);
 }
 .narration.visible { opacity: 1; }
-.narration.drifting {
-  animation: driftToTopLeft 0.9s var(--ease-drift) forwards;
-}
 
-/* Inner monologue lives near the user's input zone (bottom-right), since
-   it's the protagonist/your voice — distinct from environment narration. */
+/* ----------------------------- 内心独白 (中下, 与旁白同位置, 仅靠括号区分) ----------------------------- */
+
 .inner-zone {
   position: absolute;
-  right: 56px;
-  bottom: 220px;
-  max-width: 46vw;
-  text-align: right;
-  z-index: 6;
-  pointer-events: none;
-}
-.inner {
-  font-family: var(--serif);
-  font-style: italic;
-  font-size: 14px;
-  color: rgba(220,210,255,0.7);
-  letter-spacing: 0.1em;
-  line-height: 1.8;
-  margin: 4px 0;
-  opacity: 0;
-  transition: opacity 0.7s var(--ease-drift);
-  text-shadow: 0 0 14px rgba(0,0,0,0.5);
-}
-.inner.visible { opacity: 1; }
-.inner.drifting {
-  animation: driftToTopLeft 0.9s var(--ease-drift) forwards;
-}
-
-.heavy-zone {
-  position: absolute;
   left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  max-width: 64vw;
+  top: 10%;
+  transform: translateX(-50%);
+  max-width: 50vw;
   text-align: center;
   z-index: 6;
   pointer-events: none;
 }
-.heavy {
-  font-family: var(--serif);
-  font-size: 18px;
-  color: rgba(255,240,225,0.92);
-  letter-spacing: 0.16em;
-  line-height: 1.9;
+.inner {
+  margin: 6px 0;
   opacity: 0;
-  text-shadow: 0 0 18px rgba(0,0,0,0.65), 0 0 40px rgba(255,200,160,0.2);
-  transition: opacity 0.8s var(--ease-drift);
+  transition: opacity 0.7s var(--ease-drift);
+}
+.inner.visible { opacity: 1; }
+
+/* ----------------------------- 重旁白 (中央, 仅靠 ── 横线区分) ----------------------------- */
+
+.heavy-zone {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 56vw;
+  text-align: center;
+  z-index: 9;
+  pointer-events: none;
+}
+.heavy {
+  /* opacity / drift / visibility 由外层 .heavy-wrap 控制 */
   padding: 14px 0;
-  position: relative;
 }
 .heavy::before, .heavy::after {
   content: '── ── ── ── ── ──';
   display: block;
   font-size: 11px;
-  color: rgba(255,220,200,0.4);
+  color: rgba(255, 220, 200, 0.4);
   letter-spacing: 0.4em;
   margin: 8px 0;
 }
-.heavy.visible { opacity: 1; }
-.heavy.drifting { animation: driftToTopLeft 1.1s var(--ease-drift) forwards; }
 
-.npc-zone {
-  position: absolute;
-  inset: 0;
-  z-index: 5;
-  pointer-events: none;
+.stage.heavy-active .subtitle,
+.stage.heavy-active .narration,
+.stage.heavy-active .inner,
+.stage.heavy-active .character,
+.stage.heavy-active .art-element,
+.stage.heavy-active .edge-arc-main {
+  filter: brightness(0.55);
+  transition: filter 0.7s var(--ease-drift);
 }
+
+/* ----------------------------- NPC 缺席旁白 (中下, 入场方向区分) ----------------------------- */
+
+.npc-zone { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
 .npc-text {
   position: absolute;
-  font-family: var(--serif);
-  font-size: 14px;
-  color: rgba(255,210,200,0.7);
-  letter-spacing: 0.18em;
   white-space: nowrap;
   opacity: 0;
 }
 .npc-text.from-top {
-  top: 8%;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 8%; left: 50%; transform: translateX(-50%);
   animation: npcTop 4.5s ease-in-out forwards;
 }
 .npc-text.from-right {
-  top: 50%;
-  right: 4%;
   animation: npcRight 4.5s ease-in-out forwards;
 }
 @keyframes npcTop {
   0%   { opacity: 0; transform: translate(-50%, -20px); }
   20%  { opacity: 1; transform: translate(-50%, 0); }
   70%  { opacity: 1; transform: translate(-50%, 0); }
-  100% { opacity: 0; transform: translate(-50%, 12px); }
-}
-@keyframes npcRight {
-  0%   { opacity: 0; transform: translateX(40px); }
-  20%  { opacity: 0.85; transform: translateX(0); }
-  70%  { opacity: 0.85; transform: translateX(-30px); }
-  100% { opacity: 0; transform: translateX(-160px); }
+  100% { opacity: 0; transform: translate(-50%, -10px); }
 }
 
-/* Short drift toward upper-left — text just edges away and fades, doesn't
-   travel all the way to the journal anchor. */
-@keyframes driftToTopLeft {
-  0%   { opacity: var(--drift-from-opacity, 0.85); transform: translate(0,0); }
-  100% {
-    opacity: 0;
-    transform: translate(-32px, -22px) scale(0.96);
-    filter: blur(0.6px);
-  }
+/* ----------------------------- 漂散 · 一切轻轻向上 ----------------------------- */
+
+@keyframes gentleUp {
+  0%   { opacity: var(--drift-from-opacity, 0.85); transform: translateY(0); filter: blur(0); }
+  100% { opacity: 0; transform: translateY(-14px); filter: blur(0.8px); }
 }
+.subtitle.drifting,
+.narration.drifting,
+.inner.drifting,
+.ink-text.drifting {
+  animation: gentleUp 1.0s var(--ease-drift) forwards;
+}
+/* .heavy 的 drift 由 .heavy-wrap.drifting 提供, 见上方 banner 一节 */
 
 /* ----------------------------- opening (Scene 0) ----------------------------- */
 
 .opening-zone {
-  position: absolute;
-  inset: 0;
+  position: absolute; inset: 0;
   z-index: 30;
   background: #000;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
   pointer-events: auto;
 }
 .opening-skip {
-  position: absolute;
-  top: 18px;
-  right: 22px;
+  position: absolute; top: 18px; right: 22px;
   background: transparent;
   border: 1px solid rgba(255,225,200,0.25);
   border-radius: 14px;
   color: rgba(255,225,200,0.55);
   font-family: var(--sans);
-  font-size: 11px;
-  letter-spacing: 0.25em;
+  font-size: 11px; letter-spacing: 0.25em;
   padding: 6px 14px 6px 16px;
   cursor: pointer;
-  transition: opacity 0.4s ease, color 0.3s ease, border-color 0.3s ease;
+  transition: opacity 0.4s, color 0.3s, border-color 0.3s;
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
@@ -565,39 +968,6 @@ html, body {
   border-color: rgba(255,235,210,0.55);
 }
 
-/* Persistent skip button during gameplay — fast-forwards to the next user input */
-.play-skip {
-  position: absolute;
-  top: 18px;
-  right: 22px;
-  background: transparent;
-  border: 1px solid rgba(255,225,200,0.18);
-  border-radius: 14px;
-  color: rgba(255,225,200,0.45);
-  font-family: var(--sans);
-  font-size: 11px;
-  letter-spacing: 0.22em;
-  padding: 6px 14px 6px 16px;
-  cursor: pointer;
-  -webkit-touch-callout: none;
-  -webkit-user-select: none;
-  user-select: none;
-  touch-action: manipulation;
-  z-index: 25;
-  opacity: 0.55;
-  transition: opacity 0.3s, color 0.3s, border-color 0.3s, background 0.2s;
-}
-.play-skip:hover, .play-skip:active {
-  opacity: 1;
-  color: rgba(255,235,210,0.95);
-  border-color: rgba(255,235,210,0.6);
-}
-.play-skip.busy {
-  background: rgba(255,225,200,0.12);
-  border-color: rgba(255,235,210,0.55);
-  color: rgba(255,245,225,1);
-  opacity: 1;
-}
 .opening-text {
   font-family: var(--serif);
   font-size: 19px;
@@ -607,29 +977,20 @@ html, body {
   text-align: center;
   max-width: 60vw;
 }
-.opening-line {
-  display: block;
-  opacity: 0;
-  transition: opacity 1.4s var(--ease-drift);
-}
+.opening-line { display: block; opacity: 0; transition: opacity 1.4s var(--ease-drift); }
 .opening-line.visible { opacity: 0.92; }
 .opening-line.fading  { opacity: 0; }
 
 .opening-glow {
   position: absolute;
-  left: 50%;
-  top: 50%;
+  left: 50%; top: 50%;
   transform: translate(-50%, -50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 24px;
-  cursor: pointer;
-  user-select: none;
+  display: flex; flex-direction: column;
+  align-items: center; gap: 24px;
+  cursor: pointer; user-select: none;
 }
 .opening-glow-core {
-  width: 96px;
-  height: 96px;
+  width: 96px; height: 96px;
   border-radius: 50%;
   background: radial-gradient(circle at 50% 50%,
     rgba(255,235,210,0.7) 0%,
@@ -641,7 +1002,7 @@ html, body {
   animation: openingHold 1.4s ease-out forwards;
 }
 @keyframes openingBreath {
-  0%,100% { transform: scale(1);   opacity: 0.85; }
+  0%,100% { transform: scale(1); opacity: 0.85; }
   50%     { transform: scale(1.1); opacity: 1; }
 }
 @keyframes openingHold {
@@ -655,15 +1016,13 @@ html, body {
   padding-left: 0.45em;
 }
 
-/* ----------------------------- scene 6 run anchor ----------------------------- */
+/* ----------------------------- run anchor (scene 6) ----------------------------- */
 
 .run-anchor {
   position: absolute;
-  left: 50%;
-  top: 50%;
+  left: 50%; top: 50%;
   transform: translate(-50%, -50%);
-  width: 56px;
-  height: 56px;
+  width: 56px; height: 56px;
   border-radius: 50%;
   background: radial-gradient(circle, rgba(255,240,220,0.95) 0%, rgba(255,200,160,0.4) 50%, rgba(255,200,160,0) 80%);
   cursor: pointer;
@@ -678,8 +1037,7 @@ html, body {
 /* ----------------------------- transitions ----------------------------- */
 
 .blink-veil, .white-veil {
-  position: absolute;
-  inset: 0;
+  position: absolute; inset: 0;
   z-index: 50;
   pointer-events: none;
   opacity: 0;
@@ -701,12 +1059,9 @@ html, body {
 /* ----------------------------- end mark ----------------------------- */
 
 .endmark {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
   z-index: 18;
   pointer-events: none;
   background: rgba(0,0,0,0.55);
@@ -735,36 +1090,36 @@ html, body {
 /* ----------------------------- journal ----------------------------- */
 
 .journal {
-  position: absolute;
-  inset: 0;
+  position: absolute; inset: 0;
   z-index: 40;
   pointer-events: none;
 }
 .journal.visible { pointer-events: auto; }
 .journal-paper {
-  position: absolute;
-  inset: 0;
+  position: absolute; inset: 0;
   background: var(--paper);
-  transform: translate(-100%, -100%);
-  transition: transform 0.5s var(--ease-paper);
-  display: flex;
-  flex-direction: column;
+  /* 从左上角点绽开成上 2/3 屏的弧形:
+     关闭态——零半径点位于左上角 (0, 0), 从这里展开/收回
+     展开态——rx=115vw / ry=72vh, 中心位于画外上方 5vh 的水平中央
+     展开过程中椭圆中心从左上角推移到顶部中央, 视觉上是"从左上角绽开";
+     深/跨比 ≈ 7.2vh / 100vw = 0.072, 与底部呼吸弧 (6.36vh / 88vw) 同比例 ——
+     中段约 67vh, 两侧约 60vh, 与下方弧呼应 */
+  clip-path: ellipse(0 0 at 0 0);
+  transition: clip-path 0.55s var(--ease-paper);
+  display: flex; flex-direction: column;
+  overflow: hidden;
 }
-
+.journal.visible .journal-paper {
+  clip-path: ellipse(115vw 72vh at 50% -5vh);
+}
 .journal-close {
-  position: absolute;
-  top: 14px;
-  left: 14px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  position: absolute; top: 14px; left: 14px;
+  display: flex; align-items: center; gap: 8px;
   padding: 10px 14px;
-  border: none;
-  background: transparent;
+  border: none; background: transparent;
   color: var(--paper-mark-you);
   font-family: var(--serif);
-  font-size: 13px;
-  letter-spacing: 0.25em;
+  font-size: 13px; letter-spacing: 0.25em;
   cursor: pointer;
   z-index: 3;
   border-radius: 14px;
@@ -779,45 +1134,39 @@ html, body {
   color: var(--paper-text);
 }
 .journal-close-arrow {
-  width: 14px;
-  height: 14px;
+  width: 14px; height: 14px;
   border-left: 1.5px solid currentColor;
   border-top: 1.5px solid currentColor;
-  transform: rotate(-45deg);
+  transform: rotate(45deg);
   margin-right: 2px;
 }
-.journal-close-label {
-  padding-left: 0.25em; /* offset for letter-spacing */
-}
-.journal.visible .journal-paper { transform: translate(0, 0); }
+.journal-close-label { padding-left: 0.25em; }
 
 .journal-scroll {
   flex: 1;
   overflow-y: auto;
-  padding: 64px 14vw 80px;
+  /* 顶部留收回按钮空间, 底部留给下弧曲线
+     弧两侧最低到 ~60vh, 文字 padding-left/right=6vw 时该列弧到 ~62vh
+     padding-bottom 38vh 让最末行文字停在 ~62vh, 不会被两侧弧线吃掉 */
+  padding: 9vh 6vw 38vh 6vw;
   font-family: var(--serif);
   color: var(--paper-text);
   font-size: 15px;
   line-height: 2;
   letter-spacing: 0.06em;
-  /* let browser only handle vertical scrolling here — diagonal / horizontal
-     gestures are released to JS so the swipe-to-close can detect them */
   touch-action: pan-y;
 }
 .journal-scroll::-webkit-scrollbar { width: 4px; }
 .journal-scroll::-webkit-scrollbar-thumb { background: rgba(110,91,58,0.3); border-radius: 2px; }
-
 .journal-scroll .j-entry { margin: 6px 0; }
 .journal-scroll .j-tag {
   display: inline-block;
-  width: 1.6em;
-  margin-right: 0.4em;
+  width: 1.6em; margin-right: 0.4em;
   text-align: center;
-  font-size: 12px;
-  letter-spacing: 0;
+  font-size: 12px; letter-spacing: 0;
 }
-.journal-scroll .j-you  { color: var(--paper-mark-you); }
-.journal-scroll .j-him  { color: var(--paper-mark-him); }
+.journal-scroll .j-you { color: var(--paper-mark-you); }
+.journal-scroll .j-him { color: var(--paper-mark-him); }
 .journal-scroll .j-narration {
   color: var(--paper-italic);
   font-style: italic;
@@ -828,6 +1177,11 @@ html, body {
   color: var(--paper-italic);
   font-style: italic;
   padding-left: 2em;
+  font-size: 14px;
+}
+.journal-scroll .j-action {
+  color: #e88;
+  font-style: italic;
   font-size: 14px;
 }
 .journal-scroll .j-heavy {
@@ -844,10 +1198,9 @@ html, body {
   letter-spacing: 0.3em;
   margin: 6px 0;
 }
-
 .journal-hint {
   text-align: center;
-  padding: 14px;
+  padding: 14px 6vw 14px 6vw;
   font-family: var(--sans);
   font-size: 11px;
   color: rgba(110,91,58,0.5);
@@ -857,14 +1210,11 @@ html, body {
 /* ----------------------------- finale ----------------------------- */
 
 .finale {
-  position: absolute;
-  inset: 0;
+  position: absolute; inset: 0;
   z-index: 60;
   background: #000;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
   font-family: var(--serif);
   color: rgba(255,225,200,0.7);
   font-size: 18px;
@@ -880,4 +1230,181 @@ html, body {
   font-size: 12px;
   color: rgba(255,225,200,0.35);
   letter-spacing: 0.2em;
+}
+
+/* ----------------------------- echo prologue ----------------------------- */
+
+.echo-stage {
+  position: absolute; inset: 0;
+  z-index: 25;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 1.4s var(--ease-drift);
+}
+.echo-stage.visible { opacity: 1; }
+.echo-stage.dissolving { opacity: 0; transition-duration: 1.4s; }
+
+.echo-halo {
+  position: absolute;
+  left: 50vw;
+  top: 36vh;
+  width: 22vh;
+  height: 22vh;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.echo-halo-core {
+  position: absolute; inset: 28%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%,
+    rgba(255, 235, 210, 0.95) 0%,
+    rgba(255, 210, 170, 0.55) 35%,
+    rgba(255, 190, 150, 0.15) 65%,
+    rgba(255, 190, 150, 0) 100%);
+  filter: blur(2px);
+  animation: echoHaloBreath 4.2s ease-in-out infinite;
+}
+.echo-halo-ring {
+  position: absolute; inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%,
+    rgba(255, 220, 190, 0.18) 0%,
+    rgba(255, 220, 190, 0.08) 45%,
+    rgba(255, 220, 190, 0) 75%);
+  filter: blur(8px);
+  animation: echoHaloHalo 5s ease-in-out infinite;
+}
+@keyframes echoHaloBreath {
+  0%, 100% { transform: scale(0.92); opacity: 0.78; }
+  50%      { transform: scale(1.08); opacity: 1; }
+}
+@keyframes echoHaloHalo {
+  0%, 100% { transform: scale(0.96); opacity: 0.5; }
+  50%      { transform: scale(1.18); opacity: 0.95; }
+}
+
+.echo-text {
+  position: absolute;
+  left: 50vw;
+  top: 43vh;
+  transform: translateX(-50%);
+  max-width: 84vw;
+  font-family: var(--serif);
+  font-size: 17px;
+  color: rgba(255, 235, 210, 0.95);
+  letter-spacing: 0.08em;
+  line-height: 1.7;
+  text-align: center;
+  text-shadow: 0 1px 12px rgba(0,0,0,0.6);
+  opacity: 0;
+  pointer-events: none;
+  --drift-from-opacity: 1;
+  transition: opacity 0.5s var(--ease-drift);
+}
+.echo-text.visible { opacity: 1; }
+.echo-text.drifting {
+  animation: echoTextDrift 1.0s var(--ease-drift) forwards;
+}
+@keyframes echoTextDrift {
+  0%   { opacity: 1; transform: translateX(-50%) translateY(0);    filter: blur(0); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-14px); filter: blur(0.8px); }
+}
+
+.echo-hints {
+  position: absolute;
+  left: 0;
+  top: 68vh;
+  width: 100vw;
+  height: 8vh;
+  pointer-events: none;
+}
+.echo-hint {
+  position: absolute;
+  right: auto;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 17px;
+  color: rgba(255, 235, 210, 0.7);
+  letter-spacing: 0.18em;
+  white-space: nowrap;
+  text-align: center;
+  text-shadow: 0 1px 10px rgba(0,0,0,0.55);
+  pointer-events: none;
+  opacity: 0;
+  /* lane gives a left: X% inline; centering handled in keyframe */
+}
+.echo-hint.live {
+  animation: echoHintLife 5s var(--ease-drift) forwards;
+}
+@keyframes echoHintLife {
+  0%   { opacity: 0;   transform: translateX(-50%) translateY(36px); }
+  22%  { opacity: 0.7; transform: translateX(-50%) translateY(0); }
+  78%  { opacity: 0.7; transform: translateX(-50%) translateY(-22px); }
+  100% { opacity: 0;   transform: translateX(-50%) translateY(-44px); }
+}
+
+.white-veil.echo-flash {
+  opacity: 1;
+  transition-duration: 0.06s;
+}
+
+.echo-skip {
+  position: absolute;
+  top: 3vh;
+  right: 5vw;
+  z-index: 28;
+  background: none;
+  border: none;
+  outline: none;
+  padding: 6px 8px;
+  font-family: var(--serif);
+  font-size: 14px;
+  color: rgba(255, 235, 210, 0.45);
+  letter-spacing: 0.2em;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: color 0.3s var(--ease-drift);
+}
+.echo-skip:hover { color: rgba(255, 235, 210, 0.85); }
+
+/* ----------------------------- 竖屏剧情段排版 -----------------------------
+   立绘 / 字幕 / 旁白 / 重旁白 / NPC 在窄屏下的尺寸与位置
+   字幕跟立绘走,可压在立绘身上,加黑色阴影提升可读性
+   ---------------------------------------------------------------- */
+
+/* 字幕加黑色阴影 — 压在立绘身上仍清晰 */
+.subtitle {
+  text-shadow:
+    0 0 8px rgba(0, 0, 0, 0.95),
+    0 0 16px rgba(0, 0, 0, 0.85),
+    0 1px 2px rgba(0, 0, 0, 1);
+}
+
+/* 字幕本体在竖屏下的最大宽度(zone 已是全宽,这里限制 inline-block 自身) */
+.subtitle {
+  max-width: 84vw;
+}
+
+/* 旁白 / 内心 — 中下,拉宽 */
+.narration-zone,
+.inner-zone {
+  max-width: 80vw;
+  top: 8%;
+}
+
+/* 重旁白 — 居中,拉宽 */
+.heavy-zone {
+  max-width: 84vw;
+}
+
+/* NPC — 从右侧滑入,锚点改成屏幕中右 */
+.npc-text.from-right {
+  top: 50%;
+  right: 6vw;
+}
+@keyframes npcRight {
+  0%   { opacity: 0; transform: translateX(40px); }
+  20%  { opacity: 0.85; transform: translateX(0); }
+  70%  { opacity: 0.85; transform: translateX(-20px); }
+  100% { opacity: 0; transform: translateX(-60px); }
 }

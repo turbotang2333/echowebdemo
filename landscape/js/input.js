@@ -1,4 +1,4 @@
-import { $ } from '../../js/util.js';
+import { $ } from './util.js';
 import { recordTouchY } from './ring.js';
 
 const LONG_PRESS_MS = 250;

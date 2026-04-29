@@ -1,7 +1,7 @@
-import { $, el, wait as rawWait } from '../../js/util.js';
+import { $, el, wait as rawWait } from './util.js';
 import { waitForLongPress, waitForTap } from './input.js';
 import { addJournalEntry } from './journal.js';
-import { whiteFlash } from '../../js/transitions.js';
+import { whiteFlash } from './transitions.js';
 
 const LINES = [
   ['很久以前', '你是这个世界最受敬仰的司星使', '能用卦镜窥见命运'],

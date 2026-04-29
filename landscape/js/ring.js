@@ -1,4 +1,4 @@
-import { $ } from '../../js/util.js';
+import { $ } from './util.js';
 
 export const RING = {
   IDLE: 'idle',

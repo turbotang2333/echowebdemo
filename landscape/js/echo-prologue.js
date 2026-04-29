@@ -1,4 +1,4 @@
-import { $, el, wait } from '../../js/util.js';
+import { $, el, wait } from './util.js';
 import { setRingState, RING } from './ring.js';
 import { waitForRingLongPress, waitForRingRelease } from './input.js';
 import { showInkLine } from './ink.js';

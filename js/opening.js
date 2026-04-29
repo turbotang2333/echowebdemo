@@ -1,8 +1,3 @@
-// Scene 0 — opening ritual.
-// Black background, lines of text fade in one after another, then a glow appears
-// and waits for a long-press (or tap), which triggers a white flash transitioning
-// to Scene 1. A "跳过开场" button shortcuts straight to the wake-up moment.
-
 import { $, el, wait as rawWait } from './util.js';
 import { waitForLongPress, waitForTap } from './input.js';
 import { addJournalEntry } from './journal.js';
@@ -19,7 +14,6 @@ const LINES = [
 
 let _skip = false;
 
-// Skippable wait: resolves early if skip is requested.
 async function wait(ms) {
   const tick = 60;
   let elapsed = 0;
@@ -72,7 +66,6 @@ export async function runOpening() {
     await wait(300);
   }
 
-  // If skip was hit, clear any half-faded text immediately.
   if (_skip) {
     $('#opening-text').innerHTML = '';
   }
@@ -82,16 +75,13 @@ export async function runOpening() {
     text: '很久以前,你是司星使。一句预言断送了狐族小皇子,你以最后一道法阵祈求重来——而今,你被送到了这里。',
   });
 
-  // Show glow + wait for press
   const glow = $('#opening-glow');
   glow.hidden = false;
   glow.classList.remove('holding');
   await new Promise(requestAnimationFrame);
 
-  // hide skip button now that the wake-up moment is here
   if (skipBtn) skipBtn.style.display = 'none';
 
-  // Accept either long-press or tap — first interaction should be lenient
   await Promise.race([
     waitForLongPress('opening-glow'),
     waitForTap('opening-glow'),

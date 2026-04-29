@@ -1,8 +1,6 @@
-// Gesture engine. Listens for long-press / tap on the ring zone (and via Space key),
-// taps on arbitrary anchors, and exposes a Promise-based "wait for gesture" API
-// that the player uses at user input points.
-
 import { $ } from './util.js';
+import { recordTouchY } from './ring.js';
+import { setSpeed } from './signal.js';
 
 const LONG_PRESS_MS = 250;
 
@@ -11,7 +9,7 @@ let _isPressing = false;
 let _pressTarget = null;
 let _pressMeta = null;
 
-const _waiters = []; // each: { type, target?, resolve }
+const _waiters = [];
 
 function fire(type, target) {
   for (let i = 0; i < _waiters.length; i++) {
@@ -26,29 +24,98 @@ function fire(type, target) {
 }
 
 export function waitForLongPress(targetId) {
-  return new Promise((resolve) => {
-    _waiters.push({ type: 'longpress', target: targetId, resolve });
-  });
+  return new Promise((resolve) => { _waiters.push({ type: 'longpress', target: targetId, resolve }); });
 }
 export function waitForTap(targetId) {
-  return new Promise((resolve) => {
-    _waiters.push({ type: 'tap', target: targetId, resolve });
-  });
+  return new Promise((resolve) => { _waiters.push({ type: 'tap', target: targetId, resolve }); });
 }
 export function waitForRelease(targetId) {
+  return new Promise((resolve) => { _waiters.push({ type: 'release', target: targetId, resolve }); });
+}
+export function waitForRingLongPress() { return waitForLongPress('edge'); }
+export function waitForRingRelease()   { return waitForRelease('edge'); }
+
+const PET_HOLD_MS = 800;
+let _petWaiterResolver = null;
+
+export function waitForPet() {
   return new Promise((resolve) => {
-    _waiters.push({ type: 'release', target: targetId, resolve });
+    const charEl = document.querySelector('.character');
+    if (!charEl) { resolve(); return; }
+
+    let timer = null;
+    let startX = 0;
+    let startY = 0;
+
+    function onDown(e) {
+      e.preventDefault();
+      const pt = e.touches ? e.touches[0] : e;
+      startX = pt.clientX;
+      startY = pt.clientY;
+      timer = setTimeout(() => {
+        cleanup();
+        resolve();
+      }, PET_HOLD_MS);
+    }
+
+    function onMove(e) {
+      if (!timer) return;
+      const pt = e.touches ? e.touches[0] : e;
+      const dx = pt.clientX - startX;
+      const dy = pt.clientY - startY;
+      if (Math.abs(dx) > 25 || Math.abs(dy) > 25) {
+        clearTimeout(timer);
+        timer = null;
+      }
+    }
+
+    function onUp() {
+      if (timer) { clearTimeout(timer); timer = null; }
+    }
+
+    function cleanup() {
+      clearTimeout(timer);
+      timer = null;
+      charEl.removeEventListener('pointerdown', onDown);
+      charEl.removeEventListener('pointermove', onMove);
+      charEl.removeEventListener('pointerup', onUp);
+      charEl.removeEventListener('pointercancel', onUp);
+      charEl.removeEventListener('touchstart', onDown);
+      charEl.removeEventListener('touchmove', onMove);
+      charEl.removeEventListener('touchend', onUp);
+      charEl.removeEventListener('touchcancel', onUp);
+    }
+
+    charEl.addEventListener('pointerdown', onDown);
+    charEl.addEventListener('pointermove', onMove);
+    charEl.addEventListener('pointerup', onUp);
+    charEl.addEventListener('pointercancel', onUp);
+    charEl.addEventListener('touchstart', onDown, { passive: false });
+    charEl.addEventListener('touchmove', onMove, { passive: false });
+    charEl.addEventListener('touchend', onUp);
+    charEl.addEventListener('touchcancel', onUp);
+
+    _petWaiterResolver = () => {
+      cleanup();
+      resolve();
+    };
   });
 }
-export function waitForRingLongPress() { return waitForLongPress('ring'); }
-export function waitForRingRelease()   { return waitForRelease('ring'); }
 
-// ---------------- listeners ----------------
+export function cancelPet() {
+  if (_petWaiterResolver) {
+    _petWaiterResolver();
+    _petWaiterResolver = null;
+  }
+}
 
 function startPress(target, e) {
   _isPressing = true;
   _pressTarget = target;
   _pressMeta = { startX: e.clientX, startY: e.clientY, startTime: Date.now(), longPressed: false };
+  if (target === 'edge' && typeof e.clientY === 'number') {
+    recordTouchY(e.clientY);
+  }
   _longPressTimer = setTimeout(() => {
     if (_isPressing && _pressTarget === target) {
       _pressMeta.longPressed = true;
@@ -67,19 +134,15 @@ function endPress(target) {
   _pressTarget = null;
   _pressMeta = null;
 
-  if (wasLong) {
-    fire('release', target);
-  } else {
-    fire('tap', target);
-  }
+  if (wasLong) fire('release', target);
+  else fire('tap', target);
 }
 
 function bindPressable(node, targetId) {
   if (!node) return;
 
-  // Pointer Events (modern desktop + recent iOS / Android)
   node.addEventListener('pointerdown', (e) => {
-    if (_isPressing) return; // already started via touch event
+    if (_isPressing) return;
     e.preventDefault();
     startPress(targetId, e);
   });
@@ -90,10 +153,8 @@ function bindPressable(node, targetId) {
     if (_isPressing && _pressTarget === targetId) endPress(targetId);
   });
 
-  // Touch Events fallback — some mobile browsers fire these but not pointer events
-  // when touch-action / iOS native gestures interfere.
   node.addEventListener('touchstart', (e) => {
-    if (_isPressing) return; // pointerdown already started one
+    if (_isPressing) return;
     e.preventDefault();
     const t = e.touches[0] || { clientX: 0, clientY: 0 };
     startPress(targetId, t);
@@ -106,11 +167,10 @@ function bindPressable(node, targetId) {
   });
 }
 
-// Keyboard fallbacks:
-//   Space (hold) = long-press the ring
-//   Enter        = tap whatever is the most active interactive (opening glow / run-anchor)
-//   J            = toggle journal (debug)
+const FF_SPEED = 5;
+
 let _spaceHeld = false;
+let _shiftHeld = false;
 function initKeyboard() {
   window.addEventListener('keydown', (e) => {
     if (e.repeat) return;
@@ -118,7 +178,7 @@ function initKeyboard() {
       e.preventDefault();
       if (!_spaceHeld) {
         _spaceHeld = true;
-        startPress('ring', { clientX: 0, clientY: 0 });
+        startPress('edge', { clientX: 0, clientY: window.innerHeight * 0.55 });
       }
     } else if (e.code === 'Enter') {
       const opening = document.getElementById('opening-glow');
@@ -135,30 +195,32 @@ function initKeyboard() {
         if (m.isJournalOpen()) m.closeJournal();
         else m.openJournal();
       });
+    } else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+      if (!_shiftHeld) {
+        _shiftHeld = true;
+        setSpeed(FF_SPEED);
+      }
     }
   });
   window.addEventListener('keyup', (e) => {
     if (e.code === 'Space' && _spaceHeld) {
       _spaceHeld = false;
-      endPress('ring');
+      endPress('edge');
+    } else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+      _shiftHeld = false;
+      setSpeed(1);
     }
   });
 }
 
 export function initInput() {
-  bindPressable($('#ring-zone'), 'ring');
+  bindPressable($('#edge-zone'), 'edge');
   bindPressable($('#opening-glow'), 'opening-glow');
   bindPressable($('#run-anchor'), 'run-anchor');
   initKeyboard();
 
-  // Block the browser's right-click / long-press context menu so it doesn't
-  // pop while the user is holding the recording arc. Demo is a closed
-  // experience — no copy / save / inspect affordances expected.
   window.addEventListener('contextmenu', (e) => e.preventDefault());
-
-  // Belt-and-suspenders: explicitly block on the press targets too,
-  // for browsers that fire contextmenu before bubbling reaches window.
-  ['#ring-zone', '#opening-glow', '#run-anchor', '#stage'].forEach((sel) => {
+  ['#edge-zone', '#opening-glow', '#run-anchor', '#stage'].forEach((sel) => {
     const node = document.querySelector(sel);
     if (node) node.addEventListener('contextmenu', (e) => e.preventDefault());
   });

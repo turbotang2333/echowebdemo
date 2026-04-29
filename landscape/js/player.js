@@ -1,10 +1,10 @@
-import { $, wait } from '../../js/util.js';
+import { $, wait } from './util.js';
 import { SCRIPT } from './script.js';
 import { showNarration, showInner, showDialogue, showHeavy, showNPCText, pause } from './text.js';
 import { setPose, characterEntrance, showCharacter, setCharPosition } from './character.js';
-import { setAmbient, addArt, removeArt, gilded } from '../../js/art.js';
+import { setAmbient, addArt, removeArt, gilded } from './art.js';
 import { setScene, addSpot, updateSpot, removeSpot, clearScene, pulseSpot } from './scene.js';
-import { setBackground, blinkTransition, shake } from '../../js/transitions.js';
+import { setBackground, blinkTransition, shake } from './transitions.js';
 import { setRingState, RING } from './ring.js';
 import { showInkLine } from './ink.js';
 import { waitForRingLongPress, waitForRingRelease, waitForTap } from './input.js';

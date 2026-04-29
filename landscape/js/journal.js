@@ -1,4 +1,4 @@
-import { $, el, wait } from '../../js/util.js';
+import { $, el, wait } from './util.js';
 
 const _entries = [];
 

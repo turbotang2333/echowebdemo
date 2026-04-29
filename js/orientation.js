@@ -1,4 +1,4 @@
-import { $ } from '../../js/util.js';
+import { $ } from './util.js';
 
 export const PORTRAIT = 'portrait';
 export const LANDSCAPE = 'landscape';

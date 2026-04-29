@@ -1,17 +1,9 @@
-// Journal (事记) — accumulates every displayed text entry, then can be
-// pulled open from the top-left anchor with a swipe-from-top-left gesture.
-
 import { $, el, wait } from './util.js';
 
 const _entries = [];
 
-export function addJournalEntry(entry) {
-  _entries.push(entry);
-}
-
-export function clearJournal() {
-  _entries.length = 0;
-}
+export function addJournalEntry(entry) { _entries.push(entry); }
+export function clearJournal() { _entries.length = 0; }
 
 function renderEntries() {
   const scroll = $('#journal-scroll');
@@ -23,6 +15,8 @@ function renderEntries() {
       scroll.appendChild(el('div', { cls: 'j-entry j-narration', text: e.text }));
     } else if (e.kind === 'inner') {
       scroll.appendChild(el('div', { cls: 'j-entry j-inner', text: `（${e.text}）` }));
+    } else if (e.kind === 'action') {
+      scroll.appendChild(el('div', { cls: 'j-entry j-action', text: `（${e.text}）` }));
     } else if (e.kind === 'dialogue') {
       const tagCls = e.speaker === '你' ? 'j-you' : 'j-him';
       const wrap = el('div', { cls: 'j-entry' });
@@ -41,13 +35,11 @@ export async function openJournal() {
   renderEntries();
   const j = $('#journal');
   j.hidden = false;
-  // double rAF for transition
   await new Promise(requestAnimationFrame);
   await new Promise(requestAnimationFrame);
   j.classList.add('visible');
   _open = true;
   _opening = false;
-  // scroll to top
   $('#journal-scroll').scrollTop = 0;
 }
 
@@ -62,74 +54,49 @@ export async function closeJournal() {
 
 export function isJournalOpen() { return _open; }
 
-// Wire the gesture: swipe from top-left into screen opens it,
-// swipe back (toward top-left) closes it. Also click on anchor opens,
-// and an explicit "收回" button closes.
 export function initJournalGestures() {
   const anchor = $('#journal-anchor');
   if (anchor) {
-    anchor.addEventListener('click', () => {
-      if (!_open) openJournal();
-    });
+    anchor.addEventListener('click', () => { if (!_open) openJournal(); });
   }
-
   const closeBtn = $('#journal-close');
   if (closeBtn) {
-    const closeNow = (e) => {
-      if (e) { e.preventDefault(); e.stopPropagation(); }
-      closeJournal();
-    };
+    const closeNow = (e) => { if (e) { e.preventDefault(); e.stopPropagation(); } closeJournal(); };
     closeBtn.addEventListener('click', closeNow);
     closeBtn.addEventListener('touchstart', closeNow, { passive: false });
   }
 
-  let startX = 0, startY = 0, tracking = false;
-  const onDown = (x, y) => {
-    if (!_open) {
-      // open gesture: must start in the top-left corner zone
-      if (x < 80 && y < 80) {
-        startX = x; startY = y; tracking = true;
-      }
-    } else {
-      // close gesture: track from anywhere — direction analysis below
-      // disambiguates from vertical scroll
-      startX = x; startY = y; tracking = true;
+  // Open gesture: swipe out of the top-left corner (down + right). The 80x80
+  // capture box overlaps the breathing dot (#journal-anchor) so users can
+  // either tap the dot or drag from that area.
+  let oStartX = 0, oStartY = 0, oTracking = false;
+  const onOpenDown = (x, y) => {
+    if (_open) return;
+    if (x < 80 && y < 80) { oStartX = x; oStartY = y; oTracking = true; }
+  };
+  const onOpenMove = (x, y) => {
+    if (!oTracking || _open) return;
+    const dx = x - oStartX, dy = y - oStartY;
+    if (dx > 50 && dy > 30 && Math.hypot(dx, dy) > 75) {
+      oTracking = false;
+      openJournal();
     }
   };
-  const onMove = (x, y) => {
-    if (!tracking) return;
-    const dx = x - startX;
-    const dy = y - startY;
-    const dist = Math.hypot(dx, dy);
-    if (!_open) {
-      if (dx > 60 && dy > 30 && dist > 80) {
-        tracking = false;
-        openJournal();
-      }
-    } else {
-      // close: require both axes meaningfully negative AND horizontal motion
-      // to dominate (so a pure upward scroll doesn't accidentally close).
-      if (dx < -60 && dy < -30 && Math.abs(dx) > Math.abs(dy) * 0.6) {
-        tracking = false;
-        closeJournal();
-      }
-    }
-  };
-  const onUp = () => { tracking = false; };
+  const onOpenUp = () => { oTracking = false; };
+  window.addEventListener('pointerdown', (e) => onOpenDown(e.clientX, e.clientY));
+  window.addEventListener('pointermove', (e) => onOpenMove(e.clientX, e.clientY));
+  window.addEventListener('pointerup', onOpenUp);
+  window.addEventListener('pointercancel', onOpenUp);
 
-  window.addEventListener('pointerdown', (e) => onDown(e.clientX, e.clientY));
-  window.addEventListener('pointermove', (e) => onMove(e.clientX, e.clientY));
-  window.addEventListener('pointerup', onUp);
-  window.addEventListener('pointercancel', onUp);
-
-  // Touch fallback in case pointer events are partially eaten by browser
-  // gesture handling on mobile.
-  window.addEventListener('touchstart', (e) => {
-    const t = e.touches[0]; if (t) onDown(t.clientX, t.clientY);
-  }, { passive: true });
-  window.addEventListener('touchmove', (e) => {
-    const t = e.touches[0]; if (t) onMove(t.clientX, t.clientY);
-  }, { passive: true });
-  window.addEventListener('touchend', onUp);
-  window.addEventListener('touchcancel', onUp);
+  // Close gesture: tap below the paper arc. The .journal element is full-screen,
+  // but .journal-paper is clipped to the top 2/3. Pointer events on the empty
+  // area outside the paper land on the .journal element itself — tap there to
+  // close. (Up-swipe would clash with scroll-down on .journal-scroll.)
+  const journalEl = $('#journal');
+  if (journalEl) {
+    journalEl.addEventListener('pointerdown', (e) => {
+      if (!_open) return;
+      if (e.target === journalEl) closeJournal();
+    });
+  }
 }

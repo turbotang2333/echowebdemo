@@ -3,14 +3,20 @@ import { initInput } from './input.js';
 import { initJournalGestures } from './journal.js';
 import { runPlayer } from './player.js';
 import { showCharacter } from './character.js';
+import { initOrientation, expectOrientation, waitForOrientation, PORTRAIT } from './orientation.js';
+import { initFullscreenOnFirstTouch } from './fullscreen.js';
 
 window.addEventListener('DOMContentLoaded', async () => {
   initRing();
   initInput();
   initJournalGestures();
+  initFullscreenOnFirstTouch();
   showCharacter(false);
 
-  // Tiny delay so first frame paints black before opening kicks in.
+  initOrientation();
+  expectOrientation(PORTRAIT, '请将设备竖置 — 准备好了再开始');
+  await waitForOrientation(PORTRAIT);
+
   await new Promise((r) => setTimeout(r, 200));
 
   try {
