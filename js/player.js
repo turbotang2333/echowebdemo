@@ -5,28 +5,34 @@ import { setPose, characterEntrance, showCharacter, setCharPosition, setPetable,
 import { setAmbient, addArt, removeArt, gilded } from './art.js';
 import { setScene, addSpot, updateSpot, removeSpot, clearScene, pulseSpot } from './scene.js';
 import { setBackground, blinkTransition, shake } from './transitions.js';
-import { setRingState, setActionMode, RING } from './ring.js';
-import { showInkLine, startInkLine, startActionLine } from './ink.js';
-import { waitForRingLongPress, waitForRingRelease, waitForTap, waitForPet } from './input.js';
+import { setRingState, setActionMode, tryConsumeGuide, RING } from './ring.js';
+import { startInkLine, startActionLine } from './ink.js';
+import { waitForTap, waitForPet } from './input.js';
+import { waitForUserInput } from './type-input.js';
 import { runOpening } from './opening.js';
 import { runEchoPrologue } from './echo-prologue.js';
 import { signalWait, getSpeed, setSpeed } from './signal.js';
 
-async function runUserInputPoint(text) {
+// Run a user-input point: wait for the user to commit (typed or recorded),
+// then play the preset bubble (preset always wins — typed text is just a
+// "演" performance and never becomes the bubble). startLine is the bubble
+// factory: startInkLine for dialogue, startActionLine for actions.
+async function runUserCommit(text, startLine) {
   const speed = getSpeed();
+  const showGuide = tryConsumeGuide();
+  if (showGuide) $('#edge-zone').classList.add('arc-guide-active');
 
   if (speed > 1) {
+    // Fast-forward: skip the wait entirely, auto-press, send preset.
     setRingState(RING.INVITATION);
     await signalWait(100);
     setRingState(RING.RECORDING);
 
-    const ink = startInkLine(text, { typingSpeed: 55 });
+    const ink = startLine(text, { typingSpeed: 55 });
     await ink.typingDone;
 
     setRingState(RING.DELIVERING);
-    await ink.finish(Math.round(600 / speed), () => {
-      setRingState(RING.THINKING);
-    });
+    await ink.finish(Math.round(600 / speed), () => setRingState(RING.THINKING));
 
     await signalWait(300);
     setRingState(RING.RESPONDING);
@@ -35,17 +41,25 @@ async function runUserInputPoint(text) {
     return;
   }
 
-  setRingState(RING.INVITATION);
-  await waitForRingLongPress();
+  // Normal speed — let the user commit via short-tap (typing) or long-press (recording).
+  // waitForUserInput sets RING.INVITATION internally and returns when the user
+  // has actually committed an input gesture.
+  const result = await waitForUserInput();
   setRingState(RING.RECORDING);
 
-  const ink = startInkLine(text, { typingSpeed: 55 });
-  await Promise.all([ink.typingDone, waitForRingRelease()]);
+  const ink = startLine(text, { typingSpeed: 55 });
+  if (result.kind === 'recorded') {
+    // Long-press path: keep ink visible until BOTH typing finishes AND user
+    // releases the press (mirrors the original voice-recording feel).
+    await Promise.all([ink.typingDone, result.releasePromise]);
+  } else {
+    // Typed path: user already committed (clicked send / hit Enter). No
+    // release to wait for — just let the bubble finish typing the preset.
+    await ink.typingDone;
+  }
 
   setRingState(RING.DELIVERING);
-  await ink.finish(1400, () => {
-    setRingState(RING.THINKING);
-  });
+  await ink.finish(1400, () => setRingState(RING.THINKING));
 
   await signalWait(700);
   setRingState(RING.RESPONDING);
@@ -53,47 +67,14 @@ async function runUserInputPoint(text) {
   setRingState(RING.IDLE);
 }
 
+async function runUserInputPoint(text) {
+  await runUserCommit(text, startInkLine);
+}
+
 async function runUserActionPoint(text) {
   setActionMode(true);
   try {
-    const speed = getSpeed();
-
-    if (speed > 1) {
-      setRingState(RING.INVITATION);
-      await signalWait(100);
-      setRingState(RING.RECORDING);
-
-      const ink = startActionLine(text, { typingSpeed: 55 });
-      await ink.typingDone;
-
-      setRingState(RING.DELIVERING);
-      await ink.finish(Math.round(600 / speed), () => {
-        setRingState(RING.THINKING);
-      });
-
-      await signalWait(300);
-      setRingState(RING.RESPONDING);
-      await signalWait(100);
-      setRingState(RING.IDLE);
-      return;
-    }
-
-    setRingState(RING.INVITATION);
-    await waitForRingLongPress();
-    setRingState(RING.RECORDING);
-
-    const ink = startActionLine(text, { typingSpeed: 55 });
-    await Promise.all([ink.typingDone, waitForRingRelease()]);
-
-    setRingState(RING.DELIVERING);
-    await ink.finish(1400, () => {
-      setRingState(RING.THINKING);
-    });
-
-    await signalWait(700);
-    setRingState(RING.RESPONDING);
-    await signalWait(200);
-    setRingState(RING.IDLE);
+    await runUserCommit(text, startActionLine);
   } finally {
     setActionMode(false);
   }

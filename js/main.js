@@ -1,5 +1,6 @@
 import { initRing } from './ring.js';
 import { initInput } from './input.js';
+import { initTypeInput } from './type-input.js';
 import { initJournalGestures } from './journal.js';
 import { runPlayer } from './player.js';
 import { showCharacter } from './character.js';
@@ -9,6 +10,7 @@ import { initFullscreenOnFirstTouch } from './fullscreen.js';
 window.addEventListener('DOMContentLoaded', async () => {
   initRing();
   initInput();
+  initTypeInput();
   initJournalGestures();
   initFullscreenOnFirstTouch();
   showCharacter(false);

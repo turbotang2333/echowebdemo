@@ -1,7 +1,7 @@
 import { $, el, wait } from './util.js';
-import { setRingState, RING } from './ring.js';
-import { waitForRingLongPress, waitForRingRelease } from './input.js';
-import { showInkLine, startInkLine } from './ink.js';
+import { setRingState, RING, onRingStateChange, tryConsumeGuide } from './ring.js';
+import { startInkLine } from './ink.js';
+import { waitForUserInput, forceCloseTypingSession } from './type-input.js';
 import { addJournalEntry } from './journal.js';
 
 const TYPING_SPEED = 60;
@@ -151,21 +151,53 @@ function stopHints() {
   });
 }
 
-async function collectAnswer(hints, presetText) {
-  startHints(hints);
-  setRingState(RING.INVITATION);
-  await pressOrSkip(waitForRingLongPress());
-  setRingState(RING.RECORDING);
+// Hint lifecycle bound to RING.INVITATION: while a question is active, hints
+// auto-pause when state leaves INVITATION (entering INPUT/RECORDING/etc) and
+// auto-resume when state comes back to INVITATION (e.g. user dismissed the
+// keyboard without typing, falling back to the question).
+let _activeHints = null;
+let _hintsUnsubscribe = null;
 
-  // Clear halo + hints right away so the bubble has the stage during press.
+function bindHintsToInvitation(hints) {
+  _activeHints = hints;
+  if (_hintsUnsubscribe) return;
+  _hintsUnsubscribe = onRingStateChange((next, prev) => {
+    if (!_activeHints) return;
+    if (next === RING.INVITATION && prev !== RING.INVITATION) {
+      startHints(_activeHints);
+    } else if (prev === RING.INVITATION && next !== RING.INVITATION) {
+      stopHints();
+    }
+  });
+}
+
+function unbindHints() {
+  _activeHints = null;
+  if (_hintsUnsubscribe) { _hintsUnsubscribe(); _hintsUnsubscribe = null; }
   stopHints();
+}
+
+async function collectAnswer(hints, presetText) {
+  bindHintsToInvitation(hints);
+  const showGuide = tryConsumeGuide();
+  if (showGuide) $('#edge-zone').classList.add('arc-guide-active');
+  startHints(hints);
+
+  // waitForUserInput sets INVITATION internally and loops typing↔settled until
+  // the user commits (typed-and-sent OR long-press-and-release).
+  const result = await pressOrSkipResult(waitForUserInput());
+
+  // User has committed. Halo question fades out, bubble takes over.
+  setRingState(RING.RECORDING);
+  unbindHints();
   hideEchoText();
 
-  // Bubble starts typing the moment long-press fires. Hold + drift only run
-  // once typing finished AND user released, so a quick release waits on
-  // typing and a long press waits on the user.
   const ink = startInkLine(presetText, { typingSpeed: 60 });
-  await pressOrSkip(Promise.all([ink.typingDone, waitForRingRelease()]));
+  if (result.kind === 'recorded') {
+    await pressOrSkip(Promise.all([ink.typingDone, result.releasePromise]));
+  } else {
+    await pressOrSkip(ink.typingDone);
+  }
 
   setRingState(RING.DELIVERING);
   await ink.finish(1200);
@@ -176,6 +208,19 @@ async function collectAnswer(hints, presetText) {
   setRingState(RING.RESPONDING);
   await pwait(200);
   setRingState(RING.IDLE);
+}
+
+// Race a value-producing promise against skip — returns the value if the
+// promise resolves first, or throws SkipPrologue if skip fires.
+async function pressOrSkipResult(promise) {
+  if (_skipped) throw new SkipPrologue();
+  const SKIP = Symbol('skip');
+  const result = await Promise.race([
+    promise,
+    whenSkipped().then(() => SKIP),
+  ]);
+  if (_skipped || result === SKIP) throw new SkipPrologue();
+  return result;
 }
 
 async function cameraFlash() {
@@ -219,7 +264,10 @@ async function runFlow() {
 }
 
 function cleanupAfterSkip() {
-  stopHints();
+  unbindHints();
+  // Tear down any active typing session — keyboard might be up, type-area
+  // might be visible, all of which would otherwise survive the skip.
+  forceCloseTypingSession();
   setRingState(RING.IDLE);
   const veil = $('#white-veil');
   if (veil) veil.classList.remove('echo-flash');

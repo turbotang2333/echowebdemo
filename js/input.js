@@ -1,6 +1,6 @@
 import { $ } from './util.js';
-import { recordTouchY } from './ring.js';
 import { setSpeed } from './signal.js';
+import { getRingState, RING } from './ring.js';
 
 const LONG_PRESS_MS = 250;
 
@@ -23,17 +23,28 @@ function fire(type, target) {
   return false;
 }
 
-export function waitForLongPress(targetId) {
-  return new Promise((resolve) => { _waiters.push({ type: 'longpress', target: targetId, resolve }); });
+function pushWaiter(type, target, opts) {
+  return new Promise((resolve, reject) => {
+    const w = { type, target, resolve };
+    _waiters.push(w);
+    const signal = opts && opts.signal;
+    if (signal) {
+      const onAbort = () => {
+        const idx = _waiters.indexOf(w);
+        if (idx >= 0) _waiters.splice(idx, 1);
+        reject(signal.reason || new DOMException('Aborted', 'AbortError'));
+      };
+      if (signal.aborted) onAbort();
+      else signal.addEventListener('abort', onAbort, { once: true });
+    }
+  });
 }
-export function waitForTap(targetId) {
-  return new Promise((resolve) => { _waiters.push({ type: 'tap', target: targetId, resolve }); });
-}
-export function waitForRelease(targetId) {
-  return new Promise((resolve) => { _waiters.push({ type: 'release', target: targetId, resolve }); });
-}
-export function waitForRingLongPress() { return waitForLongPress('edge'); }
-export function waitForRingRelease()   { return waitForRelease('edge'); }
+export function waitForLongPress(targetId, opts) { return pushWaiter('longpress', targetId, opts); }
+export function waitForTap(targetId, opts)       { return pushWaiter('tap', targetId, opts); }
+export function waitForRelease(targetId, opts)   { return pushWaiter('release', targetId, opts); }
+export function waitForRingLongPress(opts) { return waitForLongPress('edge', opts); }
+export function waitForRingRelease(opts)   { return waitForRelease('edge', opts); }
+export function waitForRingTap(opts)       { return waitForTap('edge', opts); }
 
 const PET_HOLD_MS = 800;
 let _petWaiterResolver = null;
@@ -113,9 +124,6 @@ function startPress(target, e) {
   _isPressing = true;
   _pressTarget = target;
   _pressMeta = { startX: e.clientX, startY: e.clientY, startTime: Date.now(), longPressed: false };
-  if (target === 'edge' && typeof e.clientY === 'number') {
-    recordTouchY(e.clientY);
-  }
   _longPressTimer = setTimeout(() => {
     if (_isPressing && _pressTarget === target) {
       _pressMeta.longPressed = true;
@@ -171,9 +179,18 @@ const FF_SPEED = 5;
 
 let _spaceHeld = false;
 let _shiftHeld = false;
+function isTypingState() {
+  const s = getRingState();
+  return s === RING.INPUT || s === RING.SETTLED;
+}
+
 function initKeyboard() {
   window.addEventListener('keydown', (e) => {
     if (e.repeat) return;
+    // 打字态: 全局快捷键(Space 长按 / Shift 快进 / J 日记 / Enter 跳转)全部
+    // 让位给真实输入. Backspace / Enter / Escape 由隐藏 input 自己的 keydown
+    // 监听处理.
+    if (isTypingState()) return;
     if (e.code === 'Space') {
       e.preventDefault();
       if (!_spaceHeld) {
@@ -203,12 +220,16 @@ function initKeyboard() {
     }
   });
   window.addEventListener('keyup', (e) => {
+    // keyup 必须始终把对应的 _held 清掉, 否则在 typing 态下用户按住 Shift
+    // 然后 keyup 被忽略, _shiftHeld 永远是 true, 之后再按 Shift 会跳过 setSpeed.
     if (e.code === 'Space' && _spaceHeld) {
       _spaceHeld = false;
-      endPress('edge');
+      if (!isTypingState()) endPress('edge');
     } else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
-      _shiftHeld = false;
-      setSpeed(1);
+      if (_shiftHeld) {
+        _shiftHeld = false;
+        setSpeed(1);
+      }
     }
   });
 }
