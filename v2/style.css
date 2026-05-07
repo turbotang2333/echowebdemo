@@ -1,0 +1,1080 @@
+:root {
+  --bg: #070811;
+  --serif: 'Source Han Serif SC', 'Songti SC', 'STSong', 'SimSun', serif;
+  --sans: 'Source Han Sans SC', 'PingFang SC', 'HarmonyOS Sans SC', sans-serif;
+  --text: rgba(255, 245, 230, 0.95);
+  --text-soft: rgba(255, 235, 210, 0.7);
+  --text-faint: rgba(255, 235, 210, 0.45);
+  --warm: rgba(255, 200, 130, 0.9);
+  --ease-soft: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-paper: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-drift: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0; padding: 0;
+  width: 100%; height: 100%;
+  background: #000;
+  color: var(--text);
+  font-family: var(--serif);
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+  cursor: default;
+  overscroll-behavior: none;
+}
+
+.stage {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+/* ============== screen stack ============== */
+.screen-host {
+  position: absolute; inset: 0;
+  z-index: 1;
+}
+
+.screen {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  transform: translateY(0);
+  opacity: 1;
+  transition: transform 600ms var(--ease-paper), opacity 600ms var(--ease-soft);
+}
+
+.screen.entering {
+  transform: translateY(100%);
+  opacity: 0.6;
+}
+
+.screen.active {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.screen.leaving {
+  transform: translateY(-100%);
+  opacity: 0;
+}
+
+/* 屏内背景（场景图/纯色） */
+.screen-bg {
+  position: absolute; inset: 0;
+  background-color: #000;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  transition: opacity 800ms var(--ease-soft), filter 800ms var(--ease-soft), background-color 1.2s var(--ease-soft);
+  z-index: 0;
+}
+
+.screen-bg::after {
+  content: '';
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse at center, rgba(0,0,0,0) 40%, rgba(0,0,0,0.55) 100%),
+    linear-gradient(to bottom, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0) 30%, rgba(0,0,0,0) 65%, rgba(0,0,0,0.65) 100%);
+  pointer-events: none;
+}
+
+/* ============== character ============== */
+.character-layer {
+  position: absolute; inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+/* v1 容器结构：100vh × 100vh 见方的"画框"，水平居中（left=calc(50vw-50vh)）。
+   transform-origin 50% 20%（肩部锚点）让 scale 缩放以肩/胸为支点，
+   远→近过渡时人物自然往画面下方推。各档位用 top（默认 5vh）+ translateY 偏移
+   + scale 配合，数值跟 v1 script 里的 char-pos 一一对应。 */
+.character {
+  position: absolute;
+  left: calc(50vw - 50vh);
+  top: 5vh;
+  width: 100vh;
+  height: 100vh;
+  pointer-events: none;
+  transition: transform 700ms var(--ease-soft), opacity 700ms var(--ease-soft), filter 700ms var(--ease-soft);
+  opacity: 0;
+  transform-origin: 50% 20%;
+}
+
+.character.visible { opacity: 1; }
+
+.character[data-pos="far"]      { transform: scale(0.35);                   filter: brightness(0.4) blur(1px); }
+.character[data-pos="far-lit"]  { transform: scale(0.36);                   filter: brightness(0.65); }
+.character[data-pos="mid"]      { transform: scale(0.65);                   filter: brightness(1); }
+.character[data-pos="mid-back"] { transform: translateY(5vh)  scale(0.50);  filter: brightness(0.85); }
+.character[data-pos="close"]    { transform: translateY(30vh) scale(1.05);  filter: brightness(1); }
+.character[data-pos="extreme"]  { transform: translateY(35vh) scale(1.15);  filter: brightness(1); }
+.character[data-pos="hidden"]   { opacity: 0; transform: scale(0.5); }
+.character[data-pos="curled"]   { transform: translateY(30vh) scale(0.55);  filter: brightness(0.85); }
+.character[data-pos="walking-away"] {
+  transform: scale(0.65) scaleX(-1);
+  filter: brightness(0.9);
+}
+
+.character[data-pose="tilt"] .char-fig    { transform: rotate(-3deg) translateY(-2px); }
+.character[data-pose="lean-in"] .char-fig { transform: translateY(2vh) scale(1.04); }
+.character[data-pose="step-back"] .char-fig { transform: translateY(-1vh) scale(0.96); }
+.character[data-pose="attack"] .char-fig  { transform: translateY(2vh) scale(1.08) rotate(-2deg); }
+.character[data-pose="cold"] .char-fig    { filter: brightness(0.9) saturate(0.7); }
+.character[data-pose="closed-eye"] .char-fig { filter: brightness(0.85); }
+.character[data-pose="fake-smile"] .char-fig { filter: brightness(0.85) hue-rotate(-10deg); transform: translateY(1vh) scale(1.03); }
+
+.char-fig {
+  width: 100%;
+  height: 100%;
+  transition: transform 600ms var(--ease-soft), filter 600ms var(--ease-soft);
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+}
+
+.char-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center bottom;
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
+}
+
+/* ============== fx layer ============== */
+.fx-layer {
+  position: absolute; inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.fx-canvas {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+}
+
+.fx-overlay {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  transition: opacity 800ms var(--ease-soft), background-color 800ms var(--ease-soft);
+}
+
+@keyframes screen-shake {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-4px, 2px); }
+  40% { transform: translate(3px, -2px); }
+  60% { transform: translate(-2px, 3px); }
+  80% { transform: translate(2px, -1px); }
+}
+.stage.shaking { animation: screen-shake 400ms ease-in-out; }
+
+.flash-veil {
+  position: absolute; inset: 0;
+  background: white;
+  z-index: 9;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms ease-out;
+}
+.flash-veil.on { opacity: 0.9; transition: opacity 80ms ease-in; }
+
+.fog-overlay {
+  position: absolute; inset: 0;
+  background: radial-gradient(circle at 50% 60%, rgba(220, 215, 210, 0) 20%, rgba(180, 175, 170, 0.7) 80%);
+  opacity: 0;
+  z-index: 6;
+  pointer-events: none;
+  transition: opacity 1.5s var(--ease-soft);
+}
+.fog-overlay.on { opacity: 1; }
+
+/* ============== 暖光传送 (transmitToCharacter) ============== */
+/* A 段：用户气泡碎成光点（bubble 自身淡出 + 缩 + 微 blur） */
+.bubble.bubble-user.transmit-scatter {
+  animation: bubble-scatter 380ms cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+}
+@keyframes bubble-scatter {
+  0%   { opacity: 1; filter: blur(0);   transform: translateX(-50%) scale(1); }
+  60%  { opacity: 0.55; filter: blur(2px); transform: translateX(-50%) scale(0.97); }
+  100% { opacity: 0; filter: blur(4px); transform: translateX(-50%) scale(0.92); }
+}
+
+/* A 段：从气泡位置炸开的暖白光点 */
+.transmit-spark {
+  position: absolute;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: radial-gradient(circle,
+    rgba(255, 245, 215, 1) 0%,
+    rgba(255, 222, 165, 0.9) 35%,
+    rgba(255, 200, 130, 0) 100%);
+  pointer-events: none;
+  z-index: 7;
+  filter: blur(0.5px);
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  animation: transmit-spark 460ms cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+  mix-blend-mode: screen;
+}
+@keyframes transmit-spark {
+  0%   { opacity: 0;   transform: translate(-50%, -50%); }
+  18%  { opacity: 1; }
+  100% { opacity: 0;
+         transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, 0px))); }
+}
+
+/* B 段：屏底升起的暖白纵向光带（top + 自定义 height 由 JS 写入；用 translateY 上扫） */
+.transmit-beam {
+  position: absolute;
+  width: 22vw;
+  background: linear-gradient(to top,
+    rgba(255, 222, 170, 0)    0%,
+    rgba(255, 222, 170, 0.55) 22%,
+    rgba(255, 240, 200, 0.92) 55%,
+    rgba(255, 246, 215, 0.55) 82%,
+    rgba(255, 246, 215, 0)    100%);
+  filter: blur(11px);
+  transform: translate(-50%, 0);
+  opacity: 0;
+  z-index: 7;
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+.transmit-beam.rising {
+  animation: transmit-beam-rise 1800ms cubic-bezier(0.45, 0, 0.55, 1) forwards;
+}
+.transmit-beam.fade {
+  animation: none;
+  transform: translate(-50%, var(--rise, -100vh));
+  opacity: 0;
+  transition: opacity 160ms ease-out;
+}
+@keyframes transmit-beam-rise {
+  0%   { opacity: 0;    transform: translate(-50%, 0); }
+  10%  { opacity: 1; }
+  85%  { opacity: 1; }
+  100% { opacity: 0;    transform: translate(-50%, var(--rise, -100vh)); }
+}
+
+/* B 段：beam 前沿的几粒微光，跟随 beam 顶端往上飘 */
+.transmit-lead {
+  position: absolute;
+  top: 0; left: 0;
+  width: 1px; height: 1px;
+  pointer-events: none;
+  z-index: 8;
+  transform: translate(-50%, 100vh);
+  animation: transmit-lead-track 1800ms cubic-bezier(0.45, 0, 0.55, 1) forwards;
+}
+@keyframes transmit-lead-track {
+  0%   { transform: translate(-50%, 100vh); }
+  100% { transform: translate(-50%, calc(100vh + var(--rise, -100vh) + 6vh)); }
+}
+.transmit-lead-spark {
+  position: absolute;
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: radial-gradient(circle,
+    rgba(255, 250, 225, 1) 0%,
+    rgba(255, 230, 180, 0.7) 50%,
+    rgba(255, 200, 130, 0) 100%);
+  filter: blur(0.4px);
+  mix-blend-mode: screen;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  animation: transmit-lead-spark 1500ms ease-out forwards;
+}
+@keyframes transmit-lead-spark {
+  0%   { opacity: 0;   transform: translate(calc(-50% + var(--ox, 0px)), -50%); }
+  20%  { opacity: 0.95; }
+  100% { opacity: 0;
+         transform: translate(calc(-50% + var(--ox, 0px) * 0.3), calc(-50% - 18vh)); }
+}
+
+.lantern-overlay {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(circle at 20% 30%, rgba(220, 50, 50, 0.4) 0%, transparent 12%),
+    radial-gradient(circle at 78% 35%, rgba(200, 40, 40, 0.35) 0%, transparent 14%),
+    radial-gradient(circle at 50% 25%, rgba(230, 70, 70, 0.45) 0%, transparent 10%);
+  opacity: 0;
+  z-index: 5;
+  pointer-events: none;
+  transition: opacity 1.2s var(--ease-soft);
+  animation: lantern-flicker 3s ease-in-out infinite;
+}
+.lantern-overlay.on { opacity: 1; }
+@keyframes lantern-flicker {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(0.85); }
+}
+
+.nail-people {
+  position: absolute;
+  left: 0; right: 0;
+  bottom: 8vh;
+  height: 30vh;
+  z-index: 5;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 1s var(--ease-soft);
+}
+.nail-people.on { opacity: 1; }
+.nail-people .figure {
+  position: absolute;
+  bottom: 0;
+  width: 8vw;
+  height: 22vh;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.85) 30%, rgba(0,0,0,0.95) 100%);
+  clip-path: polygon(40% 0, 60% 0, 70% 35%, 70% 100%, 30% 100%, 30% 35%);
+  animation: nail-twitch 2.4s ease-in-out infinite;
+}
+.nail-people .figure::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 30%; right: 30%; height: 18%;
+  background: rgba(255, 245, 230, 0.7);
+  border-radius: 50%;
+  background-image:
+    radial-gradient(circle at 35% 45%, #000 0, #000 8%, transparent 9%),
+    radial-gradient(circle at 65% 45%, #000 0, #000 8%, transparent 9%),
+    linear-gradient(to right, transparent 30%, #000 30%, #000 70%, transparent 70%);
+  background-position: 0 0, 0 0, 0 80%;
+  background-size: 100% 100%, 100% 100%, 100% 8%;
+  background-repeat: no-repeat;
+}
+@keyframes nail-twitch {
+  0%, 100% { transform: rotate(-2deg) scaleY(1); }
+  20% { transform: rotate(3deg) scaleY(1.02); }
+  40% { transform: rotate(-1deg) scaleY(0.98); }
+  60% { transform: rotate(2deg) scaleY(1.01); }
+  80% { transform: rotate(-3deg) scaleY(0.99); }
+}
+
+/* ============================================================
+   软幕 · 边缘弧 (从 v1 移植)
+   .edge-zone: 触控热区
+   .edge-arc-host: 可见弧（呼吸 / 录音 / 派送 多状态）
+   ============================================================ */
+
+.edge-zone, .opening-glow {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: none;
+}
+
+.edge-zone {
+  position: absolute;
+  left: 0; right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 36vh;
+  min-height: 220px;
+  z-index: 10;
+  cursor: pointer;
+}
+.edge-zone[hidden] { display: none !important; }
+
+.edge-arc-host {
+  position: absolute;
+  pointer-events: none;
+  left: 0; right: 0; bottom: 12vh;
+  height: 14vh;
+  min-height: 80px;
+  transform-origin: center bottom;
+  transform: scale(1);
+  transition: transform 0.45s var(--ease-drift);
+}
+.edge-zone.state-recording .edge-arc-host {
+  transform: scale(1.7);
+  transition: transform 0.32s var(--ease-drift);
+}
+.edge-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+  transform-origin: center bottom;
+}
+.edge-arc-main {
+  opacity: 0;
+  transition: opacity 0.8s var(--ease-drift);
+}
+.edge-ripple { opacity: 0; }
+
+/* 底部暗罩 — state 驱动 opacity */
+.edge-veil {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 100vh;
+  pointer-events: none;
+  background: linear-gradient(to top,
+    rgba(0, 0, 0, 0.92) 0%,
+    rgba(0, 0, 0, 0) 70%);
+  opacity: 0;
+  transition: opacity 1s var(--ease-drift);
+}
+.edge-zone.state-invitation .edge-veil { opacity: 0.7; }
+.edge-zone.state-recording  .edge-veil { opacity: 1; }
+.edge-zone.state-delivering .edge-veil { opacity: 0.7; }
+
+/* state-idle */
+.edge-zone.state-idle .edge-arc-main { opacity: 0; }
+
+/* state-invitation — 呼吸 */
+.edge-zone.state-invitation .edge-arc-main {
+  opacity: 1;
+  stroke: rgba(255,240,215,0.95);
+  stroke-width: 2.8;
+}
+.edge-zone.state-invitation .edge-svg {
+  animation: edgeBreath 4.2s ease-in-out infinite;
+}
+@keyframes edgeBreath {
+  0%, 100% {
+    transform: scale(0.88);
+    opacity: 0.45;
+    filter: drop-shadow(0 0 6px rgba(255,225,200,0.15));
+  }
+  50% {
+    transform: scale(1.22);
+    opacity: 1;
+    filter: drop-shadow(0 0 32px rgba(255,235,210,0.9));
+  }
+}
+
+/* state-recording — 弧扩张 + 涟漪 */
+.edge-zone.state-recording .edge-arc-main {
+  opacity: 1;
+  stroke: rgba(255,250,225,1);
+  stroke-width: 3.2;
+  filter: drop-shadow(0 0 36px rgba(255,235,200,1));
+}
+.edge-zone.state-recording .edge-ripple {
+  animation: edgeRipple 1.8s ease-out infinite;
+}
+.edge-zone.state-recording .ripple-1 { animation-delay: 0s; }
+.edge-zone.state-recording .ripple-2 { animation-delay: 0.6s; }
+.edge-zone.state-recording .ripple-3 { animation-delay: 1.2s; }
+@keyframes edgeRipple {
+  0%   { opacity: 0.7; transform: translateY(0); }
+  80%  { opacity: 0.05; }
+  100% { opacity: 0; transform: translateY(-22vh); }
+}
+
+/* state-delivering — fade out */
+.edge-zone.state-delivering .edge-arc-main {
+  opacity: 0;
+  transition: opacity 0.6s ease-out;
+}
+
+/* ---- 弧下方居中操作提示（前 2 次出现） ---- */
+.arc-hint {
+  position: absolute;
+  z-index: 11;
+  left: 0; right: 0;
+  bottom: 9vh;
+  text-align: center;
+  font-family: var(--sans);
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.5s var(--ease-drift);
+  color: rgba(255,235,210,0.9);
+  text-shadow: 0 0 12px rgba(255,225,200,0.4);
+}
+.edge-zone.arc-hint-active.state-invitation .arc-hint {
+  opacity: 0.85;
+  animation: guideBreath 4.2s ease-in-out infinite;
+}
+@keyframes guideBreath {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.9; }
+}
+
+/* ---- 引导文字（对话提示） ---- */
+.edge-prompt {
+  position: absolute;
+  left: 0; right: 0;
+  bottom: calc(12vh + 14vh + 14px);
+  text-align: center;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 13px;
+  letter-spacing: 0.16em;
+  color: rgba(255, 235, 210, 0.55);
+  text-shadow: 0 0 12px rgba(0,0,0,0.6);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.5s var(--ease-drift);
+}
+.edge-zone.state-invitation .edge-prompt { opacity: 1; }
+.edge-zone.state-recording  .edge-prompt { opacity: 0.4; }
+
+/* ============================================================
+   底部尖尖 — 上滑就绪时显现
+   - 跟长按圆弧同一族（同形 + 同色系），但只露出 ~12px 的尖
+   - 弧线 + 弧内半透明填充，构成"水面下浮起"的语义
+   - 缓慢呼吸（4s）— 时显时隐，提示"可上滑"
+   - 上滑离场时跟着旧屏一起向上滑出（700ms，与 screen 切换同步）
+   - 长按弧激活时强制隐藏（保险，正常流程不应共存）
+   ============================================================ */
+
+/* 几何对齐：用与长按弧完全相同的 viewBox 1000×220 和 path，
+   元素高 88px，bottom: calc(--peek - 36px)，
+   ⇒ 弧的几何峰值（viewBox y=130 处的 t=0.5）露出屏底 ~ --peek。
+   --peek 调露出量；其它别动。
+
+   动画语汇与长按弧同源：transform-origin: center bottom（底边中央
+   永远不动），手势期间只改 scale（path d 永远不变）。leaving 用
+   translate（独立 CSS 属性）滑出，跟 scale 互不打架。 */
+.swipe-tip {
+  --peek: 30px;
+  position: absolute;
+  left: 0; right: 0;
+  bottom: calc(var(--peek) - 36px);
+  height: 88px;
+  pointer-events: none;
+  z-index: 4;
+  opacity: 0;
+  scale: 1;
+  translate: 0 0;
+  filter: blur(0);
+  transform-origin: 50% 100%;
+  transition: opacity 0.6s var(--ease-drift),
+              translate 0.7s var(--ease-drift),
+              filter 0.25s var(--ease-drift);
+}
+.swipe-tip.visible { opacity: 1; }
+
+/* leaving = "提交后涨开溶解"：
+   - 大幅减小位移 -10vh（不再"整块飞走"的生硬感）
+   - 补偿性放大 scale 到 3.5（在原地涨开 + 上飘混合，气泡破裂感）
+   - filter blur 0 → 24px 涂掉拱形结构，留半透暖光团
+   - opacity 1 → 0，总时长 ~380ms
+   scale 3.5 由 .leaving 类负责，但要让它生效，hideSwipeTip()
+   需要清掉 _node.style.scale 的 inline 值（inline 高于 class）。 */
+.swipe-tip.leaving {
+  opacity: 0;
+  translate: 0 -10vh;
+  scale: 3.5;
+  filter: blur(24px);
+  transition:
+    opacity 0.3s ease-out,
+    translate 0.38s cubic-bezier(0.2, 0.7, 0.4, 1),
+    scale 0.38s cubic-bezier(0.2, 0.7, 0.4, 1),
+    filter 0.18s ease-out;
+}
+.swipe-tip-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  animation: swipe-tip-breathe 4s ease-in-out infinite;
+}
+@keyframes swipe-tip-breathe {
+  0%, 100% { opacity: 0.55; translate: 0 0; }
+  50%      { opacity: 1;    translate: 0 -3px; }
+}
+
+/* 长按弧 = 只描边、无填充（"线"，邀请触发动作）
+   上滑尖 = 只填充、无描边（"面"，等待揭开的内容）— 完全分掉视觉语汇
+   drop-shadow 给一圈柔光，让纯填充在深色背景上有"光"的活感而非死颜色 */
+.swipe-tip-fill {
+  fill: rgba(255, 235, 210, 0.28);
+  filter: drop-shadow(0 -2px 18px rgba(255, 235, 210, 0.25));
+}
+
+/* ============================================================
+   两套文字语言（移植 v1）
+   说话(他 ↔ 你): .bubble
+     17px / 衬线 / 暖白 / 打字机 / 离场轻轻向上散
+   世界声音(旁白 / 内心 / NPC / 重旁白): .narration / .inner / .npc-text / .heavy
+     14px / 衬线斜体 / 白 50% / 字距统一
+     差别只在位置和入场方向
+   ============================================================ */
+
+.narration, .inner, .npc-text, .heavy {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+  letter-spacing: 0.14em;
+  line-height: 1.9;
+  text-shadow: 0 0 12px rgba(0, 0, 0, 0.5);
+}
+
+.narration, .inner, .npc-text {
+  display: inline-block;
+  max-width: 100%;
+  position: relative;
+  z-index: 0;
+}
+
+/* 文字身后的横向暗带 — 字真出来了才上 banner */
+.narration:not(:empty)::before,
+.inner:not(:empty)::before,
+.npc-text:not(:empty)::before {
+  content: '';
+  position: absolute;
+  left: -50vw; right: -50vw;
+  top: -22px; bottom: -22px;
+  /* 像素切渐变（不随行数变厚）；上下各 18px 羽化过渡 + 中间 0.72 实色，
+     再用 -22px 延伸把实色边缘外推到字的外侧，避免羽化吃到首尾行字。
+     min/max clamp 让暗带在生长动画中（高度可能 < 36px）渐变不交叉。 */
+  background: linear-gradient(to bottom,
+    rgba(0, 0, 0, 0)    0,
+    rgba(0, 0, 0, 0.72) min(18px, 50%),
+    rgba(0, 0, 0, 0.72) max(calc(100% - 18px), 50%),
+    rgba(0, 0, 0, 0)    100%);
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* token 模式：暗带顶端固定在文字上方 -22，高度由 JS 控制
+   （随每出一行推进），使带子从第一行起逐行向下展开。 */
+.narration.line-banner:not(:empty)::before,
+.inner.line-banner:not(:empty)::before {
+  bottom: auto;
+  height: var(--banner-h, 0);
+  transition: height 0.55s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* heavy 自己有横线装饰，banner 包到外层 .heavy-wrap */
+.heavy-wrap {
+  display: inline-block;
+  position: relative;
+  z-index: 0;
+  opacity: 0;
+  transition: opacity 0.8s var(--ease-drift);
+}
+.heavy-wrap.visible { opacity: 1; }
+.heavy-wrap.drifting { animation: gentleUp 1.4s var(--ease-drift) forwards; }
+.heavy-wrap::before {
+  content: '';
+  position: absolute;
+  left: -50vw; right: -50vw;
+  top: -10px; bottom: -10px;
+  background: linear-gradient(to bottom,
+    rgba(0, 0, 0, 0)    0%,
+    rgba(0, 0, 0, 0.85) 22%,
+    rgba(0, 0, 0, 0.85) 78%,
+    rgba(0, 0, 0, 0)    100%);
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* ============================================================
+   对话气泡 (角色 ↔ 你)
+   .bubble-zone 是覆盖整屏的定位容器，bubble 用 viewport % 定位
+   .bubble-char (紫): 跟随头部 — JS 写 head.xPct/yPct，啾啾沿气泡边沿
+   .bubble-user (金): 固定在底部弧线上方
+   ============================================================ */
+
+.bubble-zone {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.bubble {
+  position: absolute;
+  transform: translateX(-50%);
+  max-width: 70vw;
+  padding: 11px 18px;
+  border-radius: 16px;
+  font-family: var(--serif);
+  font-size: 17px;
+  line-height: 1.5;
+  letter-spacing: 0.06em;
+  text-align: center;
+  white-space: normal;
+  word-break: break-word;
+  opacity: 0;
+  transition: opacity 0.45s var(--ease-drift);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  --tail-pos: 50%;
+}
+.bubble.visible { opacity: 1; }
+
+.bubble-char {
+  background: rgba(34, 24, 50, 0.82);
+  color: #d8c2f0;
+  border: 1px solid rgba(216, 194, 240, 0.22);
+  text-shadow: 0 0 8px rgba(0, 0, 0, 0.7);
+}
+.bubble-char.tail-top::after,
+.bubble-char.tail-bottom::after {
+  content: '';
+  position: absolute;
+  left: var(--tail-pos);
+  width: 12px; height: 12px;
+  background: rgba(34, 24, 50, 0.82);
+  border: 1px solid rgba(216, 194, 240, 0.22);
+  transform: translateX(-50%) rotate(45deg);
+}
+.bubble-char.tail-top::after {
+  top: -7px;
+  border-right: none;
+  border-bottom: none;
+}
+.bubble-char.tail-bottom::after {
+  bottom: -7px;
+  border-left: none;
+  border-top: none;
+}
+
+.bubble-user {
+  left: 50%;
+  bottom: 30vh;
+  background: rgba(46, 34, 18, 0.86);
+  color: #f0d09a;
+  border: 1px solid rgba(240, 208, 154, 0.25);
+  text-shadow: 0 0 8px rgba(0, 0, 0, 0.7);
+}
+.bubble-user.tail-bottom::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -7px;
+  width: 12px; height: 12px;
+  background: rgba(46, 34, 18, 0.86);
+  border: 1px solid rgba(240, 208, 154, 0.25);
+  border-left: none;
+  border-top: none;
+  transform: translateX(-50%) rotate(45deg);
+}
+
+@keyframes bubbleDrift {
+  0%   { opacity: 0.85; transform: translateX(-50%) translateY(0);     filter: blur(0); }
+  100% { opacity: 0;    transform: translateX(-50%) translateY(-14px); filter: blur(0.8px); }
+}
+.bubble.drifting { animation: bubbleDrift 1.0s var(--ease-drift) forwards; }
+
+/* heavy-active 时压暗气泡 */
+.stage.heavy-active .bubble {
+  filter: brightness(0.55);
+  transition: filter 0.7s var(--ease-drift);
+}
+
+/* ============================================================
+   旁白 / 内心 / 重旁白 / NPC 缺席旁白 — 各自分区
+   旁白(narration-zone): 上 2/3 居中（top:25vh，避开下半屏立绘）
+   内心(inner-zone):     与旁白同位置，仅靠括号区分
+   重旁白(heavy-zone):   屏中央，加横线装饰
+   NPC(npc-zone):        从方向入场（top/right）
+   ============================================================ */
+
+.narration-zone {
+  position: absolute;
+  left: 50%;
+  top: 25vh;
+  transform: translateX(-50%);
+  max-width: 70vw;
+  text-align: center;
+  z-index: 5;
+  pointer-events: none;
+}
+.narration {
+  margin: 6px 0;
+  font-size: 17px;
+  letter-spacing: 0.12em;
+  opacity: 0;
+  transition: opacity 0.7s var(--ease-drift);
+}
+.narration.visible { opacity: 1; }
+.narration.aside {
+  font-size: 13px;
+  letter-spacing: 0.18em;
+  color: rgba(255, 240, 220, 0.55);
+}
+
+.inner-zone {
+  position: absolute;
+  left: 50%;
+  top: 25vh;
+  transform: translateX(-50%);
+  max-width: 70vw;
+  text-align: center;
+  z-index: 6;
+  pointer-events: none;
+}
+.inner {
+  margin: 6px 0;
+  font-size: 17px;
+  letter-spacing: 0.12em;
+  opacity: 0;
+  transition: opacity 0.7s var(--ease-drift);
+}
+.inner.visible { opacity: 1; }
+
+/* Token-stream reveal (LLM-feel for 旁白 / 内心 / aside)：
+   每个 chunk 是 inline-block 的纯文字，无自带背景；暗带由父级
+   .narration:not(:empty)::before / .inner:not(:empty)::before 一道整体提供。
+   chunk 在第 0 帧就按最终布局占位（pending: opacity:0），所以盒子大小不
+   会随字增长 — 没有打字机居中扩展的视觉。reveal 时 fade + 微上浮 + 模糊
+   清除，错峰出现。 */
+.gen-chunk {
+  display: inline-block;
+  /* 默认 baseline 对齐会让父级行盒在 inline-block 下方预留 descender 间隙，
+     让 .narration 盒子比直接文字模式高 3–5px → 暗带（基于盒子的 -6/-6 定位）
+     整体下移、跟文字垂直中线对不上。改为 top 对齐消除该间隙。 */
+  vertical-align: top;
+}
+
+.gen-chunk.pending {
+  opacity: 0;
+}
+
+.gen-chunk.reveal {
+  animation: genChunkIn 0.7s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  will-change: opacity, transform, filter;
+}
+
+@keyframes genChunkIn {
+  0%   { opacity: 0; transform: translateY(4px); filter: blur(4px); }
+  100% { opacity: 1; transform: translateY(0);   filter: blur(0); }
+}
+
+.heavy-zone {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 70vw;
+  text-align: center;
+  z-index: 9;
+  pointer-events: none;
+}
+.heavy {
+  padding: 14px 0;
+  font-size: 17px;
+  color: rgba(255, 245, 230, 0.95);
+  font-style: normal;
+  letter-spacing: 0.16em;
+  line-height: 1.8;
+  white-space: pre-line;
+}
+.heavy::before, .heavy::after {
+  content: '── ── ── ── ── ──';
+  display: block;
+  font-size: 11px;
+  color: rgba(255, 220, 200, 0.4);
+  letter-spacing: 0.4em;
+  margin: 8px 0;
+}
+
+.stage.heavy-active .narration,
+.stage.heavy-active .inner,
+.stage.heavy-active .character,
+.stage.heavy-active .edge-arc-main {
+  filter: brightness(0.55);
+  transition: filter 0.7s var(--ease-drift);
+}
+
+.npc-zone { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
+.npc-text {
+  position: absolute;
+  white-space: nowrap;
+  opacity: 0;
+}
+.npc-text.from-top {
+  top: 14%; left: 50%; transform: translateX(-50%);
+  animation: npcTop 4.5s ease-in-out forwards;
+}
+.npc-text.from-right {
+  top: 38%; right: 8%;
+  animation: npcRight 4.5s ease-in-out forwards;
+}
+@keyframes npcTop {
+  0%   { opacity: 0; transform: translate(-50%, -20px); }
+  20%  { opacity: 1; transform: translate(-50%, 0); }
+  70%  { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, -10px); }
+}
+@keyframes npcRight {
+  0%   { opacity: 0; transform: translateX(20px); }
+  20%  { opacity: 1; transform: translateX(0); }
+  70%  { opacity: 1; transform: translateX(0); }
+  100% { opacity: 0; transform: translateX(10px); }
+}
+
+/* 漂散 · 一切轻轻向上 */
+@keyframes gentleUp {
+  0%   { opacity: 0.85; transform: translateY(0); filter: blur(0); }
+  100% { opacity: 0; transform: translateY(-14px); filter: blur(0.8px); }
+}
+.narration.drifting,
+.inner.drifting {
+  animation: gentleUp 1.0s var(--ease-drift) forwards;
+}
+
+/* ============== touch hint (教学动画) ==============
+   一个半透明圆点，模拟"指尖"。两套动画通过 modifier class 切换:
+     .demo-swipe  上滑示范 — 从屏底往上飘
+     .demo-press  长按示范 — 停在弧上 + 向外脉冲
+   tutorial.js 控制 hidden / class，前 2 次成功后停显。 */
+.touch-hint {
+  position: absolute;
+  right: 18vw;
+  bottom: 18vh;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 245, 230, 0.55);
+  box-shadow: 0 0 18px rgba(255, 235, 210, 0.45);
+  pointer-events: none;
+  opacity: 0;
+  z-index: 12;
+}
+
+/* ---- 上滑示范 + 拖尾 ----
+   用多层 box-shadow 在圆点下方堆叠 3 个虚影 (越远越小越淡, 都带模糊),
+   形成"刚走过的轨迹"。整体随 element 移动 + opacity 一起渐隐。 */
+.touch-hint.demo-swipe {
+  bottom: 18vh;
+  animation: touch-swipe 1.8s ease-out infinite;
+  box-shadow:
+    0 0 18px rgba(255, 235, 210, 0.45),       /* 原有的辉光 */
+    0 10px 6px 0 rgba(255, 245, 230, 0.42),   /* 紧贴的尾 */
+    0 22px 12px 0 rgba(255, 245, 230, 0.24),  /* 中段尾 */
+    0 36px 18px 0 rgba(255, 245, 230, 0.10);  /* 最远端尾 */
+}
+@keyframes touch-swipe {
+  0%   { opacity: 0;   transform: translateY(0)    scale(0.85); }
+  8%   { opacity: 0.9; transform: translateY(0)    scale(0.82); }  /* 出现 + 按下 */
+  18%  { opacity: 0.9; transform: translateY(0)    scale(0.95); }  /* 微弹 */
+  85%  { opacity: 0;   transform: translateY(-12vh) scale(0.95); } /* 一气呵成上飘+渐隐 */
+  100% { opacity: 0;   transform: translateY(-12vh) scale(0.95); }
+}
+
+/* ---- 长按示范 ----
+   总时长 2.6s: 0.2s 出现+按下 → 1.6s 持续按 → 0.6s 放开+消失 → 0.2s 间隙
+   按住期间圆圈一直保持 scale 0.82 (按下态), 不再变 — 视觉上"被按住" */
+.touch-hint.demo-press {
+  bottom: 22vh;
+  animation: touch-press 2.6s ease-in-out infinite;
+}
+@keyframes touch-press {
+  0%   { opacity: 0;   transform: scale(0.95); }
+  8%   { opacity: 0.9; transform: scale(0.82); }  /* 按下 (~210ms) */
+  70%  { opacity: 0.9; transform: scale(0.82); }  /* 持续按住 ~1.6s */
+  85%  { opacity: 0.4; transform: scale(0.95); }  /* 放开 */
+  95%  { opacity: 0;   transform: scale(0.95); }
+  100% { opacity: 0;   transform: scale(0.95); }  /* 间隙停顿 */
+}
+/* 按住期间，连续 2 次向外脉冲 — 每次 ~780ms, 比之前慢一倍。
+   ease-in-out 让扩散两端柔和; 中段保持峰值 opacity 一小段, 形成
+   "呼吸"感而非"爆开"。脉冲间在 opacity:0 时复位 scale (用户不可见)。 */
+.touch-hint.demo-press::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border: 1.5px solid rgba(255, 245, 230, 0.7);
+  border-radius: 50%;
+  animation: touch-press-pulse 2.6s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes touch-press-pulse {
+  0%, 8%   { opacity: 0;    transform: scale(1); }
+  /* pulse 1 — 跟按下同时开始, ~780ms */
+  14%      { opacity: 0.5;  transform: scale(1.2); }   /* 柔和淡入 */
+  22%      { opacity: 0.5;  transform: scale(1.6); }   /* 保持峰值, 继续扩 */
+  38%      { opacity: 0;    transform: scale(2.6); }   /* 慢淡出 */
+  /* 不可见瞬间复位 */
+  38.5%    { opacity: 0;    transform: scale(1); }
+  /* pulse 2 — ~780ms */
+  46%      { opacity: 0.5;  transform: scale(1.2); }
+  54%      { opacity: 0.5;  transform: scale(1.6); }
+  70%      { opacity: 0;    transform: scale(2.6); }
+  100%     { opacity: 0;    transform: scale(1); }
+}
+
+/* ============== endmark ============== */
+.endmark {
+  position: absolute; inset: 0;
+  background: #000;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 1.2s var(--ease-soft);
+}
+.endmark.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+.endmark-text {
+  font-family: var(--serif);
+  font-size: 22px;
+  letter-spacing: 0.5em;
+  color: var(--text-soft);
+  padding-left: 0.5em;
+}
+
+/* ============== boot ============== */
+.boot-veil {
+  position: absolute; inset: 0;
+  background: #000;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: opacity 0.8s var(--ease-soft);
+}
+.boot-veil.gone { opacity: 0; pointer-events: none; }
+.boot-tap {
+  font-family: var(--serif);
+  font-size: 16px;
+  letter-spacing: 0.4em;
+  color: var(--text-faint);
+  padding-left: 0.4em;
+  animation: boot-breath 2.4s ease-in-out infinite;
+}
+@keyframes boot-breath {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+/* ============== orientation gate ============== */
+#orientation-gate {
+  position: fixed; inset: 0; z-index: 9999;
+  background: #070811;
+  color: var(--text-faint);
+  display: flex;
+  align-items: center; justify-content: center;
+  text-align: center;
+  font-family: var(--serif); font-size: 16px; letter-spacing: 0.16em;
+}
+
+/* small viewport tweaks */
+@media (max-height: 640px) {
+  .narration-zone, .inner-zone { top: 22vh; }
+}

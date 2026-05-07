@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>陀螺仪环顾测试</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #000;
+    color: #eee;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: none;
+  }
+
+  #world {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+  }
+
+  /* 场景图：放大覆盖全屏，跟随镜头平移 */
+  #scene {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 180vmax;   /* 留出余量给镜头平移 */
+    height: 180vmax;
+    object-fit: cover;
+    transform: translate(-50%, -50%);
+    will-change: transform;
+  }
+
+  /* 角色：近景，中下方，跟随镜头但速度更快（视差） */
+  #character {
+    position: absolute;
+    left: 50%;
+    top: 75%;            /* 中下方 */
+    width: 130vmin;      /* 近景特写：贴脸感 */
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    will-change: transform;
+    filter: drop-shadow(0 10px 24px rgba(0,0,0,0.65));
+  }
+
+  /* 圆弧羽化遮罩：固定在屏幕中央，不跟随镜头 */
+  #vignette {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(
+      circle at 50% 50%,
+      transparent 0%,
+      transparent 38%,
+      rgba(0,0,0,0.55) 58%,
+      rgba(0,0,0,0.95) 75%,
+      #000 88%
+    );
+  }
+
+  /* 中心十字提示（可选：帮助用户找到镜头中心） */
+  #reticle {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 24px;
+    height: 24px;
+    margin: -12px 0 0 -12px;
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 50%;
+    pointer-events: none;
+  }
+  #reticle::before, #reticle::after {
+    content: "";
+    position: absolute;
+    background: rgba(255,255,255,0.25);
+  }
+  #reticle::before { left: 50%; top: -6px; bottom: -6px; width: 1px; margin-left: -0.5px; }
+  #reticle::after  { top: 50%; left: -6px; right: -6px; height: 1px; margin-top: -0.5px; }
+
+  /* HUD */
+  #hud {
+    position: absolute;
+    left: 12px;
+    top: calc(env(safe-area-inset-top, 0px) + 12px);
+    padding: 8px 10px;
+    background: rgba(0,0,0,0.45);
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.5;
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+    max-width: 70vw;
+  }
+
+  #recenter {
+    position: absolute;
+    right: 12px;
+    top: calc(env(safe-area-inset-top, 0px) + 12px);
+    padding: 8px 12px;
+    background: rgba(255,255,255,0.12);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 999px;
+    font-size: 12px;
+  }
+
+  /* 启动遮罩 */
+  #gate {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    background: rgba(8,10,22,0.92);
+    z-index: 10;
+    text-align: center;
+    padding: 24px;
+  }
+  #gate h1 { font-size: 18px; margin: 0; font-weight: 500; }
+  #gate p { font-size: 13px; opacity: 0.7; margin: 0; max-width: 320px; line-height: 1.6; }
+  #startBtn {
+    padding: 14px 28px;
+    background: #fff;
+    color: #111;
+    border: none;
+    border-radius: 999px;
+    font-size: 15px;
+    font-weight: 500;
+  }
+  #startBtn:active { transform: scale(0.97); }
+  #err {
+    color: #ff8888;
+    font-size: 12px;
+    min-height: 18px;
+  }
+
+  .hidden { display: none !important; }
+
+  /* 调参面板 */
+  #panel {
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+    background: rgba(0,0,0,0.55);
+    border-radius: 12px;
+    padding: 10px 12px;
+    font-size: 12px;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  #panel .row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+  }
+  #panel .row label {
+    flex: 0 0 70px;
+    opacity: 0.7;
+  }
+  #panel .row input[type=range] {
+    flex: 1;
+  }
+  #panel .row .val {
+    flex: 0 0 44px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  #panel .toggles {
+    display: flex;
+    gap: 8px;
+    padding-top: 6px;
+  }
+  #panel .toggles button {
+    flex: 1;
+    padding: 8px;
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 8px;
+    font-size: 12px;
+  }
+  #panel .toggles button.on {
+    background: rgba(120,180,255,0.35);
+    border-color: rgba(120,180,255,0.7);
+  }
+  #panel .head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 4px;
+    font-size: 11px;
+    opacity: 0.7;
+  }
+  #panel .head button {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.3);
+    color: #fff;
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-size: 11px;
+  }
+  #panel.collapsed .body { display: none; }
+</style>
+</head>
+<body>
+  <div id="world">
+    <img id="scene" src="../src/images/cj6.png" alt="scene" />
+    <img id="character" src="../src/images/xiaohuli.png" alt="character" />
+    <div id="reticle"></div>
+  </div>
+  <div id="vignette"></div>
+
+  <div id="hud">
+    <div>secure: <span id="vSecure">—</span></div>
+    <div>event: <span id="vEvent">未触发</span></div>
+    <div>α (yaw): <span id="vAlpha">—</span></div>
+    <div>β (pitch): <span id="vBeta">—</span></div>
+    <div>γ (roll): <span id="vGamma">—</span></div>
+    <div>offset: <span id="vOffset">—</span></div>
+    <div>diag: <span id="vDiag">—</span></div>
+  </div>
+
+  <button id="recenter">重新校准中心</button>
+
+  <div id="panel" class="collapsed">
+    <div class="head">
+      <span>调参（实时）</span>
+      <button id="panelToggle">展开</button>
+    </div>
+    <div class="body">
+      <div class="row">
+        <label>灵敏度 X</label>
+        <input id="sensX" type="range" min="0.5" max="20" step="0.5" />
+        <span class="val" id="sensXv"></span>
+      </div>
+      <div class="row">
+        <label>灵敏度 Y</label>
+        <input id="sensY" type="range" min="0.5" max="20" step="0.5" />
+        <span class="val" id="sensYv"></span>
+      </div>
+      <div class="row">
+        <label>原始低通</label>
+        <input id="rawLp" type="range" min="0.02" max="0.5" step="0.01" />
+        <span class="val" id="rawLpv"></span>
+      </div>
+      <div class="row">
+        <label>渲染平滑</label>
+        <input id="smooth" type="range" min="0.02" max="0.4" step="0.01" />
+        <span class="val" id="smoothv"></span>
+      </div>
+      <div class="row">
+        <label>死区°</label>
+        <input id="deadzone" type="range" min="0" max="3" step="0.1" />
+        <span class="val" id="deadzonev"></span>
+      </div>
+      <div class="row">
+        <label>远景视差</label>
+        <input id="bgPar" type="range" min="0" max="1.5" step="0.05" />
+        <span class="val" id="bgParv"></span>
+      </div>
+      <div class="row">
+        <label>近景视差</label>
+        <input id="fgPar" type="range" min="0.5" max="3" step="0.05" />
+        <span class="val" id="fgParv"></span>
+      </div>
+      <div class="row">
+        <label>角色大小</label>
+        <input id="charSize" type="range" min="40" max="220" step="5" />
+        <span class="val" id="charSizev"></span>
+      </div>
+      <div class="row">
+        <label>角色高度</label>
+        <input id="charTop" type="range" min="30" max="100" step="1" />
+        <span class="val" id="charTopv"></span>
+      </div>
+      <div class="toggles">
+        <button id="invX">X 翻转</button>
+        <button id="invY">Y 翻转</button>
+        <button id="resetCfg">重置默认</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="gate">
+    <h1>陀螺仪环顾测试</h1>
+    <p>点击开始后，手机向左右、上下转动，角色会保持在虚拟空间原位，镜头跟随手机方向移动。</p>
+    <button id="startBtn">开始</button>
+    <div id="err"></div>
+  </div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const scene = $("scene");
+  const character = $("character");
+  const vAlpha = $("vAlpha"), vBeta = $("vBeta"), vGamma = $("vGamma"), vOffset = $("vOffset");
+  const vSecure = $("vSecure"), vEvent = $("vEvent"), vDiag = $("vDiag");
+  const gate = $("gate"), startBtn = $("startBtn"), errBox = $("err");
+  const recenterBtn = $("recenter");
+
+  // 启动时就显示是否安全上下文（不用等点击）
+  vSecure.textContent = (window.isSecureContext ? "yes" : "NO (需 HTTPS)") +
+                        " · " + location.protocol;
+
+  let eventCount = 0;
+  let lastEventName = "";
+
+  // —— 默认参数（已按真机调过的手感固化）
+  const DEFAULTS = {
+    SENS_X: 4.0,
+    SENS_Y: 3.5,
+    INVERT_X: true,
+    INVERT_Y: false,
+    RAW_LP: 0.10,
+    SMOOTH: 0.06,
+    DEADZONE: 2.9,
+    BG_PARALLAX: 0.35,   // 远景：跟得慢
+    FG_PARALLAX: 1.6,    // 近景：跟得快（>1 比镜头还快，近景质感）
+    CHAR_SIZE: 130,      // 角色 width = 这个数 vmin
+    CHAR_TOP: 75,        // 角色 top = 这个数 %
+  };
+
+  // 限制位移范围，避免 transform 数字爆炸
+  const MAX_X = 4000;
+  const MAX_Y = 3000;
+
+  // 当前生效的参数（可被面板/localStorage 覆盖）
+  const cfg = loadCfg();
+
+  function loadCfg() {
+    try {
+      const saved = JSON.parse(localStorage.getItem("gyroCfg") || "{}");
+      return Object.assign({}, DEFAULTS, saved);
+    } catch (e) {
+      return Object.assign({}, DEFAULTS);
+    }
+  }
+  function saveCfg() {
+    try { localStorage.setItem("gyroCfg", JSON.stringify(cfg)); } catch (e) {}
+  }
+
+  let baseAlpha = null;
+  let baseBeta = null;
+
+  // 原始输入低通后的角度
+  let lpAlpha = null;
+  let lpBeta = null;
+
+  let targetX = 0, targetY = 0;
+  let curX = 0, curY = 0;
+
+  function angleDelta(now, base) {
+    // 处理 0/360 边界，结果在 [-180, 180]
+    let d = now - base;
+    while (d > 180) d -= 360;
+    while (d < -180) d += 360;
+    return d;
+  }
+
+  function onOrientation(e) {
+    eventCount++;
+    vEvent.textContent = `${lastEventName} ×${eventCount}`;
+
+    const a = e.alpha; // 0..360
+    const b = e.beta;  // -180..180
+    const g = e.gamma; // -90..90
+
+    // 即使 null 也显示，方便诊断
+    vAlpha.textContent = (a == null ? "null" : a.toFixed(1) + "°");
+    vBeta.textContent  = (b == null ? "null" : b.toFixed(1) + "°");
+    vGamma.textContent = (g == null ? "null" : g.toFixed(1) + "°");
+
+    if (a == null || b == null) {
+      vDiag.textContent = "事件触发但 α/β 为 null（多见于无磁力计或 http 源）";
+      return;
+    }
+
+    // 原始输入低通滤波，先把传感器抖动压下去再算 delta
+    if (lpAlpha == null) {
+      lpAlpha = a;
+      lpBeta = b;
+    } else {
+      // alpha 跨 0/360 时直接平均会爆，先用最短角差算
+      lpAlpha = (lpAlpha + angleDelta(a, lpAlpha) * cfg.RAW_LP + 360) % 360;
+      lpBeta  = lpBeta + (b - lpBeta) * cfg.RAW_LP;
+    }
+
+    if (baseAlpha == null) {
+      baseAlpha = lpAlpha;
+      baseBeta = lpBeta;
+      vDiag.textContent = "已校准基准";
+    }
+
+    let dA = angleDelta(lpAlpha, baseAlpha);
+    let dB = lpBeta - baseBeta;
+
+    // 死区：极小抖动归零
+    if (Math.abs(dA) < cfg.DEADZONE) dA = 0;
+    if (Math.abs(dB) < cfg.DEADZONE) dB = 0;
+
+    const sx = cfg.INVERT_X ? -1 : 1;
+    const sy = cfg.INVERT_Y ? -1 : 1;
+    targetX = clamp(sx * dA * cfg.SENS_X, -MAX_X, MAX_X);
+    targetY = clamp(sy * dB * cfg.SENS_Y, -MAX_Y, MAX_Y);
+
+    vAlpha.textContent = lpAlpha.toFixed(1) + "° (Δ" + dA.toFixed(1) + ")";
+    vBeta.textContent  = lpBeta.toFixed(1) + "° (Δ" + dB.toFixed(1) + ")";
+  }
+
+  function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+
+  function tick() {
+    curX += (targetX - curX) * cfg.SMOOTH;
+    curY += (targetY - curY) * cfg.SMOOTH;
+
+    // 视差：远景慢、近景快，制造深度
+    const sx = curX * cfg.BG_PARALLAX, sy = curY * cfg.BG_PARALLAX;
+    const cx = curX * cfg.FG_PARALLAX, cy = curY * cfg.FG_PARALLAX;
+    scene.style.transform = `translate(calc(-50% + ${sx}px), calc(-50% + ${sy}px))`;
+    character.style.transform = `translate(calc(-50% + ${cx}px), calc(-50% + ${cy}px))`;
+
+    vOffset.textContent = `${curX.toFixed(0)}, ${curY.toFixed(0)}`;
+    requestAnimationFrame(tick);
+  }
+
+  function start() {
+    const needsPerm = typeof DeviceOrientationEvent !== "undefined"
+      && typeof DeviceOrientationEvent.requestPermission === "function";
+
+    const attach = () => {
+      // 同时监听两种事件：Android 上 deviceorientationabsolute 通常更准更稳
+      let absoluteFired = false;
+      const onAbs = (e) => {
+        absoluteFired = true;
+        lastEventName = "absolute";
+        onOrientation(e);
+      };
+      const onRel = (e) => {
+        // 如果 absolute 事件已经在用，就忽略相对事件，避免互相覆盖
+        if (absoluteFired) return;
+        lastEventName = "relative";
+        onOrientation(e);
+      };
+      window.addEventListener("deviceorientationabsolute", onAbs, true);
+      window.addEventListener("deviceorientation", onRel, true);
+
+      // 5 秒后如果一次都没触发，提示
+      setTimeout(() => {
+        if (eventCount === 0) {
+          vDiag.textContent = "5s 内无任何事件触发：检查 https / 浏览器权限 / 设备传感器";
+        }
+      }, 5000);
+
+      gate.classList.add("hidden");
+      requestAnimationFrame(tick);
+    };
+
+    if (needsPerm) {
+      DeviceOrientationEvent.requestPermission()
+        .then((state) => {
+          if (state === "granted") attach();
+          else errBox.textContent = "权限被拒绝，无法读取陀螺仪。";
+        })
+        .catch((err) => {
+          errBox.textContent = "请求权限失败：" + (err && err.message ? err.message : err);
+        });
+    } else {
+      // Android / 桌面 Chrome：直接监听
+      if (typeof DeviceOrientationEvent === "undefined") {
+        errBox.textContent = "该浏览器不支持 DeviceOrientationEvent。";
+        return;
+      }
+      attach();
+    }
+  }
+
+  startBtn.addEventListener("click", start);
+
+  recenterBtn.addEventListener("click", () => {
+    baseAlpha = null;
+    baseBeta = null;
+    lpAlpha = null;
+    lpBeta = null;
+    targetX = 0;
+    targetY = 0;
+  });
+
+  // ——— 调参面板 ———
+  const panel = $("panel");
+  const panelToggle = $("panelToggle");
+  panelToggle.addEventListener("click", () => {
+    panel.classList.toggle("collapsed");
+    panelToggle.textContent = panel.classList.contains("collapsed") ? "展开" : "收起";
+  });
+
+  function bindSlider(id, key, fmt) {
+    const slider = $(id);
+    const valEl = $(id + "v");
+    slider.value = cfg[key];
+    valEl.textContent = fmt(cfg[key]);
+    slider.addEventListener("input", () => {
+      cfg[key] = parseFloat(slider.value);
+      valEl.textContent = fmt(cfg[key]);
+      saveCfg();
+    });
+  }
+  bindSlider("sensX", "SENS_X", v => v.toFixed(1));
+  bindSlider("sensY", "SENS_Y", v => v.toFixed(1));
+  bindSlider("rawLp", "RAW_LP", v => v.toFixed(2));
+  bindSlider("smooth", "SMOOTH", v => v.toFixed(2));
+  bindSlider("deadzone", "DEADZONE", v => v.toFixed(1));
+  bindSlider("bgPar", "BG_PARALLAX", v => v.toFixed(2));
+  bindSlider("fgPar", "FG_PARALLAX", v => v.toFixed(2));
+
+  // 角色尺寸/位置：滑条直接改 CSS 变量
+  function applyCharStyle() {
+    character.style.width = cfg.CHAR_SIZE + "vmin";
+    character.style.top = cfg.CHAR_TOP + "%";
+  }
+  applyCharStyle();
+  function bindCharSlider(id, key, fmt) {
+    const slider = $(id);
+    const valEl = $(id + "v");
+    slider.value = cfg[key];
+    valEl.textContent = fmt(cfg[key]);
+    slider.addEventListener("input", () => {
+      cfg[key] = parseFloat(slider.value);
+      valEl.textContent = fmt(cfg[key]);
+      saveCfg();
+      applyCharStyle();
+    });
+  }
+  bindCharSlider("charSize", "CHAR_SIZE", v => v.toFixed(0));
+  bindCharSlider("charTop", "CHAR_TOP", v => v.toFixed(0));
+
+  function bindToggle(id, key) {
+    const btn = $(id);
+    const refresh = () => btn.classList.toggle("on", !!cfg[key]);
+    refresh();
+    btn.addEventListener("click", () => {
+      cfg[key] = !cfg[key];
+      saveCfg();
+      refresh();
+    });
+  }
+  bindToggle("invX", "INVERT_X");
+  bindToggle("invY", "INVERT_Y");
+
+  $("resetCfg").addEventListener("click", () => {
+    Object.assign(cfg, DEFAULTS);
+    saveCfg();
+    // 刷新 UI
+    $("sensX").value = cfg.SENS_X; $("sensXv").textContent = cfg.SENS_X.toFixed(1);
+    $("sensY").value = cfg.SENS_Y; $("sensYv").textContent = cfg.SENS_Y.toFixed(1);
+    $("rawLp").value = cfg.RAW_LP; $("rawLpv").textContent = cfg.RAW_LP.toFixed(2);
+    $("smooth").value = cfg.SMOOTH; $("smoothv").textContent = cfg.SMOOTH.toFixed(2);
+    $("deadzone").value = cfg.DEADZONE; $("deadzonev").textContent = cfg.DEADZONE.toFixed(1);
+    $("bgPar").value = cfg.BG_PARALLAX; $("bgParv").textContent = cfg.BG_PARALLAX.toFixed(2);
+    $("fgPar").value = cfg.FG_PARALLAX; $("fgParv").textContent = cfg.FG_PARALLAX.toFixed(2);
+    $("charSize").value = cfg.CHAR_SIZE; $("charSizev").textContent = cfg.CHAR_SIZE.toFixed(0);
+    $("charTop").value = cfg.CHAR_TOP; $("charTopv").textContent = cfg.CHAR_TOP.toFixed(0);
+    applyCharStyle();
+    $("invX").classList.toggle("on", !!cfg.INVERT_X);
+    $("invY").classList.toggle("on", !!cfg.INVERT_Y);
+  });
+})();
+</script>
+</body>
+</html>
