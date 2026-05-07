@@ -1,0 +1,12 @@
+{
+  "appId": "com.turbotang.echo",
+  "appName": "echo",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#0c0814"
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}

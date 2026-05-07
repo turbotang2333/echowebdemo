@@ -1,0 +1,16 @@
+{
+  "name": "echo-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "echo · 幕(竖屏版) — packaged via Capacitor",
+  "scripts": {
+    "build": "rm -rf www && mkdir -p www && cp index.html style.css www/ && cp -R js src www/",
+    "sync": "npm run build && npx cap sync",
+    "open:android": "npm run sync && npx cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.3.1",
+    "@capacitor/cli": "^8.3.1",
+    "@capacitor/core": "^8.3.1"
+  }
+}
