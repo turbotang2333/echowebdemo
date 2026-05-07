@@ -2,7 +2,7 @@
 // right module. Manages scene boundaries — at the end of each scene, waits
 // for one more swipe (the "scene swipe") and triggers the heavy transition.
 
-import { wait, raf } from './util.js';
+import { wait } from './util.js';
 import { SCRIPT } from './script.js';
 import {
   mountFirstScreen,
@@ -72,18 +72,8 @@ async function runFX(fx) {
     case 'nail-people-on':  showNailPeople(true); break;
     case 'nail-people-off': showNailPeople(false); break;
     case 'character-glow':  await characterGlow(1500); break;
-    case 'endmark':         await showEndmark(); break;
     default: console.warn('unknown fx', fx);
   }
-}
-
-async function showEndmark() {
-  const end = document.getElementById('endmark');
-  if (!end) return;
-  end.hidden = false;
-  await raf();
-  end.classList.add('visible');
-  await new Promise(() => {});
 }
 
 async function runBeat(beat) {
@@ -169,4 +159,19 @@ export async function runPlayer() {
       await clearAllText();
     }
   }
+
+  await showRestartVeil();
+}
+
+async function showRestartVeil() {
+  const veil = document.getElementById('boot-veil');
+  if (!veil) return;
+  await wait(1200);
+  const tap = veil.querySelector('.boot-tap');
+  if (tap) tap.textContent = '重新开始';
+  veil.hidden = false;
+  veil.classList.remove('gone');
+  veil.addEventListener('pointerdown', () => {
+    location.reload();
+  }, { once: true });
 }

@@ -11,7 +11,6 @@
 import { $, defer, raf, wait } from './util.js';
 import { setRingActive } from './input.js';
 import { showDialogue } from './paragraph.js';
-import { transmitToCharacter } from './fx.js';
 import { showPressHint, hidePressHint, recordPressSuccess, shouldShowArcHint } from './tutorial.js';
 import { isTurbo, onTurboChange } from './turbo.js';
 
@@ -151,8 +150,8 @@ export async function ringDialogue({ prompt = '', text = '' } = {}) {
   await _waiter.promise;
   offTurbo();
 
-  // Deliver the line as a user bubble; bubble exits via暖光传送（A 凝聚 / B 上送 / C 抵达）。
-  await showDialogue('你', text, { hold: 1200, onExit: transmitToCharacter });
+  // Deliver the line as a user bubble (typewriter + drift via paragraph.js).
+  await showDialogue('你', text, { hold: 1200 });
   recordPressSuccess();
 
   await wait(POST_DELIVER_HOLD);

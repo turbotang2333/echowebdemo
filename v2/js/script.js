@@ -275,9 +275,6 @@ export const SCRIPT = [
       { t: 'fx', kind: 'nail-people-on' },
       { t: 'pos', pos: 'mid-back' },
       { t: 'para', text: '庭院中央，一群"人"正在僵硬地扭动。你看清他们的脸——是粗糙的墨笔勾出来的。', hold: 3000 },
-      { t: 'await-swipe' },
-
-      { t: 'fx', kind: 'endmark' },
     ],
   },
 ];

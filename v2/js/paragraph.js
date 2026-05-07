@@ -404,13 +404,7 @@ async function showUserBubble(text, opts = {}) {
 
   await startTyper(node, text, opts.typingSpeed || TYPING_DIALOGUE);
   await wait(opts.hold != null ? opts.hold : HOLD_DIALOGUE);
-  // 自定义离场（如暖光传送）：onExit 接管，结束后由这里把节点移除
-  if (typeof opts.onExit === 'function') {
-    await opts.onExit(node);
-    if (node.parentNode) node.parentNode.removeChild(node);
-  } else {
-    await driftAway(node);
-  }
+  await driftAway(node);
 }
 
 export async function showDialogue(speaker, text, opts = {}) {

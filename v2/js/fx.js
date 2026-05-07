@@ -3,8 +3,6 @@
 // Most effects live in #fx-layer as DOM/canvas children.
 
 import { $, el, wait, raf } from './util.js';
-import { getHeadAnchor } from './character.js';
-import { isTurbo } from './turbo.js';
 
 let _layer;
 let _canvas, _ctx;
@@ -296,84 +294,6 @@ export function showNailPeople(on) {
   }
   if (on) requestAnimationFrame(() => host.classList.add('on'));
   else { host.classList.remove('on'); setTimeout(() => host.remove(), 1100); }
-}
-
-// ---------------- 暖光传送：用户气泡 → 角色头部 (每次对话都用) ----------------
-// 三段：A 凝聚(400ms 碎成光点) / B 上送(1800ms 暖光带匀速扫过) / C 抵达(600ms 角色光晕)
-// turbo 模式直接淡出，跳过仪式动画。函数内不移除 sourceEl（由调用方负责）。
-export async function transmitToCharacter(sourceEl) {
-  if (!sourceEl) return;
-  const stage = $('#stage');
-  if (!stage) return;
-
-  if (isTurbo()) {
-    sourceEl.style.transition = 'opacity 150ms ease-out';
-    sourceEl.style.opacity = '0';
-    await wait(150);
-    return;
-  }
-
-  const stageRect = stage.getBoundingClientRect();
-  const sRect = sourceEl.getBoundingClientRect();
-  const cx = sRect.left + sRect.width / 2 - stageRect.left;
-  const cy = sRect.top + sRect.height / 2 - stageRect.top;
-
-  // A 段：碎成光点 + 气泡淡出
-  sourceEl.classList.add('transmit-scatter');
-  const sparks = [];
-  const N = 22;
-  for (let i = 0; i < N; i++) {
-    const dot = el('div', { cls: 'transmit-spark' });
-    const angle = Math.random() * Math.PI * 2;
-    const dist = 22 + Math.random() * 42;
-    const dx = Math.cos(angle) * dist + (Math.random() - 0.5) * 14;
-    const dy = -Math.abs(Math.sin(angle) * dist) - 6 - Math.random() * 22;
-    dot.style.left = `${cx}px`;
-    dot.style.top = `${cy}px`;
-    dot.style.setProperty('--dx', `${dx}px`);
-    dot.style.setProperty('--dy', `${dy}px`);
-    dot.style.animationDelay = `${Math.random() * 90}ms`;
-    _layer.appendChild(dot);
-    sparks.push(dot);
-  }
-  await wait(400);
-  sparks.forEach((p) => p.remove());
-
-  // B 段：暖光带由屏底匀速上升至角色头部
-  const head = getHeadAnchor();
-  const headY = (head.yPct / 100) * stageRect.height;
-  const beamHeight = stageRect.height * 0.36;
-  const beam = el('div', { cls: 'transmit-beam' });
-  beam.style.left = `${cx}px`;
-  beam.style.height = `${beamHeight}px`;
-  beam.style.top = `${stageRect.height}px`;
-  // 让光带"中心"在结束时落在头部位置
-  const rise = -(stageRect.height - headY + beamHeight / 2);
-  beam.style.setProperty('--rise', `${rise}px`);
-  _layer.appendChild(beam);
-  await raf();
-  beam.classList.add('rising');
-  // 前沿粒子：跟随 beam 顶部向上飘
-  const leadHost = el('div', { cls: 'transmit-lead' });
-  leadHost.style.left = `${cx}px`;
-  leadHost.style.setProperty('--rise', `${rise}px`);
-  _layer.appendChild(leadHost);
-  for (let i = 0; i < 6; i++) {
-    const p = el('div', { cls: 'transmit-lead-spark' });
-    p.style.setProperty('--ox', `${(Math.random() - 0.5) * 60}px`);
-    p.style.animationDelay = `${i * 220 + Math.random() * 120}ms`;
-    leadHost.appendChild(p);
-  }
-
-  await wait(1700);
-  beam.classList.add('fade');
-  await wait(160);
-  beam.remove();
-  leadHost.remove();
-
-  // C 段：角色头部光晕（fire-and-forget，自然延伸到下一拍）
-  characterGlow(700);
-  await wait(600);
 }
 
 // ---------------- character浮起小光晕 (场景 6 内心OS / 场景 7 摸摸前) ----------------
