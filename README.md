@@ -2,14 +2,25 @@
 
 > 项目用了 ES 模块,**不能直接双击 `index.html` 打开**,必须起一个本地服务器。
 
-## 两个版本
+## 目录结构
 
-- 根目录 `/`:**竖屏版**(主推)— 全程竖屏
+- 根目录 `/`:**竖屏版**(主推)— 全程竖屏,Capacitor 构建入口
+- `v2/`:v2 demo(节奏方案,见 `plans/v2/`)
 - `landscape/`:横屏版(旧版,保留)— 引导段竖屏 → 剧情段横屏
+- `prototypes/`:独立测试/原型页(陀螺仪 + 视差)
+- `plans/`:方案文档,按版本归档
+  - `plans/main/` — 主版设计/剧本/交互问题
+  - `plans/v2/` — v2 demo 节奏与剧本
+  - `plans/landscape/` — 横屏适配方案
+- `src/images/`:三版共享图集
+- `docs/`:原始资料 PDF
 
-两版共享 `src/images/` 图集。
-- 电脑访问竖屏版:`http://localhost:8000`
-- 电脑访问横屏版:`http://localhost:8000/landscape/`
+## 访问入口
+
+- 主版(竖屏):`http://localhost:8000`
+- v2 demo:`http://localhost:8000/v2/`
+- 横屏版:`http://localhost:8000/landscape/`
+- 陀螺仪测试:`http://localhost:8000/prototypes/gyro-test.html`
 
 ## 一、启动服务器
 
@@ -31,20 +42,13 @@ http://localhost:8000
 
 ## 三、在手机上看
 
+确保**手机和电脑连同一个 Wi-Fi**,新开一个终端查当前 IP(每次都要现查,IP 会变):
+
 ```
-http://192.168.2.160:8000
+ipconfig getifaddr en0
 ```
 
-1. 确保**手机和电脑连同一个 Wi-Fi**
-2. **新开一个**终端窗口,查电脑的局域网 IP:
-   ```
-   ipconfig getifaddr en0
-   ```
-   会输出类似 `192.168.1.23` 这样一串数字
-3. 手机浏览器打开(把 IP 换成你自己的):
-   ```
-   http://192.168.1.23:8000
-   ```
+手机浏览器打开 `http://<查到的IP>:8000`
 
 ## 四、关掉服务器
 

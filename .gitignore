@@ -6,3 +6,15 @@ node_modules/
 .vscode/
 .idea/
 *.log
+
+# Capacitor build output
+www/
+
+# Android build artifacts (keep the project, ignore generated files)
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/captures/
+android/.idea/
+*.iml
