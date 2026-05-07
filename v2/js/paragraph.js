@@ -15,6 +15,7 @@
 import { $, el, raf, wait, defer } from './util.js';
 import { getHeadAnchor } from './character.js';
 import { onTurboChange } from './turbo.js';
+import { addJournalEntry } from './journal.js';
 
 const TYPING_NARRATION = 38;
 const TYPING_DIALOGUE = 55;
@@ -226,6 +227,7 @@ async function showNarrationLike(text, opts = {}) {
   const kind = opts.kind || 'narration';
   const zone = getNarrationZone(kind);
   if (!zone) return;
+  addJournalEntry({ kind, text });
 
   // Drift previous active narration out (fire-and-forget so they overlap nicely).
   if (_activeNarration && _activeNarration.parentNode) {
@@ -287,6 +289,7 @@ export async function showHeavy(text, opts = {}) {
   const stage = $('#stage');
   const zone = $('#heavy-zone');
   if (!zone) return;
+  addJournalEntry({ kind: 'heavy', text });
   if (stage) stage.classList.add('heavy-active');
 
   const wrap = el('div', { cls: 'heavy-wrap' });
@@ -314,6 +317,7 @@ export async function showNPCText(text, opts = {}) {
   const dir = opts.from || 'top';
   const zone = $('#npc-zone');
   if (!zone) return;
+  addJournalEntry({ kind: 'npc', text });
   const node = el('div', { cls: `npc-text from-${dir}`, text });
   zone.appendChild(node);
   await wait(opts.life != null ? opts.life : 4500);
@@ -408,6 +412,7 @@ async function showUserBubble(text, opts = {}) {
 }
 
 export async function showDialogue(speaker, text, opts = {}) {
+  addJournalEntry({ kind: 'dialogue', speaker: speaker || '他', text });
   if (speaker === '你') return showUserBubble(text, opts);
   return showCharBubble(text, opts);
 }

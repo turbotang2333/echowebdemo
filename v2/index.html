@@ -103,6 +103,20 @@
          切换成 上滑示范 / 长按示范 两种动画。元素始终在 DOM，靠 class 控制显隐。 -->
     <div class="touch-hint" id="touch-hint"></div>
 
+    <!-- 左上角"剧情历史"锚点（点击展开） -->
+    <div class="anchor" id="journal-anchor" aria-label="剧情历史"></div>
+
+    <!-- 剧情历史抽屉：从顶部下展，纸面内可滚动，点击空白区域收回 -->
+    <div class="journal" id="journal" hidden>
+      <div class="journal-paper">
+        <button class="journal-close" id="journal-close" type="button" aria-label="返回">
+          <span class="journal-close-arrow"></span>
+        </button>
+        <div class="journal-scroll" id="journal-scroll"></div>
+      </div>
+      <div class="journal-blank-hint">点击空白处收回</div>
+    </div>
+
     <!-- 启动遮罩 -->
     <div class="boot-veil" id="boot-veil">
       <div class="boot-tap">点击开始</div>

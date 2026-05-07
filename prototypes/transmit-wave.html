@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>transmit-wave prototype</title>
+<style>
+  :root {
+    --bg: #070811;
+    --warm: 255, 235, 210;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    width: 100%; height: 100%;
+    background: #000; color: rgba(255, 245, 230, 0.95);
+    font-family: 'Source Han Serif SC', 'Songti SC', 'STSong', serif;
+    overflow: hidden; user-select: none;
+  }
+  .stage {
+    position: relative;
+    width: 100vw; height: 100dvh;
+    overflow: hidden;
+    background: var(--bg);
+  }
+
+  /* 假场景：暗夜山林 + 立绘剪影（只为有个参照） */
+  .scene-bg {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse at 50% 65%, rgba(20, 24, 36, 0.0) 0%, rgba(0, 0, 0, 0.55) 100%),
+      linear-gradient(to bottom,
+        #0c0e1a 0%,
+        #1a1424 40%,
+        #2a1a18 75%,
+        #160d10 100%);
+  }
+  .scene-bg::after {
+    content: '';
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse at center, rgba(0,0,0,0) 40%, rgba(0,0,0,0.55) 100%),
+      linear-gradient(to bottom, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0) 30%, rgba(0,0,0,0) 65%, rgba(0,0,0,0.65) 100%);
+    pointer-events: none;
+  }
+  .character {
+    position: absolute; left: 50%; top: 18vh;
+    transform: translateX(-50%);
+    width: 26vh; height: 36vh;
+    background: radial-gradient(ellipse at 50% 30%,
+      rgba(255, 200, 130, 0.18) 0%,
+      rgba(255, 200, 130, 0.04) 55%,
+      rgba(255, 200, 130, 0) 75%);
+    border-radius: 50% 50% 30% 30% / 60% 60% 40% 40%;
+    filter: blur(1.5px);
+  }
+  .ground-veil {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    height: 60vh;
+    background: linear-gradient(to top,
+      rgba(0, 0, 0, 0.85) 0%,
+      rgba(0, 0, 0, 0.0) 70%);
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  /* 弧/波 svg 层 */
+  .wave-svg {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    overflow: visible;
+    z-index: 4;
+  }
+
+  /* 主弧 — 静止状态：模拟 v2 录音弧（scale 1.7） */
+  .arc-main {
+    fill: none;
+    stroke: rgba(var(--warm), 1);
+    stroke-width: 3.2;
+    stroke-linecap: round;
+    filter: drop-shadow(0 0 18px rgba(var(--warm), 0.6));
+    opacity: 1;
+  }
+  /* 第二层晕：跟随主弧，但 displacement 更猛、stroke 更粗、opacity 更低 → 看起来像主弧外渗的墨晕 */
+  .arc-halo {
+    fill: none;
+    stroke: rgba(var(--warm), 1);
+    stroke-width: 9;
+    stroke-linecap: round;
+    opacity: 0;
+  }
+
+  /* 暖色淡闪屏 */
+  .flash-veil {
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse at 50% 70%,
+      rgba(255, 220, 170, 0.55) 0%,
+      rgba(255, 220, 170, 0.25) 35%,
+      rgba(255, 220, 170, 0.05) 65%,
+      rgba(255, 220, 170, 0) 80%);
+    opacity: 0;
+    pointer-events: none;
+    mix-blend-mode: screen;
+    z-index: 5;
+  }
+
+  /* 触发按钮（仅 prototype） */
+  .trigger {
+    position: absolute;
+    bottom: 5vh; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255, 235, 210, 0.10);
+    border: 1px solid rgba(255, 235, 210, 0.4);
+    color: rgba(255, 235, 210, 0.95);
+    padding: 10px 22px; border-radius: 22px;
+    font-family: inherit; font-size: 14px;
+    cursor: pointer; z-index: 9;
+    letter-spacing: 0.1em;
+  }
+  .trigger:hover { background: rgba(255, 235, 210, 0.18); }
+  .hint {
+    position: absolute; top: 4vh; left: 50%;
+    transform: translateX(-50%);
+    color: rgba(255, 235, 210, 0.45);
+    font-size: 12px; letter-spacing: 0.15em;
+    pointer-events: none; z-index: 9;
+  }
+  .controls {
+    position: absolute; top: 5vh; right: 4vw;
+    z-index: 9;
+    display: flex; flex-direction: column; gap: 6px;
+    font-size: 11px; color: rgba(255, 235, 210, 0.5);
+    font-family: ui-monospace, monospace;
+  }
+  .controls label { display: flex; align-items: center; gap: 6px; }
+  .controls input[type=range] { width: 120px; }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="scene-bg"></div>
+  <div class="character"></div>
+  <div class="ground-veil"></div>
+
+  <svg class="wave-svg" id="wave-svg" preserveAspectRatio="none">
+    <defs>
+      <!-- 墨晕 filter：feTurbulence 给基础噪声，feDisplacementMap 把 stroke 的像素按噪声位移 -->
+      <filter id="ink-bleed" x="-50%" y="-50%" width="200%" height="200%">
+        <feTurbulence id="ink-noise" type="fractalNoise"
+                      baseFrequency="0.014" numOctaves="2" seed="3" result="noise"/>
+        <feDisplacementMap id="ink-disp" in="SourceGraphic" in2="noise" scale="0"
+                           xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+
+      <!-- halo 用更猛的位移 -->
+      <filter id="ink-bleed-halo" x="-50%" y="-50%" width="200%" height="200%">
+        <feTurbulence id="ink-noise-halo" type="fractalNoise"
+                      baseFrequency="0.008" numOctaves="3" seed="9" result="noise2"/>
+        <feDisplacementMap id="ink-disp-halo" in="SourceGraphic" in2="noise2" scale="0"
+                           xChannelSelector="R" yChannelSelector="G" />
+        <feGaussianBlur stdDeviation="1.2" />
+      </filter>
+    </defs>
+
+    <!-- halo 在底（先画） -->
+    <path id="arc-halo" class="arc-halo" filter="url(#ink-bleed-halo)" d="" />
+    <!-- 主弧在上 -->
+    <path id="arc-main" class="arc-main" filter="url(#ink-bleed)" d="" />
+  </svg>
+
+  <div class="flash-veil" id="flash-veil"></div>
+
+  <div class="hint">点击按钮 / 按空格触发</div>
+  <div class="controls">
+    <label>bleed max <input id="ctl-bleed" type="range" min="0" max="180" value="90" /></label>
+    <label>halo bleed <input id="ctl-halo" type="range" min="0" max="260" value="170" /></label>
+    <label>duration ms <input id="ctl-dur" type="range" min="1200" max="3000" value="2000" /></label>
+    <label>r0 vh <input id="ctl-r0" type="range" min="20" max="55" value="36" /></label>
+  </div>
+  <button class="trigger" id="trigger">松手 →</button>
+</div>
+
+<script>
+const arcMain = document.getElementById('arc-main');
+const arcHalo = document.getElementById('arc-halo');
+const disp    = document.getElementById('ink-disp');
+const dispH   = document.getElementById('ink-disp-halo');
+const noise   = document.getElementById('ink-noise');
+const noiseH  = document.getElementById('ink-noise-halo');
+const flashEl = document.getElementById('flash-veil');
+
+const ctl = {
+  bleed: document.getElementById('ctl-bleed'),
+  halo:  document.getElementById('ctl-halo'),
+  dur:   document.getElementById('ctl-dur'),
+  r0:    document.getElementById('ctl-r0'),
+};
+
+const W = () => window.innerWidth;
+const H = () => window.innerHeight;
+const vh = (p) => (p / 100) * H();
+
+// 上半圆路径（圆心在 stage 底部正中，半径 r）
+function arcPath(r) {
+  const cx = W() / 2;
+  const cy = H();
+  // 用上半圆即可：从 (cx-r, cy) 沿大半径到 (cx+r, cy)
+  // sweep-flag = 1 让 arc 走在上半部分
+  return `M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`;
+}
+
+function setArcs(r) {
+  const d = arcPath(r);
+  arcMain.setAttribute('d', d);
+  arcHalo.setAttribute('d', d);
+}
+
+// 把弧固定到初始状态（让画面一开始能看到那道弧）
+function setIdle() {
+  const r0 = vh(parseFloat(ctl.r0.value));
+  setArcs(r0);
+  arcMain.style.opacity = 1;
+  arcMain.setAttribute('stroke-width', 3.2);
+  arcHalo.style.opacity = 0;
+  arcHalo.setAttribute('stroke-width', 9);
+  disp.setAttribute('scale', 0);
+  dispH.setAttribute('scale', 0);
+  flashEl.style.opacity = 0;
+}
+
+// easings
+const easeOutQuart = (t) => 1 - Math.pow(1 - t, 4);
+const easeInQuad   = (t) => t * t;
+
+let _running = false;
+async function trigger() {
+  if (_running) return;
+  _running = true;
+
+  const TOTAL = parseFloat(ctl.dur.value);
+  const BLEED_MAX = parseFloat(ctl.bleed.value);
+  const HALO_BLEED_MAX = parseFloat(ctl.halo.value);
+  const R0 = vh(parseFloat(ctl.r0.value));
+  // 终态半径：覆盖到屏幕对角，确保 arc 顶端越过屏顶
+  const R_MAX = Math.hypot(W() / 2, H()) * 1.05;
+
+  const t0 = performance.now();
+
+  return new Promise((resolve) => {
+    function frame(now) {
+      const t = Math.min(1, (now - t0) / TOTAL);
+
+      // 半径：先慢后快不对，应该是先快后慢（声波刚松手扩散最猛）
+      const r = R0 + (R_MAX - R0) * easeOutQuart(t);
+      setArcs(r);
+
+      // 主弧 stroke 与 opacity
+      // 0–0.15: 仍是清晰弧（连续性）
+      // 0.15–0.7: 边缘渐渐被位移撕开
+      // 0.7–1: 整体淡出
+      const cleanPhase = Math.max(0, Math.min(1, (t - 0.15) / 0.55));
+      const fadePhase  = Math.max(0, (t - 0.7) / 0.3);
+      arcMain.style.opacity = Math.max(0, 1 - fadePhase);
+      arcHalo.style.opacity = Math.max(0, Math.min(0.55, cleanPhase * 0.55 - fadePhase * 0.55));
+      // stroke 渐细一点（被扯开的视觉）
+      arcMain.setAttribute('stroke-width', (3.2 + (1 - cleanPhase) * 1.5).toFixed(2));
+      arcHalo.setAttribute('stroke-width', (9 + cleanPhase * 16).toFixed(2));
+
+      // 墨晕 displacement scale，渐进式拉大
+      disp.setAttribute('scale', (BLEED_MAX * easeInQuad(cleanPhase)).toFixed(2));
+      dispH.setAttribute('scale', (HALO_BLEED_MAX * easeInQuad(cleanPhase)).toFixed(2));
+      // 噪声 baseFrequency 也轻微下降 = 越扩越粗的纹理
+      const f1 = 0.014 - 0.006 * t;
+      const f2 = 0.008 - 0.003 * t;
+      noise.setAttribute('baseFrequency', Math.max(0.003, f1).toFixed(4));
+      noiseH.setAttribute('baseFrequency', Math.max(0.002, f2).toFixed(4));
+
+      // 暖色淡闪：在 t=0.78 附近峰值，整体非常轻
+      let flash = 0;
+      if (t > 0.65) {
+        const ft = (t - 0.65) / 0.30; // 0 → 1, 之后过 1
+        flash = Math.sin(Math.min(1, ft) * Math.PI) * 0.55;
+      }
+      flashEl.style.opacity = flash.toFixed(3);
+
+      if (t < 1) requestAnimationFrame(frame);
+      else {
+        // 收束 → 回 idle
+        setIdle();
+        _running = false;
+        resolve();
+      }
+    }
+    requestAnimationFrame(frame);
+  });
+}
+
+// init
+window.addEventListener('resize', setIdle);
+document.getElementById('trigger').addEventListener('click', trigger);
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Space') { e.preventDefault(); trigger(); }
+});
+ctl.r0.addEventListener('input', () => { if (!_running) setIdle(); });
+setIdle();
+</script>
+</body>
+</html>
