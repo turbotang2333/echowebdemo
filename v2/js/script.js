@@ -7,6 +7,8 @@
 //
 // Beat types:
 //   { t: 'para', text, hold? }                     // 旁白 narration
+//   { t: 'para', text, hold?, interrupt:{kind:'dialogue',who,text,hold?},
+//     continueText, continueHold? }                 // 旁白·中段被对白打断·续写
 //   { t: 'dialogue', who, text, hold? }            // 角色对话气泡（他/你）
 //   { t: 'inner', text, hold? }                    // 内心 OS（带括号）
 //   { t: 'aside', text, hold? }                    // 镜头/动作描写（小字斜体）
@@ -45,7 +47,6 @@ export const SCRIPT = [
       { t: 'ring', prompt: '问他是谁', text: '你是谁?' },
       { t: 'dialogue', who: '他', text: '叫什么不重要。这里没人会再记得我的名字。', hold: 1800 },
       { t: 'pose', pose: 'tilt' },
-      { t: 'await-swipe' },
 
       // 旁白 2
       { t: 'para', text: '水面慢慢映出一点微光。你低头看自己——一条鱼尾。你才化形不久，连法术也不熟。水底，一道更大的影子游了过来。', hold: 1500 },
@@ -74,10 +75,15 @@ export const SCRIPT = [
       { t: 'ring', prompt: '别吃我！告诉他水里有更大的鱼', text: '别吃我！水里有更大的鱼！' },
       { t: 'dialogue', who: '他', text: '哦? 如果真有，我就不吃你。', hold: 1500 },
       { t: 'pose', pose: 'lean-in' },
-      { t: 'await-swipe' },
 
-      // 旁白 2：丢进水里当饵 → 怪鱼出现 → 撕碎
-      { t: 'para', text: '他用法术凝出绳索把你绑住，丢进水里。"那就拿你当鱼饵。" 下一秒怪鱼出现，他扑下去，一爪把它撕碎，溅起一片血。', hold: 2000 },
+      // 旁白 2：丢进水里当饵 → "那就拿你当鱼饵。"（气泡）→ 怪鱼出现 → 撕碎
+      { t: 'para',
+        text: '他用法术凝出绳索把你绑住，丢进水里。',
+        hold: 1000,
+        interrupt: { kind: 'dialogue', who: '他', text: '那就拿你当鱼饵。', hold: 1200 },
+        continueText: '下一秒怪鱼出现，他扑下去，一爪把它撕碎，溅起一片血。',
+        continueHold: 1800,
+      },
       { t: 'fx', kind: 'shake' },
     ],
   },
@@ -99,7 +105,6 @@ export const SCRIPT = [
       { t: 'dialogue', who: '他', text: '反悔了。或者——你有什么办法让我换换口味?', hold: 1500 },
       { t: 'ring', prompt: '主动开条件（比如说会做菜）', text: '我会做菜。' },
       { t: 'dialogue', who: '他', text: '那你做。做不好——', hold: 1200 },
-      { t: 'await-swipe' },
 
       // 旁白 2
       { t: 'pose', pose: 'tilt' },
@@ -139,62 +144,88 @@ export const SCRIPT = [
       { t: 'dialogue', who: '他', text: '你抢了我的猎物。', hold: 1500 },
       { t: 'await-swipe' },
 
-      { t: 'para', text: '他从你身边走过，捡起一根烧焦的藤蔓，把你的手腕死死绑住。"跑了一次。不能再有第二次。"', hold: 2200 },
+      { t: 'para', text: '他从你身边走过，捡起一根烧焦的藤蔓，把你的手腕死死绑住。', hold: 1500 },
+      { t: 'dialogue', who: '他', text: '跑了一次。不能再有第二次。', hold: 1500 },
     ],
   },
 
   // ============================================================
-  // 场景 5 · 焦土路上 (4:00 - 5:00)
+  // 场景 5 · 焦土路上 (4:00 - 5:00) [v2 新架构]
+  // 整图：骸骨.webp · env: scorched · fxDominant: dust
+  // 覆盖率推进：30% → 50% → ~85%（远处低吼时几乎全揭）
   // ============================================================
   {
     id: 'scene-5',
     title: '焦土路上',
     init: {
-      bgColor: '#1a1612',
+      bg: '骸骨.webp',
+      // 段 1 入场：露出右下骨头一角 ~30% 覆盖（半径放宽到 35×30 + 70% plateau）
+      reveal: { shape: 'ellipse', cx: 70, cy: 65, rx: 35, ry: 30 },
+      env: 'scorched',
+      fxDominant: 'dust',
       char: { pos: 'walking-away', visible: true },
-      fx: [{ kind: 'dust' }],
     },
     beats: [
       { t: 'para', text: '他用绳子牵着你往林子深处走。你跟在后面，第一次看清这岛真正的样子——焦黑的土地，散落的骸骨，空气里飘着灰白的尘。', hold: 2400 },
       { t: 'await-swipe' },
 
+      // 段 1 末：扩大露出区域到含肋骨段 ~55%
+      { t: 'scene', reveal: { shape: 'ellipse', cx: 55, cy: 60, rx: 55, ry: 45 }, wait: 600 },
       { t: 'dialogue', who: '你', text: '这是哪里?', hold: 1200 },
       { t: 'dialogue', who: '他', text: '这里曾经是我的。', hold: 1800 },
-      { t: 'await-swipe' },
 
-      { t: 'fx', kind: 'shake' },
+      // 段 2 远处低吼：揭到全图 + emotion red-alert 一闪
+      { t: 'scene', reveal: { shape: 'ellipse', cx: 50, cy: 50, rx: 100, ry: 100 } },
+      { t: 'emotion', preset: 'red-alert' },
+      { t: 'burst', kind: 'shake' },
       { t: 'npc', text: '——一声沉闷的低吼。', from: 'top', life: 3500 },
       { t: 'wait', ms: 800 },
+      { t: 'emotion', clear: true },
       { t: 'para', text: '连地面都在震。狐狸的身体几不可察地僵了一下，加快了脚步。你看着他的背影——这只把你当玩具的妖，原来也怕什么。', hold: 2600 },
     ],
   },
 
   // ============================================================
-  // 场景 6 · 月夜洞穴 (5:00 - 6:30)
+  // 场景 6 · 月夜洞穴 (5:00 - 6:30) [v2 新架构]
+  // 整图：羊人吃尸体.webp · env: cold-blue · fxDominant: moonbeam
+  // 覆盖率推进：洞内中央 40% → 偏移含羊人剪影 55% → 缩回看墙 25% → 训狗诗
   // ============================================================
   {
     id: 'scene-6',
     title: '月夜洞穴',
     init: {
-      bgColor: '#0a0c14',
+      bg: '羊人吃尸体.webp',
+      // 段 1 入场：露出洞内中央月光区 ~45%
+      reveal: { shape: 'ellipse', cx: 50, cy: 50, rx: 45, ry: 38 },
+      env: 'cold-blue',
+      fxDominant: 'moonbeam',
       char: { pos: 'curled', visible: true },
-      fx: [{ kind: 'moonbeam' }],
     },
     beats: [
       { t: 'para', text: '入夜。他把你拽进洞穴，自己蜷到角落，很快睡着。月光从洞顶的缝隙漏下来。你想趁他睡着溜走，悄悄摸到洞口——', hold: 2200 },
       { t: 'await-swipe' },
 
+      // 段 2 偷看羊人：偏移到含羊人剪影位置 ~60% + emotion red-alert 一闪
+      { t: 'scene', reveal: { shape: 'ellipse', cx: 55, cy: 50, rx: 60, ry: 50 } },
+      { t: 'emotion', preset: 'red-alert' },
+      { t: 'burst', kind: 'shake' },
+      { t: 'wait', ms: 400 },
+      { t: 'emotion', clear: true },
       { t: 'para', text: '外面，一只长着羊角的妖怪，正趴在地上啃食一具人形的尸体。它抬起头，鼻孔喷出血腥的雾。你浑身一冷，缩了回来。', hold: 2400 },
       { t: 'await-swipe' },
 
+      // 段 3 缩回看墙：缩回左下小区域 ~30%
+      { t: 'scene', reveal: { shape: 'ellipse', cx: 35, cy: 65, rx: 35, ry: 28 } },
       { t: 'para', text: '你贴着洞壁坐下，膝盖颤个不停。手指无意中碰到墙上一处粗糙的刻痕——你低头，月光下，石壁上歪歪扭扭刻着一行简体字。', hold: 2400 },
       { t: 'await-swipe' },
 
+      // 段 4 训狗诗：暂用 heavy 文字（特效层 cipher-text 待 Phase 3 实现）
       { t: 'heavy', text: '一式投食记心房\n二式顺毛莫逆\n三式坐令显威光', hold: 2200 },
       { t: 'para', text: '这是——人类留下的训狗口诀。', hold: 2000 },
       { t: 'await-swipe' },
 
-      { t: 'fx', kind: 'character-glow' },
+      // 段 5 主控决意
+      { t: 'burst', kind: 'character-glow' },
       { t: 'para', text: '你抬头看角落里蜷着的他——耳朵随呼吸轻轻颤动，比白天小了一圈。心里一紧，又一动：硬跑跑不掉。那就——投其所好。', hold: 2800 },
     ],
   },
@@ -247,31 +278,50 @@ export const SCRIPT = [
   },
 
   // ============================================================
-  // 场景 8 · 钩子 (9:00 - 10:00)
+  // 场景 8 · 钩子 (9:00 - 10:00) [v2 新架构]
+  // 整图：宅院.webp · env: dawn-warm → fog-mansion · 覆盖率：0% → 60% → 100%
+  // 假笑 emotion cold-shock 是钩子点睛
   // ============================================================
   {
     id: 'scene-8',
     title: '钩子',
     init: {
-      bgColor: '#2a2018',
-      bg: 'cj3.jpg',
+      bgColor: '#0c0a0e',
+      env: 'dawn-warm',
       char: { pos: 'extreme', pose: 'closed-eye', visible: true },
     },
     beats: [
+      // 段 1 他睁眼冷漠：emotion cold-shock 一闪
       { t: 'pose', pose: 'cold' },
-      { t: 'para', text: '他睁眼。金瞳里刚才的松弛全没了。"那我带你去转转。"', hold: 2000 },
+      { t: 'emotion', preset: 'cold-shock' },
+      { t: 'burst', kind: 'flash' },
+      { t: 'wait', ms: 400 },
+      { t: 'emotion', clear: true },
+      { t: 'para', text: '他睁眼。金瞳里刚才的松弛全没了。', hold: 1500 },
+      { t: 'dialogue', who: '他', text: '那我带你去转转。', hold: 1500 },
       { t: 'await-swipe' },
 
-      { t: 'fx', kind: 'rising-fog' },
+      // 段 2 雾涌起 + 宅院浮：env 转 fog-mansion，宅院.webp 从中心椭圆渐扩
+      { t: 'env', preset: 'fog-mansion' },
+      { t: 'scene', bg: '宅院.webp', reveal: { shape: 'ellipse', cx: 50, cy: 60, rx: 40, ry: 35 } },
+      { t: 'burst', kind: 'rising-fog', duration: 1500 },
       { t: 'fx', kind: 'lanterns-on' },
       { t: 'para', text: '浓雾骤然变浓，遮天蔽日。你回头——密林不见了。雾里浮起一座宅院，红灯高挂。', hold: 2600 },
+      // 露出扩大
+      { t: 'scene', reveal: { shape: 'ellipse', cx: 50, cy: 55, rx: 65, ry: 55 } },
       { t: 'dialogue', who: '他', text: '这是你一直想找的地方啊。', hold: 1800 },
       { t: 'await-swipe' },
 
+      // 段 3 假笑钩子点睛
       { t: 'pose', pose: 'fake-smile' },
+      { t: 'emotion', preset: 'cold-shock' },
+      { t: 'burst', kind: 'shake' },
       { t: 'para', text: '你抬头看他。他嘴角的弧度被硬拉上去——不是人的弧度。', hold: 2400 },
+      { t: 'emotion', clear: true },
       { t: 'await-swipe' },
 
+      // 段 4 镜头转向庭院：reveal 全揭示 + 纸扎人
+      { t: 'scene', reveal: { shape: 'ellipse', cx: 50, cy: 50, rx: 100, ry: 100 } },
       { t: 'fx', kind: 'nail-people-on' },
       { t: 'pos', pos: 'mid-back' },
       { t: 'para', text: '庭院中央，一群"人"正在僵硬地扭动。你看清他们的脸——是粗糙的墨笔勾出来的。', hold: 3000 },

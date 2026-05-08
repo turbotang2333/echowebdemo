@@ -20,8 +20,11 @@
   </div>
 
   <div id="stage" class="stage">
-    <!-- 屏堆栈：当前屏在前，上滑时旧屏向上推走。每屏内只放背景。 -->
+    <!-- 屏堆栈：当前屏在前，上滑时旧屏向上推走。每屏内放场景层（整图+遮罩 或 单体 PNG）。 -->
     <div class="screen-host" id="screen-host"></div>
+
+    <!-- 氛围层 · env：在场景之上、角色之下，仅染场景。 -->
+    <div class="atmo-env" id="atmo-env" aria-hidden="true"></div>
 
     <!-- 全局立绘层（跨屏复用单一立绘，由场景控制 pose/位置） -->
     <div class="character-layer" id="character-layer">
@@ -31,6 +34,9 @@
         </div>
       </div>
     </div>
+
+    <!-- 氛围层 · emotion：在角色之上，染整张画面（含角色）。 -->
+    <div class="atmo-emotion" id="atmo-emotion" aria-hidden="true"></div>
 
     <!-- 程序化特效层 -->
     <div class="fx-layer" id="fx-layer"></div>

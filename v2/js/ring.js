@@ -13,9 +13,12 @@ import { setRingActive } from './input.js';
 import { showDialogue } from './paragraph.js';
 import { showPressHint, hidePressHint, recordPressSuccess, shouldShowArcHint } from './tutorial.js';
 import { isTurbo, onTurboChange } from './turbo.js';
+import { edgeFlash } from './fx.js';
 
 const LONG_PRESS_MS = 250;
 const POST_DELIVER_HOLD = 200;
+const PRE_FLASH_PAUSE = 500;   // bubble 谢幕 → 边缘亮带
+const POST_FLASH_PAUSE = 1200; // 边缘亮带 → 下一句角色对话
 
 const RING = {
   IDLE: 'state-idle',
@@ -153,6 +156,9 @@ export async function ringDialogue({ prompt = '', text = '' } = {}) {
   // Deliver the line as a user bubble (typewriter + drift via paragraph.js).
   await showDialogue('你', text, { hold: 1200 });
   recordPressSuccess();
+  await wait(PRE_FLASH_PAUSE);
+  edgeFlash();
+  await wait(POST_FLASH_PAUSE);
 
   await wait(POST_DELIVER_HOLD);
   setState(RING.IDLE);

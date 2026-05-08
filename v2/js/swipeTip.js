@@ -31,14 +31,18 @@ const LEAVE_RESET_MS = 450;
 // anchored. Long-press goes 1.0 → 1.7 (state-recording); we go 1.0 →
 // SCALE_AT_FULL because the swipe-tip starts visually smaller (only the
 // peak peeks above the screen at scale 1).
-const SCALE_AT_FULL = 2.2;
+const SCALE_AT_FULL = 1.7;
 const SCALE_BASE = 1.0;
 
 const SETTLE_DURATION_MS = 250;
 
-// Visual modulation as progress climbs (fill alpha only — no stroke):
+// Visual modulation as progress climbs: fill alpha DROPS so the wash
+// dissolves toward transparent at full pull, instead of darkening into
+// a solid color slab. Top-edge softening is handled separately by the
+// SVG mask-image gradient on .swipe-tip-svg.
 const FILL_ALPHA_BASE = 0.28;
-const FILL_ALPHA_GAIN = 0.13;       // 0.28 → ~0.475 at p=1.5
+const FILL_ALPHA_DROP = 0.15;       // 0.28 → ~0.10 at p=1.2
+const FILL_ALPHA_FLOOR = 0.10;
 
 let _node = null;
 let _fill = null;
@@ -58,16 +62,17 @@ function ensureNodes() {
 function applyProgress(p) {
   ensureNodes();
   if (!_node) return;
-  const cl = Math.max(0, Math.min(1.5, p));
+  const cl = Math.max(0, Math.min(1.2, p));
   _currentProgress = cl;
 
   // Pure scale, center-bottom anchored — path d is never touched.
   const scale = SCALE_BASE + cl * (SCALE_AT_FULL - SCALE_BASE);
   _node.style.scale = scale.toFixed(3);
 
-  // Fill alpha climbs with progress; gradient only, no threshold step.
+  // Fill alpha falls with progress: pulled higher = closer to dissolving.
   if (_fill) {
-    _fill.style.fill = `rgba(255, 235, 210, ${FILL_ALPHA_BASE + cl * FILL_ALPHA_GAIN})`;
+    const a = Math.max(FILL_ALPHA_FLOOR, FILL_ALPHA_BASE - cl * FILL_ALPHA_DROP);
+    _fill.style.fill = `rgba(255, 235, 210, ${a})`;
   }
 }
 
@@ -89,10 +94,9 @@ export function hideSwipeTip() {
   if (_settleRaf) { cancelAnimationFrame(_settleRaf); _settleRaf = null; }
   _node.classList.add('leaving');
   _node.classList.remove('visible');
-  // Critical: clear the inline scale so .leaving's CSS scale (3.5) wins.
+  // Critical: clear the inline scale so .leaving's CSS scale:1 wins.
   // Inline style has higher specificity than class rules; without this
-  // clear, the leaving expansion would be stuck at the gesture's last
-  // scale (e.g. 2.2) instead of opening up to 3.5.
+  // clear, leaving would stay frozen at the gesture's last scale.
   _node.style.scale = '';
   if (_resetTimer) clearTimeout(_resetTimer);
   _resetTimer = setTimeout(() => {

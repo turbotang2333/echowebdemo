@@ -98,12 +98,15 @@ function startTyper(node, text, perChar) {
 // Pacing: TOKEN_CHUNK_GAP between chunks (±TOKEN_CHUNK_JITTER), plus
 // TOKEN_LINE_PAUSE extra at line breaks (detected by getBoundingClientRect).
 //
+// Multi-phase: pass an array of strings to lay out a "段 + <br> + 段 ..."
+// block whose box size is locked at frame 0. revealPhase(0) is run inline,
+// later phases are exposed via the returned controller's revealRest().
+//
 // Not registered as _activeTyper — narration can't be fast-forwarded so the
 // user controls pace by waiting for the reveal to finish.
-async function startTokenReveal(node, text) {
+function sliceForReveal(text) {
   const chars = Array.from(text);
   const total = chars.length;
-
   const slices = [];
   let i = 0;
   while (i < total) {
@@ -113,85 +116,119 @@ async function startTokenReveal(node, text) {
     slices.push(chars.slice(i, end).join(''));
     i = end;
   }
+  return slices;
+}
+
+async function startTokenReveal(node, phasesInput) {
+  const phases = Array.isArray(phasesInput) ? phasesInput : [phasesInput];
 
   // 暗带交给 line-banner 模式：顶固定 -22，高度由 --banner-h 控制，
   // 初始 0（暗带不显示），随每行推进逐步增大到"该行底 + 44"。
   node.classList.add('line-banner');
   node.style.setProperty('--banner-h', '0px');
-
-  // Mount all chunks pending — occupies layout, invisible.
   node.textContent = '';
-  const chunkEls = slices.map((slice) => {
-    const span = document.createElement('span');
-    span.className = 'gen-chunk pending';
-    span.textContent = slice;
-    node.appendChild(span);
-    return span;
-  });
 
-  // Layout settle, then measure line tops + bottoms so we can pause at line
-  // breaks AND know how far to grow the banner each new line.
-  await raf();
-  const parentTop = node.getBoundingClientRect().top;
-  const tops = chunkEls.map((el) => el.getBoundingClientRect().top);
-  const bottoms = chunkEls.map((el) =>
-    el.getBoundingClientRect().bottom - parentTop);
-
-  // Stagger reveals; bump delay at line changes; grow banner with each new line.
-  // Track timers so turbo can flush them — otherwise queued chunks would pop
-  // into the next narration.
-  const pendingTimers = [];
-  let cumDelay = 0;
-  let prevTop = tops[0];
-  let lastBannerBottom = -1;
-  for (let k = 0; k < chunkEls.length; k++) {
-    if (k > 0) {
-      const j = 1 + (Math.random() * 2 - 1) * TOKEN_CHUNK_JITTER;
-      cumDelay += TOKEN_CHUNK_GAP * j;
-      if (Math.abs(tops[k] - prevTop) > 2) {
-        cumDelay += TOKEN_LINE_PAUSE;
-        prevTop = tops[k];
-      }
-    }
-    const el = chunkEls[k];
-
-    // 该 chunk 落在比暗带当前底沿更下的一行 —— 把暗带拉长到这行底。
-    const cb = bottoms[k];
-    if (cb > lastBannerBottom + 1) {
-      const targetH = cb + 44; // 顶 -22 + 行底下方 22
-      pendingTimers.push(setTimeout(() => {
-        node.style.setProperty('--banner-h', `${targetH}px`);
-      }, cumDelay));
-      lastBannerBottom = cb;
-    }
-
-    pendingTimers.push(setTimeout(() => {
-      el.classList.remove('pending');
-      el.classList.add('reveal');
-    }, cumDelay));
+  // Mount all phases' chunks pending — occupies layout, invisible.
+  // Phases beyond the first are separated by <br> so they start on a new line;
+  // the box's final size is locked from frame 0 → no upward shift when later
+  // phases reveal.
+  const phaseChunks = [];
+  for (let p = 0; p < phases.length; p++) {
+    if (p > 0) node.appendChild(document.createElement('br'));
+    const slices = sliceForReveal(phases[p]);
+    const chunks = slices.map((slice) => {
+      const span = document.createElement('span');
+      span.className = 'gen-chunk pending';
+      span.textContent = slice;
+      node.appendChild(span);
+      return span;
+    });
+    phaseChunks.push(chunks);
   }
 
-  const handle = {
-    skip() {
-      pendingTimers.forEach((t) => clearTimeout(t));
-      pendingTimers.length = 0;
-      // Banner 推到末行覆盖（最后一个 chunk 的底 + 44），否则 turbo 跳过时
-      // 字全显出来但 banner 还停在最后一次 setProperty 的高度。
-      if (bottoms.length > 0) {
-        const finalH = bottoms[bottoms.length - 1] + 44;
-        node.style.setProperty('--banner-h', `${finalH}px`);
+  // Layout settle, then measure each chunk's line top + bottom-relative-to-node
+  // so we can pause at line breaks AND grow the banner per line.
+  await raf();
+  const parentTop = node.getBoundingClientRect().top;
+  const phaseMs = phaseChunks.map((chunks) =>
+    chunks.map((el) => ({
+      top: el.getBoundingClientRect().top,
+      bottom: el.getBoundingClientRect().bottom - parentTop,
+    })));
+
+  // Banner height + last-line tracking is shared across phases so phase N
+  // continues growing the banner past phase N-1's last line.
+  let lastBannerBottom = -1;
+  let prevTop = phaseMs[0] && phaseMs[0][0] ? phaseMs[0][0].top : 0;
+
+  const revealPhase = async (pi) => {
+    const chunks = phaseChunks[pi];
+    const ms = phaseMs[pi];
+    if (!chunks || chunks.length === 0) return;
+
+    const pendingTimers = [];
+    let cumDelay = 0;
+
+    for (let k = 0; k < chunks.length; k++) {
+      const m = ms[k];
+      if (k > 0) {
+        const j = 1 + (Math.random() * 2 - 1) * TOKEN_CHUNK_JITTER;
+        cumDelay += TOKEN_CHUNK_GAP * j;
+        if (Math.abs(m.top - prevTop) > 2) {
+          cumDelay += TOKEN_LINE_PAUSE;
+          prevTop = m.top;
+        }
+      } else {
+        // Phase boundary: still a real line change but no extra pause —
+        // the dialogue interrupt already gave the reader a break.
+        prevTop = m.top;
       }
-      chunkEls.forEach((el) => {
-        el.classList.remove('pending');
-        el.classList.add('reveal');
-      });
+
+      // 该 chunk 落在比暗带当前底沿更下的一行 —— 把暗带拉长到这行底。
+      if (m.bottom > lastBannerBottom + 1) {
+        const targetH = m.bottom + 44; // 顶 -22 + 行底下方 22
+        pendingTimers.push(setTimeout(() => {
+          node.style.setProperty('--banner-h', `${targetH}px`);
+        }, cumDelay));
+        lastBannerBottom = m.bottom;
+      }
+
+      const elRef = chunks[k];
+      pendingTimers.push(setTimeout(() => {
+        elRef.classList.remove('pending');
+        elRef.classList.add('reveal');
+      }, cumDelay));
+    }
+
+    const handle = {
+      skip() {
+        pendingTimers.forEach((t) => clearTimeout(t));
+        pendingTimers.length = 0;
+        // Banner 推到末行覆盖（最后一个 chunk 的底 + 44），否则 turbo 跳过时
+        // 字全显出来但 banner 还停在最后一次 setProperty 的高度。
+        const last = ms[ms.length - 1];
+        if (last) node.style.setProperty('--banner-h', `${last.bottom + 44}px`);
+        chunks.forEach((el) => {
+          el.classList.remove('pending');
+          el.classList.add('reveal');
+        });
+      },
+    };
+    _activeReveal = handle;
+
+    await wait(cumDelay + TOKEN_FADE_MS);
+    if (_activeReveal === handle) _activeReveal = null;
+  };
+
+  await revealPhase(0);
+
+  if (phases.length === 1) return undefined;
+
+  return {
+    revealRest: async () => {
+      for (let p = 1; p < phases.length; p++) await revealPhase(p);
     },
   };
-  _activeReveal = handle;
-
-  // Resolve only after the last chunk's fade completes.
-  await wait(cumDelay + TOKEN_FADE_MS);
-  if (_activeReveal === handle) _activeReveal = null;
 }
 
 // Tap fast-forward: skip remaining typing on the active typer.
@@ -236,7 +273,9 @@ async function showNarrationLike(text, opts = {}) {
     driftAway(prev);
   }
 
-  const display = kind === 'inner' ? `（${text}）` : text;
+  const wrap = (t) => kind === 'inner' ? `（${t}）` : t;
+  const display = wrap(text);
+  const display2 = opts.continueText ? wrap(opts.continueText) : null;
   const cls = kind === 'inner' ? 'inner' : (kind === 'aside' ? 'narration aside' : 'narration');
   const node = el('div', { cls });
   zone.appendChild(node);
@@ -245,8 +284,18 @@ async function showNarrationLike(text, opts = {}) {
   await raf();
   node.classList.add('visible');
 
-  await startTokenReveal(node, display);
+  // Multi-phase: pre-lay out 段1 + <br> + 段2 so box size is locked from
+  // frame 0 → no upward shift when phase 2 reveals after the interrupt.
+  const phases = display2 ? [display, display2] : [display];
+  const ctrl = await startTokenReveal(node, phases);
   await wait(opts.hold != null ? opts.hold : HOLD_NARRATION);
+
+  if (display2 && ctrl) {
+    if (opts.interrupt) await opts.interrupt();
+    addJournalEntry({ kind, text: opts.continueText });
+    await ctrl.revealRest();
+    await wait(opts.continueHold != null ? opts.continueHold : HOLD_NARRATION);
+  }
 }
 
 export function showNarration(text, opts) { return showNarrationLike(text, { ...opts, kind: 'narration' }); }

@@ -10,6 +10,7 @@ import { showSwipeHint, hideSwipeHint, recordSwipeSuccess } from './tutorial.js'
 import { showSwipeTip, hideSwipeTip, hideSwipeTipImmediate,
          setSwipeProgress, settleSwipeProgress } from './swipeTip.js';
 import { isTurbo, setTurbo, onTurboChange } from './turbo.js';
+import { playWaterRipple } from './wave.js';
 
 const SWIPE_DY_THRESHOLD = -40; // pixels; up is negative
 const SWIPE_VY_THRESHOLD = -0.25; // px/ms upward
@@ -38,8 +39,8 @@ function onMove(e) {
   if (!_swipeWaiter) return;
   const pt = e.touches && e.touches[0] ? e.touches[0] : e;
   const dy = pt.clientY - _down.y;
-  // progress=1 at threshold (40px upward); allow 1.5 for overshoot rubber-band.
-  const progress = Math.max(0, Math.min(1.5, -dy / Math.abs(SWIPE_DY_THRESHOLD)));
+  // progress=1 at threshold (40px upward); allow 1.2 for overshoot rubber-band.
+  const progress = Math.max(0, Math.min(1.2, -dy / Math.abs(SWIPE_DY_THRESHOLD)));
   setSwipeProgress(progress);
 }
 
@@ -179,6 +180,10 @@ export function waitForSwipe() {
   return _swipeWaiter.promise.then(() => {
     hideSwipeTip();
     hideSwipeHint();
+    // Fire-and-forget the water ripple — it runs in parallel with whatever
+    // the caller does next (text advance, scene transition). Skipped while
+    // turbo is on (handled inside playWaterRipple).
+    playWaterRipple();
   });
 }
 

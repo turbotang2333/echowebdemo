@@ -3,6 +3,7 @@
 // Most effects live in #fx-layer as DOM/canvas children.
 
 import { $, el, wait, raf } from './util.js';
+import { isTurbo } from './turbo.js';
 
 let _layer;
 let _canvas, _ctx;
@@ -63,6 +64,18 @@ export async function shake(duration = 400) {
   stage.classList.remove('shaking');
 }
 
+// ---------------- edge flash (语音发送后的"传送出去"余韵) ----------------
+// 在 user bubble 谢幕之后由 ring.js fire-and-forget 调用。Turbo 时跳过。
+export async function edgeFlash() {
+  if (isTurbo()) return;
+  const veil = el('div', { cls: 'edge-flash-veil' });
+  $('#stage').appendChild(veil);
+  await raf();
+  veil.classList.add('on');
+  await wait(1600);
+  veil.remove();
+}
+
 // ---------------- white flash ----------------
 export async function flash(intensity = 0.9, duration = 220) {
   const veil = el('div', { cls: 'flash-veil' });
@@ -76,11 +89,12 @@ export async function flash(intensity = 0.9, duration = 220) {
   veil.remove();
 }
 
-// ---------------- ghost-fire particles (场景 4) ----------------
+// ---------------- ghost-fire particles (场景 4 · 冷蓝调) ----------------
+// 色调由暖橙红改为冷蓝，呼应食人花.webp 的冷蓝美术，并与狐狸立绘紫蓝色调一致。
+// 烈焰救场 (bigFlameBurst) 仍保持暖橙，形成冷蓝包围 vs 暖橙救场的反差。
 export function startGhostFire() {
   const sys = createParticleSystem({
     spawnRate: 1.4,
-    color: () => `hsla(${15 + Math.random() * 25}, 95%, ${55 + Math.random() * 15}%, ${0.55 + Math.random() * 0.3})`,
     spawn: (w, h) => ({
       x: Math.random() * w,
       y: h - Math.random() * h * 0.6,
@@ -95,7 +109,6 @@ export function startGhostFire() {
       p.x += p.vx * dt / 1000;
       p.y += p.vy * dt / 1000;
       p.vy *= 0.997;
-      // gentle horizontal sway
       p.vx += Math.sin(p.life / 240) * 0.5;
     },
     draw: (ctx, p) => {
@@ -103,9 +116,9 @@ export function startGhostFire() {
       const a = (1 - t) * 0.7;
       ctx.beginPath();
       const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
-      grad.addColorStop(0, `hsla(28, 95%, 65%, ${a})`);
-      grad.addColorStop(0.5, `hsla(15, 90%, 50%, ${a * 0.6})`);
-      grad.addColorStop(1, `hsla(0, 90%, 30%, 0)`);
+      grad.addColorStop(0, `hsla(200, 90%, 70%, ${a})`);
+      grad.addColorStop(0.5, `hsla(215, 80%, 55%, ${a * 0.6})`);
+      grad.addColorStop(1, `hsla(230, 90%, 30%, 0)`);
       ctx.fillStyle = grad;
       ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
       ctx.fill();
@@ -217,6 +230,33 @@ export function startMoonbeam() {
     animation: moonbeam-sway 18s ease-in-out infinite;
   `;
   // Inject keyframes once
+  if (!document.getElementById('moonbeam-anim')) {
+    const style = el('style', { attrs: { id: 'moonbeam-anim' } });
+    style.textContent = `@keyframes moonbeam-sway {
+      0%,100% { transform: translateX(-50%) rotate(-8deg); }
+      50%     { transform: translateX(-48%) rotate(-6deg); }
+    }`;
+    document.head.appendChild(style);
+  }
+  _layer.appendChild(beam);
+  return () => beam.remove();
+}
+
+// ---------------- sunbeam (场景 7 · 暖金光柱) ----------------
+// 复用 moonbeam 的几何，hue 转暖金（~35°）。
+export function startSunbeam() {
+  const beam = el('div', { cls: 'sunbeam' });
+  beam.style.cssText = `
+    position: absolute;
+    top: -10vh; left: 50%;
+    width: 28vw; height: 130vh;
+    background: linear-gradient(to bottom, rgba(255,210,150,0.22) 0%, rgba(255,210,150,0) 75%);
+    transform: translateX(-50%) rotate(-8deg);
+    transform-origin: top center;
+    z-index: 0;
+    pointer-events: none;
+    animation: moonbeam-sway 22s ease-in-out infinite;
+  `;
   if (!document.getElementById('moonbeam-anim')) {
     const style = el('style', { attrs: { id: 'moonbeam-anim' } });
     style.textContent = `@keyframes moonbeam-sway {
@@ -383,5 +423,5 @@ export function clearAllFX() {
   // kill all canvas particle systems
   for (const e of _effects) if (e.kill) e.kill();
   // remove overlays
-  _layer.querySelectorAll('.fog-overlay, .lantern-overlay, .nail-people, .moonbeam').forEach((n) => n.remove());
+  _layer.querySelectorAll('.fog-overlay, .lantern-overlay, .nail-people, .moonbeam, .sunbeam').forEach((n) => n.remove());
 }

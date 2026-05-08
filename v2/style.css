@@ -76,7 +76,12 @@ html, body {
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  transition: opacity 800ms var(--ease-soft), filter 800ms var(--ease-soft), background-color 1.2s var(--ease-soft);
+  transition:
+    opacity 800ms var(--ease-soft),
+    filter 800ms var(--ease-soft),
+    background-color 1.2s var(--ease-soft),
+    -webkit-mask-image 900ms var(--ease-soft),
+    mask-image 900ms var(--ease-soft);
   z-index: 0;
 }
 
@@ -87,6 +92,93 @@ html, body {
     radial-gradient(ellipse at center, rgba(0,0,0,0) 40%, rgba(0,0,0,0.55) 100%),
     linear-gradient(to bottom, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0) 30%, rgba(0,0,0,0) 65%, rgba(0,0,0,0.65) 100%);
   pointer-events: none;
+}
+
+/* 整图露出局部：用 mask-image 控制可见区域。变量由 screen.js 注入。
+   --reveal-mask 缺省时不应用 mask（整图全显，受 ::after 渐暗）。 */
+.screen-bg.revealed {
+  -webkit-mask-image: var(--reveal-mask);
+  mask-image: var(--reveal-mask);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-mode: alpha;
+  mask-mode: alpha;
+}
+
+/* 整图露出时压制旧的 ::after 通用 vignette，避免与 reveal 软边叠成"双层暗"。
+   留白由 mask 外的极暗底承担，inside 区域不再叠加 vignette。 */
+.screen-bg.revealed::after { opacity: 0; }
+
+/* 场景层 · 单体槽：在 .screen 内、.screen-bg 之上。
+   每个 .scene-el 是一张 PNG 切图，由 screen.js 创建/移除。 */
+.scene-el-layer {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.scene-el {
+  position: absolute;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 700ms var(--ease-soft), transform 700ms var(--ease-soft);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+.scene-el.shown { opacity: 1; }
+
+/* ============== atmosphere layers (env / emotion) ============== */
+.atmo-env {
+  position: absolute; inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0;
+  background-color: transparent;
+  mix-blend-mode: multiply;
+  transition: opacity 1000ms var(--ease-soft), background-color 1000ms var(--ease-soft);
+}
+.atmo-env.active { opacity: 1; }
+
+/* env 的 vignette 用 ::after 叠在自身之上，不染场景而是再加一层暗角。
+   --vignette-strength 由 atmo.js 注入（0-1）。 */
+.atmo-env::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(0,0,0,0) 50%,
+    rgba(0,0,0, var(--vignette-strength, 0)) 100%
+  );
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  transition: background 800ms var(--ease-soft);
+}
+
+.atmo-emotion {
+  position: absolute; inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0;
+  background-color: transparent;
+  mix-blend-mode: multiply;
+  transition: opacity 600ms var(--ease-soft), background-color 600ms var(--ease-soft);
+}
+.atmo-emotion.active { opacity: 1; }
+
+.atmo-emotion::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(0,0,0,0) 50%,
+    rgba(0,0,0, var(--vignette-strength, 0)) 100%
+  );
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  transition: background 600ms var(--ease-soft);
 }
 
 /* ============== character ============== */
@@ -191,6 +283,26 @@ html, body {
   transition: opacity 200ms ease-out;
 }
 .flash-veil.on { opacity: 0.9; transition: opacity 80ms ease-in; }
+
+/* 语音发送后的边缘亮边——气泡谢幕之后单脉冲，向外传送的余韵 */
+.edge-flash-veil {
+  position: absolute; inset: 0;
+  z-index: 9;
+  pointer-events: none;
+  opacity: 0;
+  box-shadow:
+    inset 0 0 40px 4px rgba(255, 215, 165, 0.50),
+    inset 0 0 90px 20px rgba(255, 215, 165, 0.22);
+}
+.edge-flash-veil.on {
+  animation: edge-flash-pulse 1500ms cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+}
+@keyframes edge-flash-pulse {
+  0%   { opacity: 0; }
+  18%  { opacity: 1; }
+  42%  { opacity: 0.9; }
+  100% { opacity: 0; }
+}
 
 .fog-overlay {
   position: absolute; inset: 0;
@@ -452,34 +564,40 @@ html, body {
   height: 88px;
   pointer-events: none;
   z-index: 4;
+  /* 默认 = 入场前 / 离场已落定的姿态：藏在屏幕下方 24px、不可见。
+     showSwipeTip → 加 .visible：translate 0 24px → 0、opacity 0 → 1，
+     形成"从水面下浮起"的入场，与 .leaving 的下沉退场对称。 */
   opacity: 0;
   scale: 1;
-  translate: 0 0;
+  translate: 0 24px;
   filter: blur(0);
   transform-origin: 50% 100%;
-  transition: opacity 0.6s var(--ease-drift),
-              translate 0.7s var(--ease-drift),
+  transition: opacity 0.5s var(--ease-drift),
+              translate 0.55s cubic-bezier(0.2, 0.7, 0.2, 1),
               filter 0.25s var(--ease-drift);
 }
-.swipe-tip.visible { opacity: 1; }
+.swipe-tip.visible {
+  opacity: 1;
+  translate: 0 0;
+}
 
-/* leaving = "提交后涨开溶解"：
-   - 大幅减小位移 -10vh（不再"整块飞走"的生硬感）
-   - 补偿性放大 scale 到 3.5（在原地涨开 + 上飘混合，气泡破裂感）
-   - filter blur 0 → 24px 涂掉拱形结构，留半透暖光团
-   - opacity 1 → 0，总时长 ~380ms
-   scale 3.5 由 .leaving 类负责，但要让它生效，hideSwipeTip()
-   需要清掉 _node.style.scale 的 inline 值（inline 高于 class）。 */
+/* leaving = "让位给水波，安静下沉"：
+   - scale 还原到 1（清掉手势期间的放大）
+   - 轻微下沉 6px（沉回水面）
+   - blur 0 → 8px + opacity 1 → 0，~400ms 内淡出
+   不再用大幅 scale 3.5 + translate -10vh 抢戏 — "推进"由 wave.js 的
+   水波层独立提供，swipe-tip 只负责自己消失。仍需 hideSwipeTip() 清
+   inline scale 让 class 的 scale:1 生效（inline 高于 class）。 */
 .swipe-tip.leaving {
   opacity: 0;
-  translate: 0 -10vh;
-  scale: 3.5;
-  filter: blur(24px);
+  translate: 0 6px;
+  scale: 1;
+  filter: blur(8px);
   transition:
-    opacity 0.3s ease-out,
-    translate 0.38s cubic-bezier(0.2, 0.7, 0.4, 1),
-    scale 0.38s cubic-bezier(0.2, 0.7, 0.4, 1),
-    filter 0.18s ease-out;
+    opacity 0.35s ease-out,
+    translate 0.4s ease-out,
+    scale 0.4s ease-out,
+    filter 0.3s ease-out;
 }
 .swipe-tip-svg {
   position: absolute;
@@ -488,6 +606,11 @@ html, body {
   height: 100%;
   overflow: visible;
   animation: swipe-tip-breathe 4s ease-in-out infinite;
+  /* 顶部羽化：让弧顶溶进透明，避免大幅拉起时上沿读作"贴一块色块"。
+     mask 在父级 transform 之前作用，所以缩放后羽化比例不变，弧顶
+     永远是软边。下半 50% 全可见，上半 50% 渐变到透明。 */
+  mask-image: linear-gradient(to top, black 50%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to top, black 50%, transparent 100%);
 }
 @keyframes swipe-tip-breathe {
   0%, 100% { opacity: 0.55; translate: 0 0; }
@@ -1122,4 +1245,37 @@ html, body {
 /* small viewport tweaks */
 @media (max-height: 640px) {
   .narration-zone, .inner-zone { bottom: 12vh; }
+}
+
+/* ===== Wave: water ripple on every swipe-up advance ===== */
+/* z-index 4 sits at the same level as .fx-layer; DOM insertion order
+   (after .fx-layer, before .narration-zone) puts it above scene/character/fx
+   and below all text zones (z-index 5+). */
+.wave-scene-distort {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 4;
+  filter: url(#wave-water-distort);
+  -webkit-mask-image: linear-gradient(to top, transparent 0%, transparent 0%);
+  mask-image: linear-gradient(to top, transparent 0%, transparent 0%);
+  will-change: mask-image;
+}
+.wave-rings {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 4;
+}
+.wave-ring {
+  position: absolute;
+  left: 50%; top: 100%;
+  width: 0; height: 0;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 1px solid rgba(255, 250, 240, 0.30);
+  pointer-events: none;
+  mix-blend-mode: screen;
+  filter: blur(0.6px);
+  will-change: width, height, opacity;
 }
