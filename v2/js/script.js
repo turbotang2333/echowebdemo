@@ -38,6 +38,8 @@ export const SCRIPT = [
       // 旁白 1
       { t: 'para', text: '你睁眼，是黑色。耳边只有水声，和皮肤上的冷气。远处的水面亮起一双金色的眼睛。', hold: 1500 },
       { t: 'pos', pos: 'far-lit' },
+      // 金瞳一闪贴近——暗示影子在移动，避免开场 50s 零冲击
+      { t: 'burst', kind: 'flash', intensity: 0.3, duration: 200 },
       { t: 'await-swipe' },
 
       // 对话 1：他："……谁?" → 圆弧 → 他："……水妖?" → 圆弧 → 他："叫什么不重要..."
@@ -48,7 +50,8 @@ export const SCRIPT = [
       { t: 'dialogue', who: '他', text: '叫什么不重要。这里没人会再记得我的名字。', hold: 1800 },
       { t: 'pose', pose: 'tilt' },
 
-      // 旁白 2
+      // 旁白 2 —— 鱼尾 PNG 浮现（场 1 后半段从 0% → ~25%，给视觉爆点）
+      { t: 'scene', el: '鱼尾.webp' },
       { t: 'para', text: '水面慢慢映出一点微光。你低头看自己——一条鱼尾。你才化形不久，连法术也不熟。水底，一道更大的影子游了过来。', hold: 1500 },
     ],
   },
@@ -108,7 +111,7 @@ export const SCRIPT = [
 
       // 旁白 2
       { t: 'pose', pose: 'tilt' },
-      { t: 'para', text: '你强作镇定，找出岛上的果子和不知名的小兽，凭着记忆里的几道菜给他做了一顿。他大快朵颐，眼里第一次有了新奇。', hold: 2200 },
+      { t: 'para', text: '你强作镇定，找出岛上的果子和不知名的小兽，凭着记忆里的几道菜给他做了一顿。他大快朵颐，眼里第一次有了新奇——慢慢眯起，专注地啃着骨头里的残味。', hold: 2400 },
       { t: 'await-swipe' },
 
       // 旁白 3：逃
@@ -129,7 +132,7 @@ export const SCRIPT = [
       fx: [{ kind: 'ghost-fire' }],
     },
     beats: [
-      { t: 'para', text: '跑了多久不知道。前方的林间，无声无息地浮起一团团鬼火，从四面八方把你围住。藤蔓忽然活了，缠住你的脚踝。', hold: 2200 },
+      { t: 'para', text: '跑了多久不知道。这岛似乎不让你真正离开。前方的林间，无声无息地浮起一团团鬼火，从四面八方把你围住。藤蔓忽然活了，缠住你的脚踝。', hold: 2200 },
       { t: 'await-swipe' },
 
       { t: 'para', text: '头顶传来一声黏腻的开合。你抬头——一朵巨大的食人花张着血盆大口，朝你罩了下来。', hold: 1800 },
@@ -141,7 +144,7 @@ export const SCRIPT = [
       { t: 'pos', pos: 'mid' },
       { t: 'pose', pose: 'cold' },
       { t: 'para', text: '"嗤——" 一道橙红色的火焰擦着你的脸炸开，烧穿了花的喉咙。烈焰中，他慢慢走出来，眼神冰冷。', hold: 1800 },
-      { t: 'dialogue', who: '他', text: '你抢了我的猎物。', hold: 1500 },
+      { t: 'dialogue', who: '他', text: '我的猎物——只能我吃。', hold: 1500 },
       { t: 'await-swipe' },
 
       { t: 'para', text: '他从你身边走过，捡起一根烧焦的藤蔓，把你的手腕死死绑住。', hold: 1500 },
@@ -181,7 +184,7 @@ export const SCRIPT = [
       { t: 'npc', text: '——一声沉闷的低吼。', from: 'top', life: 3500 },
       { t: 'wait', ms: 800 },
       { t: 'emotion', clear: true },
-      { t: 'para', text: '连地面都在震。狐狸的身体几不可察地僵了一下，加快了脚步。你看着他的背影——这只把你当玩具的妖，原来也怕什么。', hold: 2600 },
+      { t: 'para', text: '连地面都在震。狐狸的身体几不可察地僵了一下，加快了脚步。你看着他的背影——这只把你当玩具的妖，原来也有怕的东西。', hold: 2600 },
     ],
   },
 
@@ -220,13 +223,13 @@ export const SCRIPT = [
       { t: 'await-swipe' },
 
       // 段 4 训狗诗：暂用 heavy 文字（特效层 cipher-text 待 Phase 3 实现）
-      { t: 'heavy', text: '一式投食记心房\n二式顺毛莫逆\n三式坐令显威光', hold: 2200 },
-      { t: 'para', text: '这是——人类留下的训狗口诀。', hold: 2000 },
+      { t: 'heavy', text: '一式投食记心房\n二式顺毛莫逆\n三式坐令立威', hold: 2200 },
+      { t: 'para', text: '这是——人类留下的训狗三式。', hold: 2000 },
       { t: 'await-swipe' },
 
-      // 段 5 主控决意
+      // 段 5 主控决意（删掉直白说出策略的句子，让 character-glow + 训狗诗伏笔自己说话）
       { t: 'burst', kind: 'character-glow' },
-      { t: 'para', text: '你抬头看角落里蜷着的他——耳朵随呼吸轻轻颤动，比白天小了一圈。心里一紧，又一动：硬跑跑不掉。那就——投其所好。', hold: 2800 },
+      { t: 'para', text: '你抬头看角落里蜷着的他——耳朵随呼吸轻轻颤动，比白天小了一圈。心里一紧，又一动。', hold: 2800 },
     ],
   },
 
@@ -258,7 +261,7 @@ export const SCRIPT = [
       { t: 'await-swipe' },
 
       // 内心 OS · 摸摸前
-      { t: 'inner', text: '训狗十八式 · 二式 · 顺毛莫逆。' },
+      { t: 'inner', text: '训狗三式 · 二式 · 顺毛莫逆。' },
       { t: 'wait', ms: 1500 },
       { t: 'para', text: '他歪头看你，露出难得的平静。你慢慢伸出手——他没躲。', hold: 1800 },
       { t: 'pos', pos: 'extreme' },
@@ -309,7 +312,7 @@ export const SCRIPT = [
       { t: 'para', text: '浓雾骤然变浓，遮天蔽日。你回头——密林不见了。雾里浮起一座宅院，红灯高挂。', hold: 2600 },
       // 露出扩大
       { t: 'scene', reveal: { shape: 'ellipse', cx: 50, cy: 55, rx: 65, ry: 55 } },
-      { t: 'dialogue', who: '他', text: '这是你一直想找的地方啊。', hold: 1800 },
+      { t: 'dialogue', who: '他', text: '——这是这岛上唯一像样的地方。', hold: 1800 },
       { t: 'await-swipe' },
 
       // 段 3 假笑钩子点睛
