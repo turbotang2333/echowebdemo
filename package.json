@@ -4,6 +4,7 @@
   "private": true,
   "description": "echo · 幕(竖屏版) — packaged via Capacitor",
   "scripts": {
+    "dev": "python3 -m http.server 8000",
     "build": "rm -rf www && mkdir -p www && cp index.html style.css www/ && cp -R js src www/",
     "sync": "npm run build && npx cap sync",
     "open:android": "npm run sync && npx cap open android"
