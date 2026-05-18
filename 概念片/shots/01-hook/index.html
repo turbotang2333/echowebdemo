@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>Beat 01 · 钩子</title>
+  <link rel="stylesheet" href="../shared/style.css" />
+  <style>
+    /* 气泡放大版, 适配增大的手机轮廓 (与 00 一致). */
+    .echo-bubble {
+      max-width: 24%;
+      font-size: 18px;
+      padding: 9px 14px;
+      white-space: normal;
+      text-align: center;
+      line-height: 1.4;
+    }
+
+    /* 立绘 — 绿幕视频 (WebM VP9 alpha). 与 00 完全一致, Beat 01 起态不动. */
+    #portrait {
+      background: none;
+      object-fit: cover;
+      object-position: center bottom;
+      width: 38%;
+      height: 68%;
+      bottom: 4.44%;
+      /* 继承 00 尾帧的 visible 状态, 不需要 fade-in. */
+      opacity: 1;
+      transform: translateX(-50%) scale(1);
+    }
+    /* b2 "岛上别的地方。跟上。" 打完后, 角色顺势近身 — 微放大 + 下沉.
+       transform-origin: 50% 100% (shared 默认) 让 scale 围绕脚底点向上长.
+       transition 由 shared .echo-portrait-placeholder 提供 (transform 1.4s). */
+    #portrait.is-leaning-in {
+      transform: translateX(-50%) scale(1.32) translateY(32%);
+    }
+
+    /* 双层场景: 旧 (水岸 cj3) 叠在 新 (宅院) 之上.
+       继承 00 尾帧 — 两层都已铺满 (override shared 的 scale(0.25)/opacity:0). */
+    .echo-scene-placeholder {
+      opacity: 1;
+      transform: scale(1);
+    }
+    /* 两层场景: 不用 z-index — .echo-underlay 是 z-index:auto, 正值会穿透
+       stacking context 跑到 SVG/overlay 之上. 改用 DOM 顺序: scene-new 在前 (底),
+       scene-old 在后 (顶), 自然叠. */
+    #scene-old {
+      background:
+        url('../../assets/images/cj3.jpg') no-repeat center center / cover;
+    }
+    #scene-new {
+      background:
+        url('../../assets/images/宅院.webp') no-repeat center center / cover;
+    }
+  </style>
+</head>
+<body>
+  <div class="echo-stage" id="stage">
+    <!-- Underlay: 新场景 → 旧场景 → 涟漪带 → 立绘. SVG outside-darken 之下,
+         所有手机外溢出由 darken 一并压黑. -->
+    <div class="echo-underlay">
+      <div class="echo-scene-placeholder" id="scene-new"></div>
+      <div class="echo-scene-placeholder echo-scene-swap-old" id="scene-old"></div>
+      <div class="echo-ripple-band" id="rippleBand"></div>
+      <video class="echo-portrait-placeholder" id="portrait"
+             autoplay muted loop playsinline preload="auto"
+             src="../../assets/videos/小狐狸待机_alpha.webm"></video>
+    </div>
+
+    <svg class="echo-svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <mask id="phone-mask">
+          <rect width="1600" height="900" fill="white" />
+          <path id="phone-interior" fill="black" />
+        </mask>
+      </defs>
+
+      <!-- 外暗 — 继承 00 尾帧的 0.95, Beat 01 全程不变. -->
+      <rect id="outside-darken" width="1600" height="900" fill="#000"
+            mask="url(#phone-mask)" style="opacity: var(--echo-outside-darken)" />
+
+      <!-- 手机轮廓 — 继承 00 尾帧的 opacity:1. -->
+      <path id="phone-outline" class="echo-outline" style="opacity: 1;" />
+
+      <!-- 长按弧系统 (复用 00 的 CIRCLE + ARC_NARROW). -->
+      <g id="arc-reveal-wrap">
+        <g id="arc-host">
+          <path id="signature-arc" class="echo-stroke" />
+          <path class="echo-ripple ripple-1" id="ripple1" />
+          <path class="echo-ripple ripple-2" id="ripple2" />
+          <path class="echo-ripple ripple-3" id="ripple3" />
+        </g>
+      </g>
+    </svg>
+
+    <!-- Overlay: 气泡 + 上滑色块. -->
+    <div class="echo-overlay">
+      <!-- LOOP A · 水岸 -->
+      <div class="echo-bubble echo-bubble-user tail-bottom" id="b1"
+           style="left: 50%; bottom: 28%;">你要带我去哪里?</div>
+      <div class="echo-bubble echo-bubble-char tail-bottom" id="b2"
+           style="left: 50%; top: 20%;">岛上别的地方。跟上。</div>
+      <!-- LOOP B · 宅院 -->
+      <div class="echo-bubble echo-bubble-user tail-bottom" id="b3"
+           style="left: 50%; bottom: 28%;">这门...通哪?</div>
+      <div class="echo-bubble echo-bubble-char tail-bottom" id="b4"
+           style="left: 50%; top: 20%;">通向你想去的任何地方。</div>
+
+      <!-- 上滑入口色块 — 几何照搬 demo (viewBox 1000×220 + 同一 bezier 闭合纯填充).
+           外层 clip 容器锁死在手机列, 保证 .is-pulling 的 scale 1.7 被剪裁回手机宽. -->
+      <div class="echo-swipe-tip-clip">
+        <div class="echo-swipe-tip" id="swipeTip" aria-hidden="true">
+          <svg class="echo-swipe-tip-svg" viewBox="0 0 1000 220" preserveAspectRatio="none">
+            <path class="echo-swipe-tip-fill" d="M 60 230 Q 500 30 940 230 Z" />
+          </svg>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../shared/constants.js"></script>
+  <script src="../shared/curves.js"></script>
+  <script src="../shared/stage.js"></script>
+  <script src="scene.js"></script>
+</body>
+</html>

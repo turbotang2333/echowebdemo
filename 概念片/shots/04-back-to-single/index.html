@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>Beat 04 · 回单屏 · 无限上滑剪影</title>
+  <link rel="stylesheet" href="../shared/style.css" />
+  <style>
+    /* 接续 03 尾帧: 手机轮廓 + 外暗已就位 (与 01 一致, override shared 的入场态). */
+    .echo-scene-placeholder {
+      opacity: 1;
+      transform: scale(1);
+    }
+    /* 抽象残光底 — 紫调 wash, 在剪影层全部淡出后露出, 作为 04 的"末态". */
+    #scene-wash {
+      background:
+        radial-gradient(ellipse 60% 40% at 50% 50%, rgba(180, 150, 200, 0.45), rgba(7, 8, 17, 0) 72%),
+        radial-gradient(ellipse 110% 90% at 50% 50%, rgba(120, 90, 160, 0.28), rgba(7, 8, 17, 0) 85%);
+    }
+
+    /* 三层剪影 — round-robin 复用, 切帧时只切 backgroundImage + opacity. */
+    .echo-scene-frame {
+      position: absolute;
+      inset: 0;
+      background-position: center center;
+      background-size: cover;
+      background-repeat: no-repeat;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 140ms var(--ease-drift), filter 140ms var(--ease-drift);
+      will-change: opacity, filter;
+    }
+    .echo-scene-frame.visible { opacity: 1; }
+
+    /* 流光段 — 加 mix-blend-mode: screen + blur, 让连续叠透形成 motion-blur 残影. */
+    .echo-underlay.is-flowing .echo-scene-frame {
+      mix-blend-mode: screen;
+      filter: blur(6px) brightness(1.25) saturate(1.1);
+      transition: opacity 70ms var(--ease-drift);
+    }
+
+    /* 收尾 — 全部剪影淡出, 露出 #scene-wash 的紫色残光. */
+    .echo-underlay.is-settling .echo-scene-frame {
+      opacity: 0;
+      filter: blur(12px) brightness(1.1);
+      transition: opacity 700ms var(--ease-drift), filter 700ms var(--ease-drift);
+    }
+  </style>
+</head>
+<body>
+  <div class="echo-stage" id="stage">
+    <!-- Underlay: 紫色 wash 底 + 3 个剪影层 (round-robin). 无立绘 — 04 是过场, 立绘不出. -->
+    <div class="echo-underlay" id="underlay">
+      <div class="echo-scene-placeholder" id="scene-wash"></div>
+      <div class="echo-scene-frame" id="frame-a"></div>
+      <div class="echo-scene-frame" id="frame-b"></div>
+      <div class="echo-scene-frame" id="frame-c"></div>
+    </div>
+
+    <svg class="echo-svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <mask id="phone-mask">
+          <rect width="1600" height="900" fill="white" />
+          <path id="phone-interior" fill="black" />
+        </mask>
+      </defs>
+
+      <!-- 外暗 — 继承 03 尾帧的 0.95, 04 全程不变. -->
+      <rect id="outside-darken" width="1600" height="900" fill="#000"
+            mask="url(#phone-mask)" style="opacity: var(--echo-outside-darken)" />
+
+      <!-- 手机轮廓 — 继承 03 尾帧, opacity:1. -->
+      <path id="phone-outline" class="echo-outline" style="opacity: 1;" />
+
+      <!-- 04 不出长按弧 — 上滑色块独自承担"输入"语义. -->
+    </svg>
+
+    <!-- Overlay: 上滑色块 + OV. -->
+    <div class="echo-overlay">
+      <div class="echo-swipe-tip-clip">
+        <div class="echo-swipe-tip" id="swipeTip" aria-hidden="true">
+          <svg class="echo-swipe-tip-svg" viewBox="0 0 1000 220" preserveAspectRatio="none">
+            <path class="echo-swipe-tip-fill" d="M 60 230 Q 500 30 940 230 Z" />
+          </svg>
+        </div>
+      </div>
+      <!-- OV: 「AI 驱动 / 故事无限」— 28 帧减速段浮起, 读出"无限上滑"的产品语义 -->
+      <div class="echo-vo-side echo-vo-left" id="voLeft">AI 驱动</div>
+      <div class="echo-vo-side echo-vo-right" id="voRight">故事无限</div>
+    </div>
+  </div>
+
+  <script src="../shared/constants.js"></script>
+  <script src="../shared/curves.js"></script>
+  <script src="../shared/stage.js"></script>
+  <script src="scene.js"></script>
+</body>
+</html>

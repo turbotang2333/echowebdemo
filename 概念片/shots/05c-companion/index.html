@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>Beat 05c · 角色陪伴互动</title>
+  <link rel="stylesheet" href="../shared/style.css" />
+  <link rel="preload" as="image" href="../../assets/images/xiaohuli.png" />
+  <style>
+    /* ─────────────────────────────────────────────────────────────
+       5c · 角色陪伴互动 · "长按抚摸 → 满足条增长"
+       展示一个最简单直接的交互机制 — 用户长按立绘, 立绘表情递进, 满足条
+       从 0 涨到满, 涨满后心形图标点亮 + 飞出几颗小心. 全程不需要真实用户
+       操作, 时间轴自动驱动, 把"交互可读"演给观众.
+
+       立绘 = src/images/xiaohuli.png. pose 滤镜数值直接对齐主线 style.css
+       §.character[data-pose] (tense/relaxing/squint/tail-curl), 通过给
+       .echo-char-frame 加 data-pose 属性触发 brightness/saturate/hue-rotate
+       + scale + translateY 微调.
+       ───────────────────────────────────────────────────────────── */
+
+    /* 紫调场景 wash — 比 shared 默认更暗, 让立绘成为唯一焦点. */
+    .echo-scene-placeholder.dim {
+      background:
+        radial-gradient(ellipse 60% 50% at 50% 55%, rgba(80, 55, 120, 0.42), rgba(7, 8, 17, 0) 70%),
+        radial-gradient(ellipse 120% 100% at 50% 60%, rgba(40, 28, 70, 0.45), rgba(7, 8, 17, 0) 85%);
+    }
+
+    /* ───── 立绘 frame — 对齐 00-opening 几何 (38%×68% bottom:4.44%), 比手机略宽,
+            溢出部分由 outside-darken (0.95) 自然变暗 5%, 不裁切 ───── */
+    .echo-char-frame {
+      position: absolute;
+      left: 31%;          /* 中心 50%, 宽 38%, 左缘 31% */
+      bottom: 4.44%;
+      width: 38%;
+      height: 68%;
+      pointer-events: none;
+      opacity: 0;
+      transform: scale(0.96);
+      transform-origin: 50% 100%;   /* 脚底锚, pose scale/translateY 都从脚底走 */
+      transition:
+        opacity 1.2s var(--ease-drift),
+        transform 0.9s var(--ease-out-soft),
+        filter 0.9s var(--ease-drift);
+    }
+    .echo-char-frame.visible {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    /* sway 中间层 — pose (frame) 与 sway (这一层) 解耦: pose 静态变形在 frame,
+       sway 动态摇摆在这层. 两者 transform 叠加, transform-origin 都 50% 100%. */
+    .echo-char-sway {
+      position: absolute;
+      inset: 0;
+      transform-origin: 50% 100%;
+      will-change: transform;
+    }
+    .echo-char-frame.is-swaying .echo-char-sway {
+      animation: echo-char-sway 2.8s ease-in-out infinite;
+    }
+    @keyframes echo-char-sway {
+      0%, 100% { transform: translateX(0)    rotate(0deg);    }
+      33%      { transform: translateX(-3px) rotate(-0.9deg); }
+      66%      { transform: translateX(3px)  rotate(0.9deg);  }
+    }
+
+    /* 角色 img — height:100% width:auto 保持自然 aspect (1868×1920 ~1:1), 底锚居中. */
+    .echo-char-img {
+      position: absolute;
+      left: 50%;
+      bottom: 0;
+      height: 100%;
+      width: auto;
+      max-width: 100%;
+      transform: translateX(-50%);
+      user-select: none;
+      -webkit-user-drag: none;
+      pointer-events: none;
+    }
+
+    /* pose 差分 — 直接照抄主线 style.css §.character[data-pose]:
+         tense:     brightness(0.95) saturate(0.95)
+         relaxing:  brightness(1.00) saturate(1.05)
+         squint:    brightness(1.05) saturate(1.15) hue-rotate(-5deg) translateY(-0.5vh)
+         tail-curl: brightness(1.10) saturate(1.20) hue-rotate(-8deg) translateY(-1vh) scale(1.02)
+       这里 5c 4 阶用 soft/relax/squint/bliss 命名:
+         soft   ≈ relaxing
+         relax  ≈ relaxing→squint 之间
+         squint = squint (照抄)
+         bliss  ≈ tail-curl (照抄, scale 略再大)
+       特异性: .visible[data-pose] = 2 class + 1 attr > 1 class (.visible), 覆盖 .visible 的 transform. */
+    .echo-char-frame.visible[data-pose="soft"] {
+      transform: scale(1.00);
+      filter: brightness(1.00) saturate(1.05);
+    }
+    .echo-char-frame.visible[data-pose="relax"] {
+      transform: scale(1.015);
+      filter: brightness(1.03) saturate(1.10) hue-rotate(-3deg);
+    }
+    .echo-char-frame.visible[data-pose="squint"] {
+      transform: translateY(-0.5%) scale(1.03);
+      filter: brightness(1.05) saturate(1.15) hue-rotate(-5deg);
+    }
+    .echo-char-frame.visible[data-pose="bliss"] {
+      transform: translateY(-1.0%) scale(1.06);
+      filter: brightness(1.10) saturate(1.20) hue-rotate(-8deg);
+    }
+
+    /* ───── 满足条 — 立绘头顶上方的横条 + 左侧心形图标 ───── */
+    .echo-sat-bar {
+      position: absolute;
+      left: 50%;
+      top: 13%;
+      transform: translateX(-50%);
+      width: 14%;
+      height: 8px;
+      background: rgba(8, 6, 18, 0.55);
+      border: 1px solid rgba(240, 208, 154, 0.40);
+      border-radius: 4px;
+      overflow: visible;
+      opacity: 0;
+      transition: opacity 0.7s var(--ease-drift);
+      box-shadow: 0 0 14px rgba(0, 0, 0, 0.4);
+    }
+    .echo-sat-bar.visible { opacity: 1; }
+
+    .echo-sat-fill {
+      position: absolute;
+      inset: 0;
+      width: 0%;
+      border-radius: 3px;
+      background: linear-gradient(to right,
+        rgba(255, 180, 130, 0.85) 0%,
+        rgba(255, 220, 165, 1) 100%);
+      box-shadow:
+        0 0 10px rgba(255, 200, 140, 0.7),
+        0 0 4px rgba(255, 235, 200, 0.9) inset;
+      transition: width 1.2s var(--ease-out-soft);
+    }
+
+    .echo-sat-icon {
+      position: absolute;
+      right: 100%;
+      top: 50%;
+      transform: translateY(-50%);
+      margin-right: 8px;
+      font-size: 12px;
+      line-height: 1;
+      color: rgba(255, 200, 165, 0.40);
+      text-shadow: 0 0 4px rgba(255, 200, 140, 0.25);
+      transition: color 0.6s var(--ease-drift), text-shadow 0.6s var(--ease-drift), transform 0.4s var(--ease-out-soft);
+      pointer-events: none;
+    }
+    .echo-sat-bar.is-full .echo-sat-icon {
+      color: rgba(255, 230, 180, 1);
+      text-shadow: 0 0 14px rgba(255, 220, 140, 0.95);
+      animation: echo-sat-icon-pop 0.7s var(--ease-out-soft);
+    }
+    @keyframes echo-sat-icon-pop {
+      0%   { transform: translateY(-50%) scale(1); }
+      40%  { transform: translateY(-50%) scale(1.45); }
+      100% { transform: translateY(-50%) scale(1); }
+    }
+
+    /* ───── 抚摸光晕 — 横向来回, 每次扫过都顺势下移一档, "横扫多个高度" ─────
+       一个 cycle 3.4s 跑 3 次横向 sweep: 上排 L→R, 中排 R→L, 下排 L→R, 每次扫过
+       Y 自然下落 ~7% stage. 首尾 opacity fade 让"末态(右下)→下个 cycle 起态(左上)"
+       的跳跃在不可见时发生. 椭圆光斑宽:高 ≈ 2:1 + blur, 形态本身暗示横向滑动. */
+    .echo-touch {
+      position: absolute;
+      left: 38%;
+      top: 38%;
+      width: 46px;
+      height: 24px;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      background: radial-gradient(ellipse 55% 70% at 50% 50%,
+        rgba(255, 245, 220, 0.95) 0%,
+        rgba(255, 220, 170, 0.45) 50%,
+        rgba(255, 200, 140, 0)    85%);
+      filter: blur(1px);
+      mix-blend-mode: screen;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .echo-touch.visible {
+      animation: echo-touch-flow 3.4s cubic-bezier(0.5, 0.1, 0.5, 0.9) infinite;
+    }
+    @keyframes echo-touch-flow {
+      /* 上排 L 出现 */
+      0%   { left: 38%; top: 38%; opacity: 0;    transform: translate(-50%, -50%) scale(0.7); }
+      10%  { left: 38%; top: 38%; opacity: 0.95; transform: translate(-50%, -50%) scale(1);   }
+      /* sweep 1: 上排 L→R, 略下移 */
+      33%  { left: 62%; top: 44%; opacity: 0.95; }
+      /* sweep 2: 中排 R→L, 再下 */
+      56%  { left: 38%; top: 52%; opacity: 0.95; }
+      /* sweep 3: 下排 L→R, 到末端尺度略放大 */
+      79%  { left: 62%; top: 60%; opacity: 0.95; transform: translate(-50%, -50%) scale(1.05);}
+      /* 收尾: 右下淡出 */
+      100% { left: 62%; top: 66%; opacity: 0;    transform: translate(-50%, -50%) scale(0.7); }
+    }
+
+    /* ───── 情绪 wash — 玫红径向, 覆盖手机内部, opacity 由 JS 控 ───── */
+    .echo-emotion {
+      position: absolute;
+      left: 37.5%;
+      top: 4.44%;
+      width: 25%;
+      height: 91.11%;
+      background: radial-gradient(ellipse 65% 55% at 50% 55%,
+        rgba(255, 145, 140, 0.55) 0%,
+        rgba(255, 105, 120, 0.22) 50%,
+        rgba(255, 80,  110, 0)   85%);
+      mix-blend-mode: screen;
+      opacity: 0;
+      transition: opacity 1.1s var(--ease-drift);
+      pointer-events: none;
+    }
+
+    /* ───── 立绘外圈柔光 — 阶 4 bliss 爆点 ───── */
+    .echo-char-glow {
+      position: absolute;
+      left: 50%;
+      bottom: 4.44%;
+      width: 42%;
+      height: 70%;
+      transform: translateX(-50%);
+      background: radial-gradient(ellipse 55% 50% at 50% 55%,
+        rgba(255, 225, 170, 0.55) 0%,
+        rgba(255, 200, 130, 0.20) 50%,
+        rgba(255, 180, 100, 0)    82%);
+      filter: blur(8px);
+      mix-blend-mode: screen;
+      opacity: 0;
+      transition: opacity 0.8s var(--ease-drift);
+      pointer-events: none;
+    }
+    .echo-char-glow.visible { opacity: 1; }
+    .echo-char-glow.is-burst {
+      animation: echo-char-glow-burst 1.6s var(--ease-out-soft);
+    }
+    @keyframes echo-char-glow-burst {
+      0%   { opacity: 0;    transform: translateX(-50%) scale(0.85); }
+      30%  { opacity: 1;    transform: translateX(-50%) scale(1.08); }
+      100% { opacity: 0.55; transform: translateX(-50%) scale(1); }
+    }
+
+    /* ───── 提示文字 "长按抚摸" — 立绘下方, 呼吸节奏 ───── */
+    .echo-hint-prompt {
+      position: absolute;
+      left: 50%;
+      top: 86%;
+      transform: translateX(-50%);
+      font-size: 13px;
+      letter-spacing: 0.28em;
+      color: rgba(255, 235, 210, 0.7);
+      text-shadow: 0 0 8px rgba(0, 0, 0, 0.6);
+      opacity: 0;
+      pointer-events: none;
+      white-space: nowrap;
+      transition: opacity 0.6s var(--ease-drift);
+    }
+    .echo-hint-prompt.visible {
+      opacity: 1;
+      animation: echo-hint-breath 2.4s ease-in-out infinite;
+    }
+    @keyframes echo-hint-breath {
+      0%, 100% { opacity: 0.6; }
+      50%      { opacity: 1; }
+    }
+
+    /* ───── 飘心 — 满足条满后向上飘散 ───── */
+    .echo-heart-float {
+      position: absolute;
+      font-size: 16px;
+      line-height: 1;
+      color: rgba(255, 210, 180, 0.95);
+      text-shadow: 0 0 8px rgba(255, 200, 140, 0.7);
+      filter: drop-shadow(0 0 4px rgba(255, 200, 140, 0.6));
+      opacity: 0;
+      pointer-events: none;
+      transform: translate(-50%, 0);
+    }
+    .echo-heart-float.is-float {
+      animation: echo-heart-rise 1.8s ease-out forwards;
+    }
+    @keyframes echo-heart-rise {
+      0%   { opacity: 0;    transform: translate(-50%,  0)    scale(0.6); }
+      20%  { opacity: 1;    transform: translate(-50%, -10px) scale(1);   }
+      100% { opacity: 0;    transform: translate(-50%, -80px) scale(1.15);}
+    }
+
+    /* 整段淡出 — 末端 .gone */
+    .echo-stage.gone .echo-underlay,
+    .echo-stage.gone .echo-overlay {
+      opacity: 0;
+      transition: opacity 0.55s var(--ease-drift);
+    }
+  </style>
+</head>
+<body>
+  <div class="echo-stage" id="stage">
+    <!-- Underlay (SVG 下方): 紫色场景 wash + 立绘 (真图 xiaohuli.png). -->
+    <div class="echo-underlay">
+      <div class="echo-scene-placeholder dim" id="scene"></div>
+      <div class="echo-char-frame" id="char-frame">
+        <div class="echo-char-sway">
+          <img class="echo-char-img" src="../../assets/images/xiaohuli.png" alt="" draggable="false">
+        </div>
+      </div>
+      <!-- 立绘外圈柔光, 阶 4 爆点 -->
+      <div class="echo-char-glow" id="char-glow"></div>
+    </div>
+
+    <svg class="echo-svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <mask id="phone-mask">
+          <rect width="1600" height="900" fill="white" />
+          <path id="phone-interior" fill="black" />
+        </mask>
+      </defs>
+
+      <!-- 沿用 04/05a 末态: 外暗 0.95 + 手机轮廓 opacity 1. -->
+      <rect id="outside-darken" width="1600" height="900" fill="#000"
+            mask="url(#phone-mask)" style="opacity: var(--echo-outside-darken)" />
+      <path id="phone-outline" class="echo-outline" style="opacity: 1;" />
+    </svg>
+
+    <!-- Overlay (SVG 上方): 满足条 / 提示 / 手指光 / emotion / 飘心. -->
+    <div class="echo-overlay">
+      <!-- 情绪 wash 在最底 (overlay 内), 视觉上落在立绘上但在文字/UI 下 -->
+      <div class="echo-emotion" id="emotion"></div>
+
+      <!-- 抚摸光晕 (沿身体流动, 自带留尾) -->
+      <div class="echo-touch" id="touch"></div>
+
+      <!-- 满足条 -->
+      <div class="echo-sat-bar" id="sat-bar">
+        <span class="echo-sat-icon">&#x2665;</span>
+        <div class="echo-sat-fill" id="sat-fill"></div>
+      </div>
+
+      <!-- 提示文字 -->
+      <div class="echo-hint-prompt" id="hint">长按抚摸</div>
+
+      <!-- 飘心 (3 颗, 末段 is-float 触发) -->
+      <span class="echo-heart-float" id="heart-1" style="left: 47%; top: 56%;">&#x2665;</span>
+      <span class="echo-heart-float" id="heart-2" style="left: 53%; top: 52%; animation-delay: 0.25s;">&#x2665;</span>
+      <span class="echo-heart-float" id="heart-3" style="left: 50%; top: 49%; animation-delay: 0.50s;">&#x2665;</span>
+    </div>
+  </div>
+
+  <script src="../shared/constants.js"></script>
+  <script src="../shared/curves.js"></script>
+  <script src="../shared/stage.js"></script>
+  <script src="scene.js"></script>
+</body>
+</html>

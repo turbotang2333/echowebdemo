@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>Beat 07 · 收尾</title>
+  <link rel="stylesheet" href="../shared/style.css" />
+  <style>
+    /* Ending-specific bubbles — same shape as 00 */
+    .echo-bubble {
+      max-width: 26%;
+      font-size: 18px;
+      padding: 9px 14px;
+      white-space: normal;
+      text-align: center;
+      line-height: 1.4;
+    }
+
+    /* 背景视频 — 替代原 scene + portrait. 占满 stage, object-fit cover,
+       起态 opacity 0 (被手机内 white-wash 盖住, 手机外被 outside-darken 盖住);
+       0~600ms 与 white-wash 交叉淡入淡出至 1.0;
+       PHASE B (11.1s) 跟随圆闭合 fade out 至 0. */
+    #bg-video {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0;
+      transition: opacity 0.6s var(--ease-drift);
+      pointer-events: none;
+    }
+    #bg-video.is-revealed { opacity: 1; }
+    #bg-video.is-fading {
+      opacity: 0;
+      transition: opacity 1.5s var(--ease-drift);
+    }
+
+    /* 白曝光层 (承接 06 末态) — 限定在手机内, 起态 opacity 1.
+       0~600ms 与 #bg-video 交叉淡入淡出至 0. */
+    #white-wash {
+      opacity: 1;
+      transition: opacity 0.6s var(--ease-drift);
+    }
+    #white-wash.is-fading { opacity: 0; }
+
+    /* 弧/圆 stroke 抗 viewBox 缩放 + 自身作第 3 脉冲所需的 transform 基准.
+       v3: signature-arc 在 PHASE D 加 .is-self-pulsing 时, 自己做 scale+fade 动画
+       (跟 ripples 同形态), 接力散波的第 3 拍. transform-box: fill-box 让 scale
+       围绕 fullCircle 的几何中心 (= CIRCLE 圆心). */
+    #signature-arc {
+      vector-effect: non-scaling-stroke;
+      transform-box: fill-box;
+      transform-origin: 50% 50%;
+    }
+    #arc-host.is-self-pulsing #signature-arc {
+      animation: echo-arc-self-pulse 2.2s var(--ease-out-soft) 0s 1 both;
+    }
+    @keyframes echo-arc-self-pulse {
+      0%   { opacity: 1; transform: scale(1); }
+      100% { opacity: 0; transform: scale(1.8); }
+    }
+
+    /* ============================================================
+       同心圆涟漪 — 7.6 圆向外散波 (single-pass, 2 个脉冲后消失)
+       ============================================================
+       2 条 SVG circle 同心于 (CIRCLE.cx, CIRCLE.cy), 起态 r=CIRCLE.r,
+       transform-box: fill-box 让 transform-origin: 50% 50% 对齐圆心.
+       scale(1→1.8) 把圆向外扩张, opacity 0.85→0 衰减.
+       2 条 stagger delay 0/0.65s, 单条周期 2.2s, 单次播放后停在 opacity 0.
+       animation-fill-mode: forwards 让结束态保留, iteration-count: 1 单次. */
+    .echo-pulse {
+      fill: none;
+      stroke: var(--echo-arc-stroke);
+      stroke-width: 2.6;
+      stroke-linecap: round;
+      vector-effect: non-scaling-stroke;
+      filter: drop-shadow(0 0 14px var(--echo-arc-glow));
+      opacity: 0;
+      transform-box: fill-box;
+      transform-origin: 50% 50%;
+    }
+    #pulse-host.is-pulsing .pulse-1 {
+      animation: echo-pulse-out 2.2s var(--ease-out-soft) 0s 1 both;
+    }
+    #pulse-host.is-pulsing .pulse-2 {
+      animation: echo-pulse-out 2.2s var(--ease-out-soft) 0.65s 1 both;
+    }
+    @keyframes echo-pulse-out {
+      0%   { opacity: 0.85; transform: scale(1); }
+      100% { opacity: 0;    transform: scale(1.8); }
+    }
+
+    /* (v3: arc-reveal-wrap.is-fading-slow 已废弃 — 圆自身 self-pulse 接力) */
+
+    /* ============================================================
+       slogan + logo 定格层 — 落在圆内 (画面正中)
+       ============================================================ */
+    .echo-slogan {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      color: var(--echo-arc-stroke);
+      font-size: 26px;
+      letter-spacing: 0.28em;
+      opacity: 0;
+      white-space: nowrap;
+      text-shadow: 0 0 18px var(--echo-arc-glow);
+      transition: opacity 1.2s var(--ease-drift);
+      pointer-events: none;
+    }
+    .echo-slogan.visible { opacity: 1; }
+
+    /* logo — slogan 淡出后浮现, 同位 (圆心). 占位: 极简 "回响圆" mark
+       (外环 + 中心点). 用户提供真 logo 素材时把 SVG 内容换成 <image>. */
+    .echo-logo {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      color: var(--echo-arc-stroke);
+      opacity: 0;
+      transition: opacity 1.2s var(--ease-drift);
+      pointer-events: none;
+    }
+    .echo-logo.visible { opacity: 1; }
+    .echo-logo img {
+      display: block;
+      width: 80px;
+      height: auto;
+      filter: drop-shadow(0 0 14px var(--echo-arc-glow));
+    }
+  </style>
+</head>
+<body>
+  <div class="echo-stage" id="stage">
+    <!-- Underlay: 背景视频 (替代原 scene + portrait, 占满 stage). -->
+    <div class="echo-underlay">
+      <video id="bg-video"
+             src="../../assets/videos/狐狸草地.mp4"
+             muted loop autoplay playsinline preload="auto"></video>
+    </div>
+
+    <svg class="echo-svg" id="svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <mask id="phone-mask">
+          <rect width="1600" height="900" fill="white" />
+          <path id="phone-interior" fill="black" />
+        </mask>
+
+        <!-- 手机内部 clipPath — 白曝光层只画在手机内 (沿用 06 命名约定). -->
+        <clipPath id="phone-interior-clip-07">
+          <path id="phone-interior-clip-path-07" />
+        </clipPath>
+      </defs>
+
+      <!-- 起态: 外暗 + 手机轮廓 已在 (承接 06). 7.4 同步淡出. -->
+      <rect id="outside-darken" width="1600" height="900" fill="#000"
+            mask="url(#phone-mask)" style="opacity: var(--echo-outside-darken)" />
+
+      <!-- 白曝光层 (承接 06 末态) — clipPath 限定只在手机内, 起态 opacity 1.
+           0~600ms 与 #bg-video 交叉淡入淡出至 0. -->
+      <rect id="white-wash" width="1600" height="900" fill="#fffbeb"
+            clip-path="url(#phone-interior-clip-07)" />
+
+      <path id="phone-outline" class="echo-outline" />
+
+      <!-- 弧 (7.3) → 圆 (7.5 d 替换为 fullCircle, 同时 viewBox 拉远) -->
+      <g id="arc-reveal-wrap">
+        <g id="arc-host">
+          <path id="signature-arc" class="echo-stroke" />
+        </g>
+      </g>
+
+      <!-- 7.6 同心圆涟漪 (圆补全后启动, 2 个脉冲 single-pass) -->
+      <g id="pulse-host">
+        <circle class="echo-pulse pulse-1" id="pulse1" />
+        <circle class="echo-pulse pulse-2" id="pulse2" />
+      </g>
+    </svg>
+
+    <!-- Overlay: 气泡 + slogan + logo -->
+    <div class="echo-overlay">
+      <!-- 7.1 你 -->
+      <div class="echo-bubble echo-bubble-user tail-bottom" id="b1"
+           style="left: 50%; bottom: 28%;">你...会在吗?</div>
+      <!-- 7.2 他 -->
+      <div class="echo-bubble echo-bubble-char tail-bottom" id="b2"
+           style="left: 50%; top: 20%;">...一直在。</div>
+
+      <!-- 7.7 slogan 浮现 → 淡出 → logo 浮现 (同位, 顺序切换) -->
+      <div class="echo-slogan" id="slogan">念念不忘  必有回响</div>
+      <div class="echo-logo" id="logo">
+        <img src="../../assets/images/回响logo.png" alt="回响" />
+      </div>
+    </div>
+  </div>
+
+  <script src="../shared/constants.js"></script>
+  <script src="../shared/curves.js"></script>
+  <script src="../shared/stage.js"></script>
+  <script src="scene.js"></script>
+</body>
+</html>

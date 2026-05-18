@@ -1,0 +1,474 @@
+:root {
+  --echo-bg: #070811;
+  /* 他 = 温紫沉 (留旧 bubble 调以保留两人对比) */
+  --echo-bubble-char-bg: rgba(34, 24, 50, 0.82);
+  --echo-bubble-char-fg: #e8d4b8;
+  --echo-bubble-char-border: rgba(232, 212, 184, 0.22);
+  /* 你 = 暖金 */
+  --echo-bubble-user-bg: rgba(46, 34, 18, 0.86);
+  --echo-bubble-user-fg: #f0d09a;
+  --echo-bubble-user-border: rgba(240, 208, 154, 0.22);
+  /* 弧 — 移植 demo .edge-arc-main 配色 */
+  --echo-arc-stroke: rgba(255, 240, 215, 0.95);
+  --echo-arc-stroke-recording: rgba(255, 250, 225, 1);
+  --echo-arc-glow: rgba(255, 235, 210, 0.9);
+  --echo-arc-glow-strong: rgba(255, 235, 200, 1);
+  --echo-arc-soft: rgba(240, 208, 154, 0.45);
+  /* 手机轮廓 + VO — 与弧同色系金 */
+  --echo-outline-stroke: rgba(240, 208, 154, 0.55);
+  --echo-vo-fg: rgba(240, 208, 154, 0.78);
+  /* 16:9 画布边框 — 开发期明显可见 */
+  --echo-stage-border: rgba(240, 208, 154, 0.7);
+  --ease-drift: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
+  /* 外暗强度 — 跟 EchoConstants.OUTSIDE_DARKEN 同源, constants.js 加载时会覆写到当前值;
+     此处定义保留作为 fallback (constants.js 缺失/未加载时仍可用). */
+  --echo-outside-darken: 0.95;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%;
+  height: 100%;
+  background: #000;
+  color: var(--echo-bubble-char-fg);
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  overflow: hidden;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Letterboxed 16:9 stage — JS sizes it; design coordinates are 1600x900 via SVG viewBox. */
+.echo-stage {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--echo-bg);
+  overflow: hidden;
+  /* Visible 16:9 frame border — helps gauge content proportion/position during dev.
+     Hidden in clean (recording) mode. */
+  box-shadow:
+    0 0 0 2px var(--echo-stage-border) inset,
+    0 0 24px rgba(240, 208, 154, 0.18) inset;
+}
+body.echo-clean .echo-stage { box-shadow: none; }
+
+/* The main SVG fills the stage. All beats render their visuals into it. */
+.echo-stage > svg.echo-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Underlay sits below the SVG (scene/portrait, so SVG outside-darken can hide them outside phone). */
+.echo-underlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Overlay sits above the SVG (bubbles/VO that should remain bright inside phone). */
+.echo-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Bubbles. Positioned via inline style with left/top in % of stage. */
+.echo-bubble {
+  position: absolute;
+  padding: 10px 16px;
+  border-radius: 18px;
+  font-size: 18px;
+  line-height: 1.5;
+  max-width: 60%;
+  opacity: 0;
+  transform: translate(-50%, 8px);
+  transition:
+    opacity 0.6s var(--ease-drift),
+    transform 0.6s var(--ease-out-soft),
+    top 0.8s var(--ease-out-soft);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.35);
+  white-space: nowrap;
+}
+.echo-bubble.visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+.echo-bubble-char {
+  background: var(--echo-bubble-char-bg);
+  color: var(--echo-bubble-char-fg);
+  border: 1px solid var(--echo-bubble-char-border);
+  text-shadow: 0 0 8px rgba(0, 0, 0, 0.7);
+}
+.echo-bubble-user {
+  background: var(--echo-bubble-user-bg);
+  color: var(--echo-bubble-user-fg);
+  border: 1px solid var(--echo-bubble-user-border);
+  text-shadow: 0 0 8px rgba(0, 0, 0, 0.7);
+}
+
+/* Tail triangles (ported from style.css §.bubble-char / .bubble-user). */
+.echo-bubble.tail-bottom::after,
+.echo-bubble.tail-top::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  transform: translateX(-50%) rotate(45deg);
+}
+.echo-bubble-char.tail-bottom::after {
+  bottom: -6px;
+  background: var(--echo-bubble-char-bg);
+  border: 1px solid var(--echo-bubble-char-border);
+  border-left: none;
+  border-top: none;
+}
+.echo-bubble-char.tail-top::after {
+  top: -6px;
+  background: var(--echo-bubble-char-bg);
+  border: 1px solid var(--echo-bubble-char-border);
+  border-right: none;
+  border-bottom: none;
+}
+.echo-bubble-user.tail-bottom::after {
+  bottom: -6px;
+  background: var(--echo-bubble-user-bg);
+  border: 1px solid var(--echo-bubble-user-border);
+  border-left: none;
+  border-top: none;
+}
+
+/* VO subtitle — 拆左右两块, 分置于手机轮廓两侧. */
+.echo-vo-side {
+  position: absolute;
+  top: 50%;
+  color: var(--echo-vo-fg);
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: 0.25em;
+  line-height: 1.6;
+  opacity: 0;
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+  transition: opacity 1.2s var(--ease-drift), transform 1.2s var(--ease-out-soft);
+}
+.echo-vo-left {
+  /* 左侧手机外区域中心: 1600 vw 下, 手机左缘 x≈600, 中心 x≈300 → 18.75% */
+  left: 18.75%;
+  transform: translate(-50%, -50%) translateX(-24px);
+}
+.echo-vo-right {
+  /* 右侧手机外区域中心: 手机右缘 x≈1000, 中心 x≈1300 → 81.25% */
+  left: 81.25%;
+  transform: translate(-50%, -50%) translateX(24px);
+}
+.echo-vo-side.visible {
+  opacity: 1;
+  transform: translate(-50%, -50%);
+}
+
+/* Placeholder portrait — bottom-anchored inside phone, matching demo character立绘
+   convention (bottom-aligned, taking up ~70-80% of phone height). */
+.echo-portrait-placeholder {
+  position: absolute;
+  left: 50%;
+  /* phone bottom is at stage y=95.56% (cy=450, h=820, viewBox 900) — anchor portrait there */
+  bottom: 4.44%;
+  width: 18%;
+  height: 68%;
+  transform: translateX(-50%) scale(0.92);
+  transform-origin: 50% 100%;
+  background:
+    radial-gradient(ellipse 55% 30% at 50% 18%, rgba(255, 230, 180, 0.42), rgba(80, 60, 30, 0) 72%),
+    radial-gradient(ellipse 70% 80% at 50% 75%, rgba(140, 100, 50, 0.32), rgba(7, 8, 17, 0) 75%);
+  opacity: 0;
+  transition: opacity 1.2s var(--ease-drift), transform 1.4s var(--ease-out-soft);
+  pointer-events: none;
+}
+.echo-portrait-placeholder.visible {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+}
+
+/* Placeholder scene — radial wash that grows from center to fill stage.
+   Warm-tone wash matching demo gold theme; per-beat backgrounds will replace this later. */
+.echo-scene-placeholder {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 50%, rgba(120, 80, 40, 0.35), rgba(7, 8, 17, 0) 70%),
+    radial-gradient(ellipse 120% 100% at 50% 50%, rgba(70, 50, 25, 0.30), rgba(7, 8, 17, 0) 85%);
+  transform: scale(0.25);
+  transform-origin: 50% 50%;
+  opacity: 0;
+  transition: opacity 1.4s var(--ease-drift), transform 1.8s var(--ease-out-soft);
+  pointer-events: none;
+}
+.echo-scene-placeholder.visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Dev overlay — hidden when body has .echo-clean (recording mode). */
+.echo-dev {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-family: ui-monospace, "SF Mono", monospace;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.55);
+  z-index: 9999;
+}
+.echo-dev button {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: inherit;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+}
+.echo-dev button:hover { background: rgba(255, 255, 255, 0.15); }
+.echo-dev .echo-dev-time { min-width: 5em; }
+.echo-dev .echo-dev-hint {
+  opacity: 0.6;
+  margin-left: 4px;
+}
+body.echo-clean .echo-dev { display: none; }
+
+/* SVG element defaults so beat code stays terse. Arc visual ported from demo .edge-arc-main. */
+.echo-stroke {
+  fill: none;
+  stroke: var(--echo-arc-stroke);
+  stroke-width: 2.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 16px var(--echo-arc-glow));
+  transition: stroke 0.4s var(--ease-drift), stroke-width 0.4s var(--ease-drift), filter 0.4s var(--ease-drift);
+}
+
+/* ── 弧承载层 — 与 demo 一致的多态:
+   #arc-reveal-wrap = 入场 (translateY + opacity)
+   #arc-host = 呼吸/涟漪 容器 (添加 is-invitation / is-recording 切态) */
+#arc-reveal-wrap {
+  opacity: 0;
+  transform: translateY(80px);
+  transition: opacity 1.0s var(--ease-drift), transform 1.0s var(--ease-out-soft);
+}
+#arc-reveal-wrap.is-revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+#arc-reveal-wrap.is-fading {
+  opacity: 0;
+  transition: opacity 0.8s var(--ease-drift);
+}
+
+/* state-invitation — 弧"召唤"呼吸态 (移植 demo edgeBreath, 但宽弧版改为 opacity/filter 主导, 避免 scale 把端点推出屏外) */
+#arc-host.is-invitation #signature-arc {
+  animation: edgeBreath 4.2s ease-in-out infinite;
+}
+@keyframes edgeBreath {
+  0%, 100% {
+    opacity: 0.55;
+    filter: drop-shadow(0 0 10px var(--echo-arc-glow));
+  }
+  50% {
+    opacity: 1;
+    filter: drop-shadow(0 0 26px var(--echo-arc-glow-strong));
+  }
+}
+
+/* state-recording — 长按蓄波: 主弧加粗变亮, 涟漪沿同形向上扩散 (移植 demo edgeRipple) */
+#arc-host.is-recording #signature-arc {
+  animation: none;
+  stroke: var(--echo-arc-stroke-recording);
+  stroke-width: 3.2;
+  filter: drop-shadow(0 0 32px var(--echo-arc-glow-strong));
+}
+.echo-ripple {
+  fill: none;
+  stroke: var(--echo-arc-stroke);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 8px var(--echo-arc-glow));
+  opacity: 0;
+  pointer-events: none;
+}
+#arc-host.is-recording .echo-ripple {
+  animation: edgeRipple 1.8s ease-out infinite;
+}
+#arc-host.is-recording .ripple-1 { animation-delay: 0s; }
+#arc-host.is-recording .ripple-2 { animation-delay: 0.6s; }
+#arc-host.is-recording .ripple-3 { animation-delay: 1.2s; }
+@keyframes edgeRipple {
+  0%   { opacity: 0.75; transform: translateY(0); }
+  80%  { opacity: 0.05; }
+  100% { opacity: 0; transform: translateY(-200px); }
+}
+.echo-stroke-soft {
+  fill: none;
+  stroke: var(--echo-arc-soft);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+.echo-outline {
+  fill: none;
+  stroke: var(--echo-outline-stroke);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ============================================================
+   上滑入口色块 (swipe-tip) — 移植 demo .swipe-tip
+   ============================================================
+   "面" 语言, 与长按弧的 "线" 对立 — 同一 bezier 几何 (M 60 230 Q 500 30 940 230 Z),
+   纯填充 + 暖白柔光. 位于手机底部内沿, 只露 --peek 高度的弧尖, 4s 缓慢呼吸.
+   .visible = "从水面下浮起" 入场 / .leaving = "沉回水面 + blur" 离场.
+   横向占满手机内部 (phone w=400/viewBox=1600=25%, 居中 left 37.5%).
+   纵向: 元素底沿略低于手机底 (peek-36px), 让弧峰 (viewBox y=130) 露出手机底 --peek px.
+*/
+/* clip 容器 — 钉在手机列位置 (left 37.5% width 25%), overflow:hidden 锁死.
+   是 .is-pulling 时 scale 1.7 不漏出手机两侧的必要条件: CSS transform 在
+   layout/overflow 之后才应用, 所以元素自身的 overflow:hidden 阻止不了 scale
+   把外接矩形撑大; 必须用一个不被 transform 的父容器来做边界剪裁.
+   高度 250px 给放大后的 150px 元素 + drop-shadow 留余裕; 底沿贴手机底, 也兜底
+   剪掉 path 在 viewBox 220 之下的 4px 溢出. */
+.echo-swipe-tip-clip {
+  position: absolute;
+  left: 37.5%;
+  width: 25%;
+  bottom: 4.44%;
+  height: 250px;
+  overflow: hidden;
+  pointer-events: none;
+}
+.echo-swipe-tip {
+  position: absolute;
+  /* 在 clip 容器内: 充满父宽, 底沿对齐父底 (= 手机底). */
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 88px;
+  pointer-events: none;
+  opacity: 0;
+  scale: 1;
+  translate: 0 24px;
+  filter: blur(0);
+  transform-origin: 50% 100%;
+  transition:
+    opacity 0.5s var(--ease-drift),
+    translate 0.55s cubic-bezier(0.2, 0.7, 0.2, 1),
+    scale 0.5s var(--ease-out-soft),
+    filter 0.25s var(--ease-drift);
+}
+.echo-swipe-tip.visible {
+  opacity: 1;
+  translate: 0 0;
+}
+/* is-pulling: 脚本化的"上滑手势进行中" — scale 1→1.7 (transform-origin 底沿),
+   弧峰拔起约 60px peek; fill alpha 0.28→0.14 模拟"被拉得越高越淡". 照 demo
+   swipe-tip.js 的 setSwipeProgress(p=1.2) 视觉. */
+.echo-swipe-tip.is-pulling {
+  scale: 1.7;
+}
+.echo-swipe-tip.is-pulling .echo-swipe-tip-fill {
+  fill: rgba(255, 235, 210, 0.14);
+  transition: fill 0.5s ease-out;
+}
+.echo-swipe-tip.leaving {
+  opacity: 0;
+  translate: 0 6px;
+  scale: 1;
+  filter: blur(8px);
+  transition:
+    opacity 0.35s ease-out,
+    translate 0.4s ease-out,
+    scale 0.4s ease-out,
+    filter 0.3s ease-out;
+}
+.echo-swipe-tip-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  animation: echo-swipe-tip-breathe 4s ease-in-out infinite;
+  mask-image: linear-gradient(to top, black 50%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to top, black 50%, transparent 100%);
+}
+@keyframes echo-swipe-tip-breathe {
+  0%, 100% { opacity: 0.55; translate: 0 0; }
+  50%      { opacity: 1;    translate: 0 -3px; }
+}
+.echo-swipe-tip-fill {
+  fill: rgba(255, 235, 210, 0.28);
+  filter: drop-shadow(0 -2px 18px rgba(255, 235, 210, 0.25));
+}
+
+/* ============================================================
+   场景切换 — "涟漪带扫过 + 旧场景自下而上被擦掉, 新场景从底浮出"
+   ============================================================
+   Beat 01 首次启用. 替代 demo wave.js 全套快照+displacement 的简化版本.
+   语义对齐: 上滑动作 → 横向涟漪带从手机底沿往上扫 ~1200ms, 带过之处旧场景
+   被裁掉露出底下新场景.
+
+   用法: 双层 .echo-scene-placeholder 并叠 z-index (新在下旧在上); 旧层加
+   .echo-scene-swap-old; 触发时 .is-wiping. 单独 .echo-ripple-band 加 .is-sweeping.
+*/
+.echo-scene-swap-old {
+  clip-path: inset(0 0 0 0);
+  -webkit-clip-path: inset(0 0 0 0);
+  transition:
+    clip-path 1.2s var(--ease-out-soft),
+    -webkit-clip-path 1.2s var(--ease-out-soft);
+}
+.echo-scene-swap-old.is-wiping {
+  clip-path: inset(0 0 100% 0);
+  -webkit-clip-path: inset(0 0 100% 0);
+}
+
+.echo-ripple-band {
+  position: absolute;
+  left: 37.5%;
+  width: 25%;
+  height: 80px;
+  /* 起手: 中心在手机底; .is-sweeping 时上推到手机顶. */
+  top: calc(95.56% - 40px);
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(
+    to top,
+    rgba(255, 235, 210, 0) 0%,
+    rgba(255, 235, 210, 0.18) 30%,
+    rgba(255, 240, 215, 0.42) 55%,
+    rgba(255, 235, 210, 0.18) 75%,
+    rgba(255, 235, 210, 0) 100%
+  );
+  filter: blur(2px);
+  mix-blend-mode: screen;
+  transition:
+    opacity 0.35s var(--ease-drift),
+    top 1.2s var(--ease-out-soft);
+}
+.echo-ripple-band.is-sweeping {
+  opacity: 1;
+  top: calc(4.44% - 40px);
+}
+.echo-ripple-band.is-leaving {
+  opacity: 0;
+}

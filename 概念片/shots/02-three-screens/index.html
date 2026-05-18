@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>Beat 02 · 千人千面</title>
+  <link rel="stylesheet" href="../shared/style.css" />
+  <style>
+    /* 气泡尺寸沿用 01 (用户决定: 字号/尺寸最后统一调). 文本会 wrap. */
+    .echo-bubble {
+      max-width: 24%;
+      font-size: 18px;
+      padding: 9px 14px;
+      white-space: normal;
+      text-align: center;
+      line-height: 1.4;
+    }
+
+    /* 立绘 — 三个绿幕视频 (1/2/3_alpha.webm), 起手全部重合于中央大手机内.
+       由 JS 在 setSplitState 内每帧改写 left/bottom/transform; opacity 永远 1.
+       覆盖 shared 的 radial-gradient 占位; object-fit: cover 与 00/01 对齐. */
+    .echo-portrait-placeholder.is-fox {
+      background: none;
+      object-fit: cover;
+      object-position: center bottom;
+      width: 38%;
+      height: 68%;
+      opacity: 1;
+      transform: translateX(-50%) scale(1);
+    }
+
+    /* 共享背景 — 宅院 (继承 01 末帧, 全屏铺, 永久铺底, 外暗会盖手机外的部分) */
+    .echo-scene-shared {
+      position: absolute;
+      inset: 0;
+      background: url('../../assets/images/宅院.webp') no-repeat center center / cover;
+      pointer-events: none;
+    }
+
+    /* 三屏新场景 pane — 各自在所在 phone 内自下而上 wipe up (沿 00 揭开手法).
+       inset(100% 0 0 0) = 完全裁掉; inset(0 0 0 0) = 完整可见. 插值底先露,
+       自下而上揭开. left/top/width/height 由 JS 在 setSplitState 内每帧写. */
+    .echo-scene-pane {
+      position: absolute;
+      transform: translateX(-50%);
+      clip-path: inset(100% 0 0 0);
+      -webkit-clip-path: inset(100% 0 0 0);
+      transition:
+        clip-path 1.8s var(--ease-out-soft),
+        -webkit-clip-path 1.8s var(--ease-out-soft);
+      pointer-events: none;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+    }
+    .echo-scene-pane.visible {
+      clip-path: inset(0 0 0 0);
+      -webkit-clip-path: inset(0 0 0 0);
+    }
+    #scene-pane-A { background-image: url('../../assets/images/红日.png'); }
+    #scene-pane-B { background-image: url('../../assets/images/cj4.png'); }
+    #scene-pane-C { background-image: url('../../assets/images/骸骨.webp'); }
+
+    /* 类版 arc-wrap / arc-host / signature-arc — 与 shared/style.css 的 ID 选择器
+       并行 (id 选择器只覆 00/01 的单弧; 类选择器让 02 的 3 套同时 work). */
+    .echo-arc-wrap {
+      opacity: 0;
+      transform: translateY(80px);
+      transition: opacity 1.0s var(--ease-drift), transform 1.0s var(--ease-out-soft);
+    }
+    .echo-arc-wrap.is-revealed {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .echo-arc-wrap.is-fading {
+      opacity: 0;
+      transition: opacity 0.8s var(--ease-drift);
+    }
+    .echo-arc-host.is-invitation .signature-arc {
+      animation: edgeBreath 4.2s ease-in-out infinite;
+    }
+    .echo-arc-host.is-recording .signature-arc {
+      animation: none;
+      stroke: var(--echo-arc-stroke-recording);
+      stroke-width: 3.2;
+      filter: drop-shadow(0 0 32px var(--echo-arc-glow-strong));
+    }
+    .echo-arc-host.is-recording .echo-ripple {
+      animation: edgeRipple 1.8s ease-out infinite;
+    }
+    .echo-arc-host.is-recording .ripple-1 { animation-delay: 0s; }
+    .echo-arc-host.is-recording .ripple-2 { animation-delay: 0.6s; }
+    .echo-arc-host.is-recording .ripple-3 { animation-delay: 1.2s; }
+  </style>
+</head>
+<body>
+  <div class="echo-stage" id="stage">
+    <!-- Underlay: 共享宅院 (z 底) → 三屏新场景 pane (z 中) → 三立绘 (z 顶). SVG outside-darken 之下. -->
+    <div class="echo-underlay">
+      <div class="echo-scene-shared" id="scene-shared"></div>
+      <div class="echo-scene-pane" id="scene-pane-A"></div>
+      <div class="echo-scene-pane" id="scene-pane-B"></div>
+      <div class="echo-scene-pane" id="scene-pane-C"></div>
+      <video class="echo-portrait-placeholder is-fox" id="portrait-A"
+             autoplay muted loop playsinline preload="auto"
+             src="../../assets/videos/1_alpha.webm"></video>
+      <video class="echo-portrait-placeholder is-fox" id="portrait-B"
+             autoplay muted loop playsinline preload="auto"
+             src="../../assets/videos/2_alpha.webm"></video>
+      <video class="echo-portrait-placeholder is-fox" id="portrait-C"
+             autoplay muted loop playsinline preload="auto"
+             src="../../assets/videos/3_alpha.webm"></video>
+    </div>
+
+    <svg class="echo-svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <!-- 3 phone-interior 子路径并叠在同一 mask 内. 起手三者重合 (mask=1 洞), 裂开后 = 3 洞. -->
+        <mask id="phone-mask">
+          <rect width="1600" height="900" fill="white" />
+          <path id="phone-interior-A" fill="black" />
+          <path id="phone-interior-B" fill="black" />
+          <path id="phone-interior-C" fill="black" />
+        </mask>
+      </defs>
+
+      <!-- 外暗 — 继承 01 末帧的 0.95, 02 全程不变. -->
+      <rect id="outside-darken" width="1600" height="900" fill="#000"
+            mask="url(#phone-mask)" style="opacity: var(--echo-outside-darken)" />
+
+      <!-- 三个手机轮廓 — d 属性由 JS 每帧改 (裂开 tween). 起手三者重合. -->
+      <path id="phone-outline-A" class="echo-outline" style="opacity: 1;" />
+      <path id="phone-outline-B" class="echo-outline" style="opacity: 1;" />
+      <path id="phone-outline-C" class="echo-outline" style="opacity: 1;" />
+
+      <!-- 三套弧系统 (each = reveal-wrap > host > signature-arc + 3 ripples). 起手三者重合. -->
+      <g class="echo-arc-wrap" id="arc-reveal-wrap-A">
+        <g class="echo-arc-host" id="arc-host-A">
+          <path class="echo-stroke signature-arc" id="signature-arc-A" />
+          <path class="echo-ripple ripple-1" id="ripple1-A" />
+          <path class="echo-ripple ripple-2" id="ripple2-A" />
+          <path class="echo-ripple ripple-3" id="ripple3-A" />
+        </g>
+      </g>
+      <g class="echo-arc-wrap" id="arc-reveal-wrap-B">
+        <g class="echo-arc-host" id="arc-host-B">
+          <path class="echo-stroke signature-arc" id="signature-arc-B" />
+          <path class="echo-ripple ripple-1" id="ripple1-B" />
+          <path class="echo-ripple ripple-2" id="ripple2-B" />
+          <path class="echo-ripple ripple-3" id="ripple3-B" />
+        </g>
+      </g>
+      <g class="echo-arc-wrap" id="arc-reveal-wrap-C">
+        <g class="echo-arc-host" id="arc-host-C">
+          <path class="echo-stroke signature-arc" id="signature-arc-C" />
+          <path class="echo-ripple ripple-1" id="ripple1-C" />
+          <path class="echo-ripple ripple-2" id="ripple2-C" />
+          <path class="echo-ripple ripple-3" id="ripple3-C" />
+        </g>
+      </g>
+    </svg>
+
+    <!-- Overlay: 6 气泡 (3 你 / 3 他), 各自钉在所在 phone 中线. -->
+    <div class="echo-overlay">
+      <!-- A · 好奇世界 -->
+      <div class="echo-bubble echo-bubble-user tail-bottom" id="you-A"
+           style="left: 18.75%; bottom: 28%;">狗牙岛?什么样?</div>
+      <div class="echo-bubble echo-bubble-char tail-bottom" id="him-A"
+           style="left: 18.75%; top: 20%;">犬牙石林，日头正烈。</div>
+      <!-- B · 好奇角色 -->
+      <div class="echo-bubble echo-bubble-user tail-bottom" id="you-B"
+           style="left: 50%; bottom: 28%;">你住的地方。</div>
+      <div class="echo-bubble echo-bubble-char tail-bottom" id="him-B"
+           style="left: 50%; top: 20%;">洞里，可别怕。</div>
+      <!-- C · 好奇内心 -->
+      <div class="echo-bubble echo-bubble-user tail-bottom" id="you-C"
+           style="left: 81.25%; bottom: 28%;">你最想去?</div>
+      <div class="echo-bubble echo-bubble-char tail-bottom" id="him-C"
+           style="left: 81.25%; top: 20%;">这里，曾是我的。</div>
+    </div>
+  </div>
+
+  <script src="../shared/constants.js"></script>
+  <script src="../shared/curves.js"></script>
+  <script src="../shared/stage.js"></script>
+  <script src="scene.js"></script>
+</body>
+</html>

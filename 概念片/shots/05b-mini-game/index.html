@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>Beat 05b · 互动小游戏</title>
+  <link rel="stylesheet" href="../shared/style.css" />
+  <link rel="preload" as="image" href="../../assets/images/祭坛.jpg" />
+  <style>
+    /* 5b · 符纸配对 (纯视频示意, 不做真交互).
+       承接 05a 末态: 手机轮廓 + 外暗 0.95 + 内部黑底, 全程不动.
+       3 上 (记忆) + 3 下 (信物); 错配 1 次 (翻回背面再翻回面) + 2 对归位
+       + 第 3 对刚被点按、墨线刚起头, 画面被切走. */
+
+    /* 背景 · 祭坛 — 全 stage 铺底; 手机外被 SVG outside-darken (0.95) 压成几乎黑,
+       手机内 (phone-mask 挖洞) 显原图. 不动, 与 05a 末态衔接. */
+    #scene-bg {
+      background: url('../../assets/images/祭坛.jpg') no-repeat center center / cover;
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    /* 符纸承载 — 全 stage; 卡用 left/top % 各自定位到手机内. */
+    .charm-host {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    /* 单张符纸 — 5.5% 宽 × 4:3 比例; --drift-from 控入场起始 Y 偏移 (px). */
+    .charm-card {
+      position: absolute;
+      width: 5.5%;
+      aspect-ratio: 3 / 4;
+      transform: translate(-50%, calc(-50% + var(--drift-from, 0px))) scale(0.94);
+      opacity: 0;
+      perspective: 700px;
+      transition:
+        transform 720ms var(--ease-out-soft),
+        opacity 600ms var(--ease-drift);
+      will-change: transform, opacity;
+    }
+    .charm-card.visible {
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 1;
+    }
+    .charm-card.selected .charm-card-inner {
+      box-shadow:
+        0 0 0 1.5px rgba(255, 220, 160, 0.85),
+        0 6px 18px rgba(255, 200, 130, 0.35),
+        0 4px 12px rgba(0, 0, 0, 0.45);
+      transform: scale(1.06);
+    }
+    /* 接到信物时的金光晕脉冲. */
+    .charm-card.receive .charm-card-inner {
+      animation: card-receive 520ms cubic-bezier(.4, .8, .3, 1);
+    }
+    @keyframes card-receive {
+      0%   { box-shadow: 0 0 0 1.5px rgba(255, 220, 160, 0.85), 0 6px 18px rgba(255, 200, 130, 0.35), 0 4px 12px rgba(0, 0, 0, 0.45); transform: scale(1.06); }
+      40%  { box-shadow: 0 0 0 2px rgba(255, 235, 180, 1), 0 0 30px rgba(255, 210, 140, 0.7), 0 6px 18px rgba(255, 200, 130, 0.5); transform: scale(1.14); }
+      100% { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45); transform: scale(1); }
+    }
+    .charm-card.shake .charm-card-inner {
+      animation: card-shake 240ms ease-in-out;
+    }
+    @keyframes card-shake {
+      0%, 100% { transform: translateX(0) scale(1.06); }
+      25%      { transform: translateX(-3px) scale(1.06); }
+      75%      { transform: translateX(3px) scale(1.06); }
+    }
+    .charm-card.gone {
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(0.86);
+      transition:
+        transform 380ms var(--ease-drift),
+        opacity 320ms var(--ease-drift);
+    }
+    /* 末尾"画面被切走" — 剩余卡集体上推 + 淡. */
+    .charm-card.outro {
+      opacity: 0;
+      transform: translate(-50%, calc(-50% - 42px)) scale(0.96);
+      transition:
+        transform 800ms var(--ease-out-soft),
+        opacity 600ms var(--ease-drift);
+    }
+
+    /* 3D 翻面结构 — 翻回背面由 scene.js 直接控制 inline transform. */
+    .charm-card-inner {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      transform-style: preserve-3d;
+      transition:
+        transform 320ms cubic-bezier(.6, .2, .4, 1),
+        box-shadow 200ms ease-out;
+      border-radius: 3px;
+    }
+    .charm-card-face {
+      position: absolute;
+      inset: 0;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      border-radius: 3px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+      background: linear-gradient(135deg, #f0e6d2 0%, #ede1c8 60%, #e6d6b8 100%);
+    }
+    .charm-card-back {
+      transform: rotateY(180deg);
+      background:
+        repeating-linear-gradient(45deg,
+          rgba(80, 60, 40, 0) 0 6px,
+          rgba(80, 60, 40, 0.14) 6px 7px),
+        linear-gradient(135deg, #e8dcc0, #ddd0b0);
+    }
+    .charm-card-face svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    /* token 卡内符号"脱卡"淡出. */
+    .charm-card.tok-detach .charm-card-front svg {
+      opacity: 0;
+      transition: opacity 240ms ease-out;
+    }
+
+    /* 飞行信物 — 配对成功时从 token 卡飞向 memory 卡. 单实例, scene.js 重复用. */
+    .flying-token {
+      position: absolute;
+      width: 4%;
+      aspect-ratio: 1;
+      pointer-events: none;
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(0.9);
+      will-change: left, top, opacity, transform;
+      z-index: 5;
+    }
+    .flying-token svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+      filter: drop-shadow(0 0 12px rgba(255, 220, 160, 0.85));
+    }
+    .flying-token.armed {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1.18);
+      transition:
+        left 480ms cubic-bezier(.4, .8, .3, 1),
+        top 480ms cubic-bezier(.4, .8, .3, 1),
+        transform 480ms cubic-bezier(.4, .8, .3, 1),
+        opacity 220ms ease-out;
+    }
+    .flying-token.dissolving {
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(0.7);
+      transition:
+        opacity 240ms ease-out,
+        transform 280ms ease-out;
+    }
+
+    /* 墨线 (SVG path) — stroke-dasharray/offset 控描入. */
+    .ink-line {
+      fill: none;
+      stroke: rgba(36, 24, 14, 0.82);
+      stroke-width: 2.2;
+      stroke-linecap: round;
+      filter: drop-shadow(0 0 6px rgba(255, 220, 160, 0.45));
+      opacity: 0;
+      transition: opacity 200ms ease-out;
+    }
+    .ink-line.drawing { opacity: 1; }
+    .ink-line.fizzle  { opacity: 0; transition: opacity 260ms ease-in; }
+  </style>
+</head>
+<body>
+  <div class="echo-stage" id="stage">
+
+    <!-- 卡 + 飞行信物在 underlay; 手机外被 outside-darken 遮住, 手机内显完整. -->
+    <div class="echo-underlay" id="underlay">
+      <!-- 祭坛背景图 — 在卡之下, SVG outside-darken 之上方做手机内/外明暗分界. -->
+      <div class="echo-scene-placeholder" id="scene-bg"></div>
+      <div class="charm-host" id="charm-host">
+        <!-- 上排 · 记忆 (top:30%, 横向 41/50/59%) -->
+        <div class="charm-card mem mem-1" data-card="mem-1"
+             style="left:41%; top:30%; --drift-from: -120px;">
+          <div class="charm-card-inner">
+            <div class="charm-card-face charm-card-front">
+              <svg viewBox="0 0 40 50" aria-hidden="true">
+                <!-- 狐狸俯水: 狐脸正视 + 下方水波 -->
+                <g stroke-linecap="round" stroke-linejoin="round">
+                  <!-- 双耳 -->
+                  <path d="M 12 16 L 14 7 L 18 14 Z" fill="rgba(170,90,40,0.45)" stroke="#241808" stroke-width="1.2" />
+                  <path d="M 28 16 L 26 7 L 22 14 Z" fill="rgba(170,90,40,0.45)" stroke="#241808" stroke-width="1.2" />
+                  <!-- 心形脸 -->
+                  <path d="M 12 16 Q 13 24 20 28 Q 27 24 28 16"
+                        fill="rgba(170,90,40,0.22)" stroke="#241808" stroke-width="1.4" />
+                  <!-- 眼鼻 -->
+                  <circle cx="16" cy="19" r="0.9" fill="#241808" />
+                  <circle cx="24" cy="19" r="0.9" fill="#241808" />
+                  <circle cx="20" cy="23" r="1.1" fill="#241808" />
+                  <!-- 水波 (蓝调, 与水滴信物呼应) -->
+                  <g stroke="#243748" fill="none">
+                    <path d="M 4 38 Q 11 35 18 38 T 32 38 L 36 38" stroke-width="1.4" />
+                    <path d="M 6 43 Q 12 40 18 43 T 30 43" stroke-width="1.0" opacity="0.6" />
+                  </g>
+                </g>
+              </svg>
+            </div>
+            <div class="charm-card-face charm-card-back"></div>
+          </div>
+        </div>
+        <div class="charm-card mem mem-2" data-card="mem-2"
+             style="left:50%; top:30%; --drift-from: -120px;">
+          <div class="charm-card-inner">
+            <div class="charm-card-face charm-card-front">
+              <svg viewBox="0 0 40 50" aria-hidden="true">
+                <!-- 狐狸坐姿望月: 月亮右上 + 狐狸侧坐 -->
+                <g stroke-linecap="round" stroke-linejoin="round">
+                  <!-- 月亮 -->
+                  <circle cx="30" cy="11" r="4.5" stroke="#c9b878" stroke-width="1.4" fill="rgba(220,200,140,0.4)" />
+                  <!-- 双耳 -->
+                  <path d="M 11 22 L 12 12 L 17 19 Z" fill="rgba(170,90,40,0.45)" stroke="#241808" stroke-width="1.2" />
+                  <path d="M 23 19 L 26 13 L 25 21 Z" fill="rgba(170,90,40,0.45)" stroke="#241808" stroke-width="1.2" />
+                  <!-- 头 -->
+                  <ellipse cx="18" cy="22" rx="6" ry="4" fill="rgba(170,90,40,0.25)" stroke="#241808" stroke-width="1.4" />
+                  <!-- 眼 (朝月偏右) -->
+                  <circle cx="21" cy="21" r="0.7" fill="#241808" />
+                  <!-- 身体 (坐姿) -->
+                  <ellipse cx="19" cy="36" rx="6" ry="7" fill="rgba(170,90,40,0.22)" stroke="#241808" stroke-width="1.4" />
+                  <!-- 蓬松尾巴 -->
+                  <path d="M 25 38 Q 32 36 32 28 Q 30 24 26 26"
+                        fill="rgba(170,90,40,0.32)" stroke="#241808" stroke-width="1.2" />
+                </g>
+              </svg>
+            </div>
+            <div class="charm-card-face charm-card-back"></div>
+          </div>
+        </div>
+        <div class="charm-card mem mem-3" data-card="mem-3"
+             style="left:59%; top:30%; --drift-from: -120px;">
+          <div class="charm-card-inner">
+            <div class="charm-card-face charm-card-front">
+              <svg viewBox="0 0 40 50" aria-hidden="true">
+                <!-- 狐狸蜷睡 + 落叶飘 -->
+                <g stroke-linecap="round" stroke-linejoin="round">
+                  <!-- 落叶 (3 片飘散) -->
+                  <path d="M 7 10 Q 5 13 7 16 Q 10 14 7 10 Z" fill="rgba(170,100,50,0.5)" stroke="#241808" stroke-width="1.0" />
+                  <path d="M 32 6 Q 35 9 33 13 Q 29 11 32 6 Z" fill="rgba(140,80,40,0.5)" stroke="#241808" stroke-width="1.0" />
+                  <path d="M 30 16 Q 33 16 32 20 Q 29 19 30 16 Z" fill="rgba(170,100,50,0.4)" stroke="#241808" stroke-width="1.0" />
+                  <!-- 蜷曲身体 (大椭圆) -->
+                  <ellipse cx="20" cy="34" rx="11" ry="7" fill="rgba(170,90,40,0.25)" stroke="#241808" stroke-width="1.4" />
+                  <!-- 蓬松尾巴绕到前 -->
+                  <path d="M 11 36 Q 6 32 8 26 Q 14 25 16 30"
+                        fill="rgba(170,90,40,0.32)" stroke="#241808" stroke-width="1.4" />
+                  <!-- 双耳尖 (顶) -->
+                  <path d="M 16 28 L 15 23 L 19 26 Z" fill="rgba(170,90,40,0.5)" stroke="#241808" stroke-width="1.2" />
+                  <path d="M 24 28 L 25 23 L 21 26 Z" fill="rgba(170,90,40,0.5)" stroke="#241808" stroke-width="1.2" />
+                  <!-- 闭眼弧 + 鼻 -->
+                  <path d="M 17 33 Q 18 34 19 33" stroke="#241808" stroke-width="1.0" fill="none" />
+                  <circle cx="22" cy="35" r="0.9" fill="#241808" />
+                </g>
+              </svg>
+            </div>
+            <div class="charm-card-face charm-card-back"></div>
+          </div>
+        </div>
+
+        <!-- 下排 · 信物 (top:64%; 横向重排为 B/C/A = 41/50/59%, 让正确对儿全部对角:
+             ①(上1)-A(下3), ②(上2)-B(下1), ③(上3)-C(下2). -->
+        <div class="charm-card tok tok-A" data-card="tok-A"
+             style="left:59%; top:64%; --drift-from: 120px;">
+          <div class="charm-card-inner">
+            <div class="charm-card-face charm-card-front">
+              <svg viewBox="0 0 40 50" aria-hidden="true">
+                <!-- 一滴水 -->
+                <path d="M 20 12 Q 28 22 25 30 Q 22 36 20 36 Q 18 36 15 30 Q 12 22 20 12 Z"
+                      stroke="#243748" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"
+                      fill="rgba(70,110,150,0.32)" />
+              </svg>
+            </div>
+            <div class="charm-card-face charm-card-back"></div>
+          </div>
+        </div>
+        <div class="charm-card tok tok-B" data-card="tok-B"
+             style="left:41%; top:64%; --drift-from: 120px;">
+          <div class="charm-card-inner">
+            <div class="charm-card-face charm-card-front">
+              <svg viewBox="0 0 40 50" aria-hidden="true">
+                <!-- 一轮满月 (配 mem-2 狐狸望月) -->
+                <circle cx="20" cy="24" r="10"
+                        stroke="#c9b878" stroke-width="1.4"
+                        fill="rgba(220,200,140,0.5)" />
+                <g fill="rgba(140,120,70,0.55)">
+                  <circle cx="17" cy="22" r="1.5" />
+                  <circle cx="23" cy="26" r="1.2" />
+                  <circle cx="20" cy="19" r="0.8" />
+                </g>
+              </svg>
+            </div>
+            <div class="charm-card-face charm-card-back"></div>
+          </div>
+        </div>
+        <div class="charm-card tok tok-C" data-card="tok-C"
+             style="left:50%; top:64%; --drift-from: 120px;">
+          <div class="charm-card-inner">
+            <div class="charm-card-face charm-card-front">
+              <svg viewBox="0 0 40 50" aria-hidden="true">
+                <!-- 一片落叶 (配 mem-3 狐狸蜷睡卧叶) -->
+                <path d="M 10 32 Q 10 14 22 12 Q 30 18 28 30 Q 18 36 10 32 Z"
+                      fill="rgba(170,100,50,0.5)" stroke="#241808" stroke-width="1.4"
+                      stroke-linecap="round" stroke-linejoin="round" />
+                <g stroke="#241808" fill="none" stroke-linecap="round">
+                  <path d="M 12 30 L 28 14" stroke-width="1.2" />
+                  <path d="M 15 28 L 20 23 M 18 30 L 23 23 M 21 31 L 26 25" stroke-width="0.8" opacity="0.65" />
+                </g>
+                <path d="M 10 32 L 6 38" stroke="#241808" stroke-width="1.4" stroke-linecap="round" fill="none" />
+              </svg>
+            </div>
+            <div class="charm-card-face charm-card-back"></div>
+          </div>
+        </div>
+
+        <!-- 飞行信物 (单实例): scene.js 复用. -->
+        <div class="flying-token" id="flying-token"></div>
+      </div>
+    </div>
+
+    <!-- 主 SVG: phone-mask + 外暗 + 手机轮廓 + 4 条墨线.
+         墨线端点已 inset ~60 viewBox 单位避开卡内, 看起来"贴边连接". -->
+    <svg class="echo-svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <mask id="phone-mask">
+          <rect width="1600" height="900" fill="white" />
+          <path id="phone-interior" fill="black" />
+        </mask>
+      </defs>
+      <rect id="outside-darken" width="1600" height="900" fill="#000"
+            mask="url(#phone-mask)" style="opacity: var(--echo-outside-darken)" />
+      <path id="phone-outline" class="echo-outline" style="opacity: 1;" />
+
+      <g class="ink-lines">
+        <!-- 卡中心 viewBox: mem 在 y=270, tok 在 y=576; x=656/800/944.
+             所有正确对儿都是对角, 错配 ①+B 是 vertical (读作"懒得想直下"). 端点 inset ~65 避开卡内. -->
+        <!-- 错配 ①+B 竖直 (mem-1 上1 656,270 → tok-B-at-下1 656,576). -->
+        <path id="line-err-1B" class="ink-line" d="M 656 335 L 656 511" />
+        <!-- 正确 ①+A 对角右下 (mem-1 上1 656,270 → tok-A-at-下3 944,576). -->
+        <path id="line-cor-1A" class="ink-line" d="M 701 317 L 900 529" />
+        <!-- 正确 ②+B 对角左下 (mem-2 上2 800,270 → tok-B-at-下1 656,576). -->
+        <path id="line-cor-2B" class="ink-line" d="M 772 329 L 684 517" />
+        <!-- 第 3 对 ③+C 对角左下 (mem-3 上3 944,270 → tok-C-at-下2 800,576) — 只描 35% 即被切走. -->
+        <path id="line-tail-3C" class="ink-line" d="M 916 329 L 828 517" />
+      </g>
+    </svg>
+  </div>
+
+  <script src="../shared/constants.js"></script>
+  <script src="../shared/curves.js"></script>
+  <script src="../shared/stage.js"></script>
+  <script src="scene.js"></script>
+</body>
+</html>

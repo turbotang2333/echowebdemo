@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>Beat 05a · 高光视频</title>
+  <link rel="stylesheet" href="../shared/style.css" />
+  <style>
+    /* ─────────────────────────────────────────────────────────────
+       时空门 · 回响视频 — 移植自主线 demo style.css §portal-host
+       (js/portal.js + style.css L1399-1591). 关键差异:
+       - 不可点击 (无 pointer-events:auto on entry, 时间轴自动驱动开/关门)
+       - portal-host 缩到手机内部矩形 (left:37.5% top:4.44% width:25% height:91.11%) —
+         对应设计坐标 phone interior (cx=800 cy=450 w=400 h=820). 全程在手机轮廓内.
+       - portal-entry 用 % + aspect-ratio 取代 220px 固定值, 按手机内部比例算
+       - clip 锚点 (50%, 34%) 是手机内部坐标, 不是 stage 坐标
+       - 视频强制 muted (浏览器 autoplay 策略 + 5a/5b/5c 共用同一只占位视频, 不带声)
+       ───────────────────────────────────────────────────────────── */
+
+    /* portal-host 套在手机内部 — 与 SVG phone-mask 对齐, 内容在外被 outside-darken 自然遮住.
+       isolation:isolate 是关键 — 把内部 .portal-video (z-index:1) 和 ::after (z-index:2) 圈进
+       自己的 stacking context, 否则它们会冒到 .echo-stage 的 stacking 层, 盖在 z-index:auto 的
+       .echo-svg 之上, 把手机轮廓也一并盖住. */
+    .portal-host {
+      position: absolute;
+      left: 37.5%;
+      top: 4.44%;
+      width: 25%;
+      height: 91.11%;
+      pointer-events: none;
+      isolation: isolate;
+    }
+
+    /* 入口容器: 55% 宽 × aspect-ratio 1 = 手机宽的 55%, 居中略偏上 (y=34%, 匹配 demo 比例). */
+    .portal-entry {
+      position: absolute;
+      top: 34%;
+      left: 50%;
+      width: 55%;
+      aspect-ratio: 1;
+      transform: translate(-50%, -50%) scale(0.85);
+      opacity: 0;
+      transition:
+        transform 900ms cubic-bezier(.2, .8, .2, 1),
+        opacity   800ms ease-out;
+    }
+    .portal-host.visible .portal-entry {
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 1;
+    }
+
+    /* 三层柔光 (远晕 / 中晕 / 核心) — radial-gradient + blur + screen 混合 + 错相位呼吸. */
+    .portal-glow {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      pointer-events: none;
+      mix-blend-mode: screen;
+      will-change: opacity;
+      animation: portal-breath 5.2s ease-in-out infinite;
+    }
+    .portal-glow-far {
+      background: radial-gradient(circle,
+        rgba(255, 195, 130, 0.42) 0%,
+        rgba(255, 170, 95,  0.22) 35%,
+        rgba(255, 150, 80,  0.08) 60%,
+        rgba(255, 130, 60,  0)    80%);
+      filter: blur(34px);
+      transform: scale(1.25);
+      animation-delay: 0s;
+    }
+    .portal-glow-mid {
+      background: radial-gradient(circle,
+        rgba(255, 220, 165, 0.6)  0%,
+        rgba(255, 190, 120, 0.32) 40%,
+        rgba(255, 160, 90,  0.1)  70%,
+        rgba(255, 140, 70,  0)    90%);
+      filter: blur(18px);
+      transform: scale(0.85);
+      animation-delay: -1.7s;
+    }
+    .portal-glow-core {
+      background: radial-gradient(circle,
+        rgba(255, 240, 215, 0.85) 0%,
+        rgba(255, 215, 160, 0.55) 35%,
+        rgba(255, 185, 110, 0.18) 65%,
+        rgba(255, 160, 90,  0)    85%);
+      filter: blur(10px);
+      transform: scale(0.55);
+      animation-delay: -3.2s;
+    }
+    @keyframes portal-breath {
+      0%, 100% { opacity: 0.62; }
+      50%      { opacity: 1; }
+    }
+
+    /* 涟漪 — 三圈错相位向外扩散的 radial 光环. */
+    .portal-ripples {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+    .portal-ripple {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: radial-gradient(circle,
+        rgba(255, 200, 140, 0)    52%,
+        rgba(255, 200, 140, 0.32) 64%,
+        rgba(255, 200, 140, 0.12) 72%,
+        rgba(255, 200, 140, 0)    82%);
+      filter: blur(10px);
+      mix-blend-mode: screen;
+      opacity: 0;
+      animation: portal-ripple 4.2s ease-out infinite;
+    }
+    .portal-ripple:nth-child(2) { animation-delay: 1.4s; }
+    .portal-ripple:nth-child(3) { animation-delay: 2.8s; }
+    @keyframes portal-ripple {
+      0%   { transform: scale(0.6); opacity: 0; }
+      18%  { opacity: 0.85; }
+      100% { transform: scale(2.4); opacity: 0; }
+    }
+
+    /* 视频 — clip 锚点 (50%, 34%) 是 portal-host(=手机内部) 坐标; 开门时扩张到 150% 覆盖整内部. */
+    .portal-video {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      background: #000;
+      pointer-events: none;
+      clip-path: circle(0px at 50% 34%);
+      -webkit-clip-path: circle(0px at 50% 34%);
+      transition:
+        clip-path 700ms cubic-bezier(.6, .2, .4, 1),
+        -webkit-clip-path 700ms cubic-bezier(.6, .2, .4, 1);
+      filter: sepia(0.32) saturate(1.05) brightness(0.96) contrast(1.04);
+      z-index: 1;
+    }
+
+    /* 回忆叠层: 暖黄轻染 + 四角 vignette. 与视频共用同一 clip 锚点, 开合同步. */
+    .portal-host::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 2;
+      background:
+        linear-gradient(rgba(255, 208, 140, 0.10), rgba(255, 208, 140, 0.10)),
+        radial-gradient(ellipse at center,
+          rgba(0, 0, 0, 0)    48%,
+          rgba(0, 0, 0, 0.22) 78%,
+          rgba(0, 0, 0, 0.55) 100%);
+      clip-path: circle(0px at 50% 34%);
+      -webkit-clip-path: circle(0px at 50% 34%);
+      transition:
+        clip-path 700ms cubic-bezier(.6, .2, .4, 1),
+        -webkit-clip-path 700ms cubic-bezier(.6, .2, .4, 1);
+    }
+
+    /* 阶段 B (opening): clip 扩张覆盖整个手机内部 + 入口光晕淡出. */
+    .portal-host.opening .portal-video,
+    .portal-host.opening::after {
+      clip-path: circle(150% at 50% 50%);
+      -webkit-clip-path: circle(150% at 50% 50%);
+    }
+    .portal-host.opening .portal-entry {
+      opacity: 0;
+      transition: opacity 320ms ease-out;
+    }
+
+    /* 阶段 C (closing): clip 缩回入口 + 光晕短暂回浮 ("门关上"). */
+    .portal-host.closing .portal-video,
+    .portal-host.closing::after {
+      clip-path: circle(0px at 50% 34%);
+      -webkit-clip-path: circle(0px at 50% 34%);
+    }
+    .portal-host.closing .portal-entry {
+      opacity: 0.9;
+      transform: translate(-50%, -50%) scale(1);
+      transition: opacity 360ms ease-in 200ms;
+    }
+
+    /* 阶段 D (gone): 整组淡出. */
+    .portal-host.gone {
+      opacity: 0;
+      transition: opacity 480ms ease-out;
+    }
+  </style>
+</head>
+<body>
+  <div class="echo-stage" id="stage">
+    <!-- Underlay (SVG 下方): portal-host 套在手机内部. 外面被 outside-darken 自然遮住. -->
+    <div class="echo-underlay" id="underlay">
+      <div class="portal-host" id="portal-host">
+        <div class="portal-entry">
+          <div class="portal-glow portal-glow-far"></div>
+          <div class="portal-glow portal-glow-mid"></div>
+          <div class="portal-glow portal-glow-core"></div>
+          <div class="portal-ripples">
+            <span class="portal-ripple"></span>
+            <span class="portal-ripple"></span>
+            <span class="portal-ripple"></span>
+          </div>
+        </div>
+        <video class="portal-video" id="portal-video"
+               src="../../assets/videos/回响视频.mp4"
+               muted playsinline preload="auto"></video>
+      </div>
+    </div>
+
+    <svg class="echo-svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <mask id="phone-mask">
+          <rect width="1600" height="900" fill="white" />
+          <path id="phone-interior" fill="black" />
+        </mask>
+      </defs>
+
+      <!-- 外暗 — 继承 04 末态的 0.95, 5a 全程不变. -->
+      <rect id="outside-darken" width="1600" height="900" fill="#000"
+            mask="url(#phone-mask)" style="opacity: var(--echo-outside-darken)" />
+
+      <!-- 手机轮廓 — 继承 04 末态, opacity:1. 5a 不淡出 (07 收尾才淡). -->
+      <path id="phone-outline" class="echo-outline" style="opacity: 1;" />
+    </svg>
+  </div>
+
+  <script src="../shared/constants.js"></script>
+  <script src="../shared/curves.js"></script>
+  <script src="../shared/stage.js"></script>
+  <script src="scene.js"></script>
+</body>
+</html>

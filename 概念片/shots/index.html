@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>Echo 概念片 · 粗剪台</title>
+  <link rel="stylesheet" href="shared/style.css" />
+  <style>
+    body { overflow: auto; padding: 48px 32px 80px; }
+    h1 {
+      color: var(--echo-bubble-char-fg);
+      font-weight: 400;
+      letter-spacing: 0.12em;
+      margin-bottom: 8px;
+      font-size: 22px;
+    }
+    .sub {
+      color: rgba(216, 194, 240, 0.55);
+      font-size: 13px;
+      margin-bottom: 32px;
+      letter-spacing: 0.05em;
+    }
+    .actions {
+      margin-bottom: 28px;
+      display: flex;
+      gap: 12px;
+    }
+    .btn {
+      background: rgba(216, 194, 240, 0.08);
+      border: 1px solid rgba(216, 194, 240, 0.3);
+      color: var(--echo-bubble-char-fg);
+      padding: 10px 18px;
+      border-radius: 4px;
+      font: inherit;
+      font-size: 14px;
+      letter-spacing: 0.1em;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn:hover { background: rgba(216, 194, 240, 0.16); }
+    .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 20px;
+      max-width: 1280px;
+    }
+    .card {
+      background: rgba(34, 24, 50, 0.5);
+      border: 1px solid rgba(216, 194, 240, 0.15);
+      border-radius: 6px;
+      padding: 18px 18px 16px;
+      text-decoration: none;
+      color: inherit;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: border-color 0.2s, background 0.2s, transform 0.2s;
+    }
+    .card[data-status="ready"]:hover {
+      border-color: rgba(216, 194, 240, 0.4);
+      background: rgba(34, 24, 50, 0.75);
+      transform: translateY(-2px);
+    }
+    .card[data-status="todo"] {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .card .num {
+      font-family: ui-monospace, "SF Mono", monospace;
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      color: rgba(216, 194, 240, 0.45);
+    }
+    .card .title {
+      font-size: 18px;
+      color: var(--echo-bubble-char-fg);
+      letter-spacing: 0.05em;
+    }
+    .card .desc {
+      font-size: 13px;
+      color: rgba(216, 194, 240, 0.55);
+      line-height: 1.5;
+    }
+    .card .meta {
+      display: flex;
+      gap: 12px;
+      margin-top: auto;
+      padding-top: 10px;
+      font-size: 11px;
+      font-family: ui-monospace, "SF Mono", monospace;
+      letter-spacing: 0.1em;
+      color: rgba(216, 194, 240, 0.45);
+    }
+    .badge { display: inline-block; }
+    .badge.ready { color: #a8e6c0; }
+    .badge.wip { color: #e6d0a8; }
+    .badge.todo { color: rgba(216, 194, 240, 0.35); }
+  </style>
+</head>
+<body>
+  <h1>Echo 概念片 · 粗剪台</h1>
+  <div class="sub">分段前端实现 · 索引网格 + 连播 = 粗剪 · 单段可独立录屏</div>
+
+  <div class="actions">
+    <button class="btn" id="play-all">▶ 连播 (按时序)</button>
+    <a class="btn" href="../执行脚本.md" target="_blank">执行脚本</a>
+    <a class="btn" href="../投资人概念片方案.md" target="_blank">概念片方案</a>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <script>
+    // Beat manifest. 'ready' = playable; 'wip' = exists but unfinished; 'todo' = not built.
+    const BEATS = [
+      { id: '00-opening', num: '00', title: '开场', desc: '7 层叠加:他先存在 → 弧 → 立绘 → 二轮对话 → 场景生长 → 手机轮廓', dur: '9.0s', status: 'ready' },
+      { id: '01-hook', num: '01', title: '钩子 · 极简交互', desc: '1.5 轮: 长按弧→你→他→上滑色块→场景切 (完整) → HOOK (简化, 跳 你气泡).', dur: '10.0s', status: 'ready' },
+      { id: '02-three-screens', num: '02', title: '千人千面 · 三屏', desc: '单屏裂三屏,同男主 + 三输入 → 三响应', dur: '9.4s', status: 'ready' },
+      { id: '03-node-map', num: '03', title: 'AI 导演节点图', desc: '镜头穿入背后,大节点 + 曲线发散收束', dur: '8.0s', status: 'ready' },
+      { id: '04-back-to-single', num: '04', title: '回单屏 · 无限上滑', desc: '上滑色块一次性触发 → 28 帧 cj1-6 钟形节奏 (匀加速 → 流光 → 匀缓减 → 匀急减), P 段叠透流光, 末态抽象残光', dur: '6.0s', status: 'ready' },
+      { id: '05-moments', num: '05', title: '关系瞬间 · 三段合并 (上滑串联)', desc: '5a 高光 → 上滑切 → 5b 符纸 → 上滑切 → 5c 陪伴. 段间靠 swipe-tip 承担母题, 0.55s 交叉淡入淡出.', dur: '14.6s', status: 'ready' },
+      { id: '05a-highlight-video', num: '05a', title: '关系瞬间 · 高光视频 (单段原型)', desc: '"他记得". 合并版已用, 此处仅作单段调试入口.', dur: '9.0s', status: 'wip' },
+      { id: '05b-mini-game', num: '05b', title: '关系瞬间 · 互动小游戏 (单段原型)', desc: '符纸配对. 合并版已用, 此处仅作单段调试入口.', dur: '7.5s', status: 'wip' },
+      { id: '05c-companion', num: '05c', title: '关系瞬间 · 角色陪伴 (单段原型)', desc: '长按抚摸 4 阶 pose. 合并版已用, 此处仅作单段调试入口.', dur: '10.0s', status: 'wip' },
+      { id: '06-starmap', num: '06', title: '记忆人格星图', desc: '三颗果实星从画外飞入→点亮三主星云→其他星+连接生长→残缺浮起→整片向白曝光涨起+手机轮廓内白外暗', dur: '8.5s', status: 'ready' },
+      { id: '07-ending', num: '07', title: '收尾 · 补圆散波', desc: '内白外暗承接 06 → 白曝光⇄狐狸草地视频 → 对白 → 弧浮起 → 手机淡出+弧扩展 → 圆闭合+视频同步消失 → 2 ripples → 圆作第3拍+slogan 同步 → logo', dur: '20.6s', status: 'ready' },
+    ];
+
+    const grid = document.getElementById('grid');
+    BEATS.forEach(function (b) {
+      const el = document.createElement(b.status === 'todo' ? 'div' : 'a');
+      el.className = 'card';
+      el.dataset.status = b.status;
+      if (b.status !== 'todo') el.href = b.id + '/';
+      el.innerHTML =
+        '<div class="num">BEAT ' + b.num + '</div>' +
+        '<div class="title">' + b.title + '</div>' +
+        '<div class="desc">' + b.desc + '</div>' +
+        '<div class="meta">' +
+          '<span>⏱ ' + b.dur + '</span>' +
+          '<span class="badge ' + b.status + '">' +
+            (b.status === 'ready' ? '● 可播' : b.status === 'wip' ? '◐ 进行中' : '○ 未做') +
+          '</span>' +
+        '</div>';
+      grid.appendChild(el);
+    });
+
+    // 连播: open each ready beat in sequence in a single overlay iframe.
+    document.getElementById('play-all').addEventListener('click', function () {
+      const ready = BEATS.filter(function (b) { return b.status === 'ready'; });
+      if (!ready.length) { alert('还没有可播段落'); return; }
+      sequencePlay(ready);
+    });
+
+    function sequencePlay(beats) {
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'position:fixed;inset:0;background:#000;z-index:1000;';
+      const frame = document.createElement('iframe');
+      frame.style.cssText = 'width:100%;height:100%;border:0;display:block;';
+      const close = document.createElement('button');
+      close.textContent = '✕ 关闭';
+      close.className = 'btn';
+      close.style.cssText = 'position:fixed;top:12px;left:12px;z-index:1001;';
+      close.addEventListener('click', function () { wrap.remove(); });
+      wrap.appendChild(frame);
+      wrap.appendChild(close);
+      document.body.appendChild(wrap);
+
+      let i = 0;
+      function playNext() {
+        if (i >= beats.length) {
+          // End of sequence — hold last frame for a moment then close.
+          setTimeout(function () { wrap.remove(); }, 800);
+          return;
+        }
+        const b = beats[i++];
+        frame.src = b.id + '/?clean=1';
+        frame.onload = function () {
+          // Wait for EchoBeat to register, then chain on its duration.
+          const win = frame.contentWindow;
+          const waitForBeat = setInterval(function () {
+            if (win.EchoBeat && win.EchoBeat.duration) {
+              clearInterval(waitForBeat);
+              setTimeout(playNext, win.EchoBeat.duration + 600);
+            }
+          }, 50);
+        };
+      }
+      playNext();
+    }
+  </script>
+</body>
+</html>

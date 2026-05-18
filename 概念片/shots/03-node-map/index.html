@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>Beat 03 · AI 导演节点图</title>
+  <link rel="stylesheet" href="../shared/style.css" />
+  <style>
+    /* ── Phone overlay (Beat 3.1: three screens zoom-in & fade) ───────── */
+    #phone-overlay {
+      position: absolute;
+      inset: 0;
+      transform: scale(1);
+      opacity: 1;
+      transition:
+        transform 2.4s cubic-bezier(0.16, 1, 0.3, 1),
+        opacity 2.0s cubic-bezier(0.4, 0, 0.2, 1);
+      transform-origin: center center;
+      z-index: 10;
+    }
+    #phone-overlay.zooming {
+      transform: scale(2.8);
+      opacity: 0;
+    }
+    #phone-overlay.hidden {
+      display: none;
+    }
+
+    .phone-scene {
+      position: absolute;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      pointer-events: none;
+      /* Phone A: left=6.25% top=4.44% width=25% height≈91.11%.
+         Border-radius approximates r=28 on 400×820 rect in 1600×900 space. */
+      border-radius: 1.75% / 3.06%;
+    }
+    #scene-a {
+      left: 6.25%; top: 4.44%; width: 25%; height: 91.11%;
+      background-image: url('../../assets/images/红日.png');
+    }
+    #scene-b {
+      left: 37.5%; top: 4.44%; width: 25%; height: 91.11%;
+      background-image: url('../../assets/images/cj4.png');
+    }
+    #scene-c {
+      left: 68.75%; top: 4.44%; width: 25%; height: 91.11%;
+      background-image: url('../../assets/images/骸骨.webp');
+    }
+
+    /* ── Node map (Beat 3.2+) ────────────────────────────────────────── */
+    #map-group {
+      opacity: 0;
+      filter: blur(2.4px);
+      transition: opacity 1.4s var(--ease-drift), filter 2.5s var(--ease-drift);
+    }
+    #map-group.emerging {
+      opacity: 1;
+      filter: blur(0.6px);
+    }
+    #map-group.focusing {
+      filter: blur(0.1px);
+    }
+    .node-dot-lg {
+      fill: var(--echo-arc-stroke-recording);
+      opacity: 0;
+      filter: drop-shadow(0 0 16px var(--echo-arc-glow-strong)) drop-shadow(0 0 40px var(--echo-arc-glow));
+      transition: opacity 0.8s var(--ease-drift);
+    }
+    .node-dot-lg.visible { opacity: 1; }
+
+    .node-dot-sm {
+      fill: var(--echo-arc-stroke);
+      opacity: 0;
+      filter: drop-shadow(0 0 4px var(--echo-arc-glow));
+      transition: opacity 0.6s var(--ease-drift);
+    }
+    .node-dot-sm.visible { opacity: 0.85; }
+
+    .conn-line, .conn-growth {
+      fill: none;
+      stroke-linecap: round;
+      opacity: 0;
+      filter: drop-shadow(0 0 4px var(--echo-arc-glow));
+      transition: opacity 0.7s var(--ease-drift), stroke-dashoffset var(--draw-dur, 900ms) var(--ease-out-soft);
+    }
+    .conn-line { stroke: var(--echo-arc-stroke); stroke-width: 1.1; }
+    .conn-growth { stroke-width: 1.1; }
+    .conn-line.drawn, .conn-growth.drawn { opacity: 1; }
+
+    @keyframes starBreath {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.78; }
+    }
+    @keyframes dotBreath {
+      0%, 100% { opacity: 0.85; }
+      50% { opacity: 0.5; }
+    }
+    @keyframes connBreath {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.55; }
+    }
+    #map-group.breathing .node-dot-lg { animation: starBreath 4.2s ease-in-out infinite; }
+    #map-group.breathing .node-dot-sm { animation: dotBreath 4.2s ease-in-out infinite 0.15s; }
+    #map-group.breathing .conn-line,
+    #map-group.breathing .conn-growth { animation: connBreath 4.2s ease-in-out infinite 0.3s; }
+  </style>
+</head>
+<body>
+  <div class="echo-stage" id="stage">
+    <!-- Bottom: node map SVG -->
+    <svg class="echo-svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <radialGradient id="depth-glow-grad" cx="50%" cy="50%" r="55%">
+          <stop offset="0%" stop-color="#3C2350" stop-opacity="0.25" />
+          <stop offset="70%" stop-color="#1A0F2E" stop-opacity="0.10" />
+          <stop offset="100%" stop-color="#070811" stop-opacity="0" />
+        </radialGradient>
+      </defs>
+      <rect width="1600" height="900" fill="url(#depth-glow-grad)" />
+      <g id="map-group">
+        <g id="connections"></g>
+        <g id="dots"></g>
+      </g>
+    </svg>
+
+    <!-- Top: phone overlay (three screens, zooms in & fades out) -->
+    <div id="phone-overlay">
+      <div class="phone-scene" id="scene-a"></div>
+      <div class="phone-scene" id="scene-b"></div>
+      <div class="phone-scene" id="scene-c"></div>
+      <svg class="echo-svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" style="position:absolute;inset:0;pointer-events:none;">
+        <defs>
+          <mask id="phone-mask-overlay">
+            <rect width="1600" height="900" fill="white" />
+            <path id="phone-int-a" fill="black" />
+            <path id="phone-int-b" fill="black" />
+            <path id="phone-int-c" fill="black" />
+          </mask>
+        </defs>
+        <rect width="1600" height="900" fill="#000" mask="url(#phone-mask-overlay)" style="opacity: var(--echo-outside-darken)" />
+        <path id="phone-out-a" class="echo-outline" />
+        <path id="phone-out-b" class="echo-outline" />
+        <path id="phone-out-c" class="echo-outline" />
+      </svg>
+    </div>
+  </div>
+  <script src="../shared/constants.js"></script>
+  <script src="../shared/curves.js"></script>
+  <script src="../shared/stage.js"></script>
+  <script src="scene.js"></script>
+</body>
+</html>

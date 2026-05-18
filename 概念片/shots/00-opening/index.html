@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>Beat 00 · 开场</title>
+  <link rel="stylesheet" href="../shared/style.css" />
+  <style>
+    /* Opening-specific: bubbles fit inside the enlarged phone window. */
+    .echo-bubble {
+      max-width: 22%;
+      font-size: 18px;
+      padding: 9px 14px;
+      white-space: normal;
+      text-align: center;
+      line-height: 1.4;
+    }
+
+    /* 立绘 — 绿幕视频 (WebM VP9 alpha). 38%×68%, 头部落在 ~28% 处, 整体仍在下 2/3 区域.
+       覆盖 shared 的 radial-gradient 占位 + 用 object-fit 还原 background size:contain 行为. */
+    #portrait {
+      background: none;
+      object-fit: cover;
+      object-position: center bottom;
+      width: 38%;
+      height: 68%;
+      bottom: 4.44%;
+    }
+    /* 场景 — 水岸 cj3. 不再 scale 放大, 改为 clip-path 从下到上 reveal.
+       inset(100% 0 0 0) = 整图被裁掉; inset(0 0 0 0) = 完整可见;
+       插值时底部先露出, 自下而上揭开. */
+    #scene {
+      background:
+        url('../../assets/images/cj3.jpg') no-repeat center center / cover;
+      transform: scale(1);
+      clip-path: inset(100% 0 0 0);
+      -webkit-clip-path: inset(100% 0 0 0);
+      transition:
+        clip-path 1.8s var(--ease-out-soft),
+        -webkit-clip-path 1.8s var(--ease-out-soft),
+        opacity 1.2s var(--ease-drift);
+    }
+    #scene.visible {
+      clip-path: inset(0 0 0 0);
+      -webkit-clip-path: inset(0 0 0 0);
+    }
+  </style>
+</head>
+<body>
+  <div class="echo-stage" id="stage">
+    <!-- Underlay: scene + portrait. Below SVG so 0.9 outside-darken hides them outside phone. -->
+    <div class="echo-underlay">
+      <div class="echo-scene-placeholder" id="scene"></div>
+      <video class="echo-portrait-placeholder" id="portrait"
+             autoplay muted loop playsinline preload="auto"
+             src="../../assets/videos/小狐狸待机_alpha.webm"></video>
+    </div>
+
+    <svg class="echo-svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <!-- Phone-interior mask. White = show outside-darken; black = hide it (phone interior stays clear). -->
+        <mask id="phone-mask">
+          <rect width="1600" height="900" fill="white" />
+          <path id="phone-interior" fill="black" />
+        </mask>
+      </defs>
+
+      <!-- 0.9 outside-darken; masked so phone interior stays clear. -->
+      <rect id="outside-darken" width="1600" height="900" fill="#000"
+            mask="url(#phone-mask)" opacity="0" />
+
+      <!-- 0.9 phone outline — opacity fade-in (no stroke-dashoffset draw-in). -->
+      <path id="phone-outline" class="echo-outline" />
+
+      <!-- 0.3 arc system: 入场层(translateY+opacity) ▶ 呼吸/录音 容器 ▶ 主弧 + 3 条涟漪 -->
+      <g id="arc-reveal-wrap">
+        <g id="arc-host">
+          <path id="signature-arc" class="echo-stroke" />
+          <path class="echo-ripple ripple-1" id="ripple1" />
+          <path class="echo-ripple ripple-2" id="ripple2" />
+          <path class="echo-ripple ripple-3" id="ripple3" />
+        </g>
+      </g>
+    </svg>
+
+    <!-- Overlay: bubbles + VO. Above SVG so they stay visible inside the phone. -->
+    <div class="echo-overlay">
+      <!-- 0.2 他 -->
+      <div class="echo-bubble echo-bubble-char tail-bottom" id="b1"
+           style="left: 50%; top: 20%;">谁?</div>
+      <!-- 0.5 你 -->
+      <div class="echo-bubble echo-bubble-user tail-bottom" id="b2"
+           style="left: 50%; bottom: 28%;">是你在叫我?</div>
+      <!-- 0.8 他 (立绘成形后) -->
+      <div class="echo-bubble echo-bubble-char tail-bottom" id="b3"
+           style="left: 50%; top: 20%;">小鱼妖，出来!</div>
+      <!-- VO 拆左右, 分置手机两侧 — OV1 (整片首句, 母题 + "划"动作引出): 他的世界, 由你"划"开 -->
+      <div class="echo-vo-side echo-vo-left" id="voLeft">他的世界</div>
+      <div class="echo-vo-side echo-vo-right" id="voRight">由你&ldquo;划&rdquo;开</div>
+    </div>
+  </div>
+
+  <script src="../shared/constants.js"></script>
+  <script src="../shared/curves.js"></script>
+  <script src="../shared/stage.js"></script>
+  <script src="scene.js"></script>
+</body>
+</html>

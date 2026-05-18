@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>Beat 06 · 记忆人格星图</title>
+  <link rel="stylesheet" href="../shared/style.css" />
+  <style>
+    /* ─── 飞入星 — 从画外飞入到三星云主星位置 (与 05 末尾飞出的 fruit-star 反向) ─── */
+    .fly-star {
+      position: absolute;
+      width: 32px;
+      height: 32px;
+      pointer-events: none;
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(0.6);
+      filter: drop-shadow(0 0 14px currentColor);
+      transition:
+        opacity 350ms var(--ease-drift),
+        transform 400ms var(--ease-out-soft),
+        left 1000ms cubic-bezier(.4, .15, .2, 1),
+        top 1000ms cubic-bezier(.4, .15, .2, 1);
+      z-index: 12;
+    }
+    .fly-star::before {
+      content: '';
+      position: absolute;
+      inset: -180%;
+      border-radius: 50%;
+      background: radial-gradient(circle,
+        currentColor 0%,
+        rgba(255, 255, 255, 0) 55%);
+      opacity: 0.55;
+      filter: blur(6px);
+    }
+    .fly-star::after {
+      content: '';
+      position: absolute;
+      inset: 26%;
+      border-radius: 50%;
+      background: radial-gradient(circle,
+        rgba(255, 255, 255, 0.98) 0%,
+        currentColor 45%,
+        rgba(255, 255, 255, 0) 95%);
+      box-shadow: 0 0 16px currentColor;
+    }
+    .fly-star.flying {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(0.9);
+    }
+    .fly-star.landed {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1.5);
+      transition:
+        opacity 220ms var(--ease-drift),
+        transform 280ms var(--ease-out-soft);
+    }
+    .fly-star.dissolving {
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(0.85);
+      transition:
+        opacity 520ms var(--ease-drift),
+        transform 600ms var(--ease-drift);
+    }
+    .fly-A { color: #f4d4a0; }
+    .fly-B { color: #c8aae0; }
+    .fly-C { color: #f0b8a8; }
+
+    /* ─── 白曝光层 + 外暗层 + 手机轮廓 (起态 0, T=3500 起一起涨) ─── */
+    #white-wash, #outside-darken, #phone-outline {
+      opacity: 0;
+    }
+    #white-wash.rising  { transition: opacity 3000ms cubic-bezier(.4, 0, .6, 1); opacity: 1; }
+    #outside-darken.rising { transition: opacity 2800ms cubic-bezier(.4, 0, .6, 1); opacity: 0.95; }
+    #phone-outline.rising  { transition: opacity 1800ms var(--ease-drift); opacity: 1; }
+
+    .c-nebula {
+      opacity: 0;
+      transition: opacity 2s var(--ease-drift);
+    }
+    .c-nebula.visible { opacity: 1; }
+
+    /* Lit lines — with draw-in (stroke-dasharray = totalLength) */
+    .c-line {
+      stroke-dashoffset: var(--len);
+      transition: stroke-dashoffset 1.0s var(--ease-out-soft), opacity 0.9s var(--ease-drift);
+      opacity: 0;
+    }
+    .c-line.visible { stroke-dashoffset: 0; opacity: 1; }
+
+    /* Unlit potential lines — always dashed, fade-in only */
+    .c-line-dim {
+      opacity: 0;
+      transition: opacity 1.2s var(--ease-drift);
+    }
+    .c-line-dim.visible { opacity: 1; }
+
+    .c-star {
+      opacity: 0;
+      transition: opacity 0.8s var(--ease-drift);
+      transform-box: fill-box;
+      transform-origin: center;
+    }
+    .c-star.visible { opacity: 1; }
+
+    .c-star-glow,
+    .c-star-halo {
+      opacity: 0;
+      transition: opacity 0.9s var(--ease-drift);
+      transform-box: fill-box;
+      transform-origin: center;
+    }
+    .c-star-glow.visible,
+    .c-star-halo.visible { opacity: 1; }
+
+    .bg-dot {
+      opacity: 0;
+      transition: opacity 2s var(--ease-drift);
+    }
+    .bg-dot.visible { opacity: 1; }
+
+    @keyframes starPulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.15); }
+    }
+    @keyframes starPulseDim {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+    }
+    .c-star.pulse { animation: starPulse 4.2s ease-in-out infinite; }
+    .c-star.pulse-dim { animation: starPulseDim 5s ease-in-out infinite; }
+    .c-star-glow.pulse { animation: starPulse 4.2s ease-in-out infinite; }
+    .c-star-glow.pulse-dim { animation: starPulseDim 5s ease-in-out infinite; }
+
+    @keyframes nebulaBreathe {
+      0%, 100% { opacity: 0.8; }
+      50% { opacity: 1; }
+    }
+    .c-nebula.breathe { animation: nebulaBreathe 5s ease-in-out infinite; }
+
+    @keyframes dimLinePulse {
+      0%, 100% { opacity: 0.7; }
+      50% { opacity: 1; }
+    }
+    .c-line-dim.dim-alive { animation: dimLinePulse 3.5s ease-in-out infinite; }
+  </style>
+</head>
+<body>
+  <div class="echo-stage" id="stage">
+    <svg class="echo-svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <!-- Soma halo: wide diffuse aura for core stars -->
+        <filter id="star-halo" x="-200%" y="-200%" width="500%" height="500%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="8" />
+        </filter>
+        <filter id="star-glow" x="-150%" y="-150%" width="400%" height="400%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+        <filter id="star-soft" x="-100%" y="-100%" width="300%" height="300%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+        <!-- Line glow for bright lit lines (axons) -->
+        <filter id="line-glow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="1.6" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+
+        <!-- Deep field atmosphere — gentle warm-dark center so the canvas
+             doesn't read as flat black; the galactic "core" ambience. -->
+        <radialGradient id="atmo" cx="50%" cy="55%" r="72%">
+          <stop offset="0%" stop-color="#1c1824" stop-opacity="0.65" />
+          <stop offset="60%" stop-color="#0e0c14" stop-opacity="0.28" />
+          <stop offset="100%" stop-color="#070811" stop-opacity="0" />
+        </radialGradient>
+
+        <!-- Nebula gradients — three主板块 (A/B/C) bumped up, residual (D/E) muted -->
+        <!-- A · 5a 高光视频 "他记得" · 暖金 — 长条流 -->
+        <radialGradient id="nebula-grad-A" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#f0c890" stop-opacity="0.22" />
+          <stop offset="55%" stop-color="#f0c890" stop-opacity="0.08" />
+          <stop offset="100%" stop-color="#f0c890" stop-opacity="0" />
+        </radialGradient>
+        <!-- B · 5b 符纸配对 · 紫 — 环状 -->
+        <radialGradient id="nebula-grad-B" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#c8aae0" stop-opacity="0.20" />
+          <stop offset="55%" stop-color="#c8aae0" stop-opacity="0.075" />
+          <stop offset="100%" stop-color="#c8aae0" stop-opacity="0" />
+        </radialGradient>
+        <!-- C · 5c 陪伴 · 暖玫 — 密集团 -->
+        <radialGradient id="nebula-grad-C" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#e8a098" stop-opacity="0.22" />
+          <stop offset="55%" stop-color="#e8a098" stop-opacity="0.08" />
+          <stop offset="100%" stop-color="#e8a098" stop-opacity="0" />
+        </radialGradient>
+        <!-- D · 残缺记忆 · 灰紫 -->
+        <radialGradient id="nebula-grad-D" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#8890a8" stop-opacity="0.10" />
+          <stop offset="55%" stop-color="#8890a8" stop-opacity="0.035" />
+          <stop offset="100%" stop-color="#8890a8" stop-opacity="0" />
+        </radialGradient>
+        <!-- E · 残缺记忆 · 灰金 -->
+        <radialGradient id="nebula-grad-E" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#a09078" stop-opacity="0.09" />
+          <stop offset="55%" stop-color="#a09078" stop-opacity="0.03" />
+          <stop offset="100%" stop-color="#a09078" stop-opacity="0" />
+        </radialGradient>
+
+        <!-- 手机内部 mask — 用于 outside-darken (只显手机外侧) -->
+        <mask id="phone-mask-06">
+          <rect width="1600" height="900" fill="white" />
+          <path id="phone-interior-06" fill="black" />
+        </mask>
+
+        <!-- 手机内部 clipPath — 白曝光只画在手机内 (外侧绝不显白) -->
+        <clipPath id="phone-interior-clip-06">
+          <path id="phone-interior-clip-path-06" />
+        </clipPath>
+      </defs>
+
+      <g id="starmap">
+        <!-- 整片"深空"底色:把死黑底盘 → 一片连续宇宙的氛围 -->
+        <rect id="atmo-rect" width="1600" height="900" fill="url(#atmo)" />
+        <g id="bg-dots"></g>
+        <g id="nebulae"></g>
+        <g id="lines"></g>
+        <g id="stars"></g>
+      </g>
+
+      <!-- 白曝光层 — 用 clipPath 限定只在手机内画 (外侧不带任何白色) -->
+      <rect id="white-wash" width="1600" height="900" fill="#fffbeb"
+            clip-path="url(#phone-interior-clip-06)" />
+
+      <!-- 外暗层 (mask 出手机内部, 只在手机外侧涂黑 0.95). -->
+      <rect id="outside-darken" width="1600" height="900" fill="#000"
+            mask="url(#phone-mask-06)" />
+
+      <!-- 手机轮廓 (顶层). -->
+      <path id="phone-outline" class="echo-outline" />
+    </svg>
+
+    <!-- 飞入星 (overlay 在 SVG 之上, 跨手机内外都能显示) -->
+    <div class="echo-overlay">
+      <div class="fly-star fly-A" id="fly-A"></div>
+      <div class="fly-star fly-B" id="fly-B"></div>
+      <div class="fly-star fly-C" id="fly-C"></div>
+      <!-- OV5: 「你与他的 / 专属记忆」— 与外暗 + 手机轮廓同步浮起, 暗区烘字 -->
+      <div class="echo-vo-side echo-vo-left" id="voLeft">你与他的</div>
+      <div class="echo-vo-side echo-vo-right" id="voRight">专属记忆</div>
+    </div>
+  </div>
+
+  <script src="../shared/constants.js"></script>
+  <script src="../shared/curves.js"></script>
+  <script src="../shared/stage.js"></script>
+  <script src="scene.js"></script>
+</body>
+</html>
