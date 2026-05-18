@@ -3,31 +3,35 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-  <meta name="theme-color" content="#0c0814" />
+  <meta name="theme-color" content="#070811" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <title>echo · 幕(竖屏版)</title>
+  <title>echo · 幕</title>
   <link rel="preload" as="image" href="src/images/xiaohuli.png" />
   <link rel="preload" as="image" href="src/images/cj1.jpg" />
   <link rel="preload" as="image" href="src/images/cj2.jpg" />
   <link rel="preload" as="image" href="src/images/cj3.jpg" />
-  <link rel="preload" as="image" href="src/images/cj4.png" />
-  <link rel="preload" as="image" href="src/images/cj5.jpg" />
+  <!-- 时空门 · 回响视频（场 6 段 4 后）：约 8MB，提前 prefetch 到达时已就绪 -->
+  <link rel="prefetch" href="src/videos/回响视频.mp4" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div id="orientation-gate">
+  <div id="orientation-gate" hidden>
     <p>请将设备竖置以体验</p>
   </div>
 
   <div id="stage" class="stage">
-    <div class="stage-bg" id="stage-bg"></div>
+    <!-- 屏堆栈·后景：当前屏在前，上滑时旧屏向上推走。每屏内放场景·后景（整图+遮罩 或 单体 PNG）。 -->
+    <div class="screen-host" id="screen-host"></div>
 
-    <div class="scene-bg" id="scene-bg" aria-hidden="true"></div>
+    <!-- 氛围层 · env：在场景·后景之上、角色之下，仅染场景前景+后景。 -->
+    <div class="atmo-env" id="atmo-env" aria-hidden="true"></div>
 
-    <div class="art-layer" id="art-layer"></div>
+    <!-- 主导特效·后：角色之后的常驻粒子/光柱（鬼火/月光柱等） -->
+    <div class="fx-dominant-back" id="fx-dominant-back" aria-hidden="true"></div>
 
+    <!-- 全局立绘层（跨屏复用单一立绘，由场景控制 pose/位置） -->
     <div class="character-layer" id="character-layer">
       <div class="character" id="character" aria-hidden="true">
         <div class="char-fig" id="char-fig">
@@ -36,13 +40,34 @@
       </div>
     </div>
 
-    <div class="anchor" id="journal-anchor" aria-label="历史锚点"></div>
+    <!-- 屏堆栈·前景：与后景平行的镜像 host，承载场景·前景（角色之前的近景遮挡/装饰）。
+         当前所有素材均按后景使用，前景为预留扩展位。 -->
+    <div class="screen-host-front" id="screen-host-front"></div>
 
-    <!-- 软幕 · 触控热区在下 1/3 屏,弧在底部,长按向上展开 -->
-    <div class="edge-zone" id="edge-zone">
+    <!-- 主导特效·前：角色之前的常驻粒子（粒子飘过面前/训狗字符浮在身前）。
+         与"主导特效·后"二选一，任意时刻只允许一种主导特效在屏。 -->
+    <div class="fx-dominant-front" id="fx-dominant-front" aria-hidden="true"></div>
+
+    <!-- 氛围层 · emotion：在所有视觉层之上、文字之下，染整张画面（含前景/角色/主导特效）。 -->
+    <div class="atmo-emotion" id="atmo-emotion" aria-hidden="true"></div>
+
+    <!-- 旁白 / 内心 / 重旁白 / NPC 缺席旁白 / 对话气泡 — 跨屏全局，
+         scene 切换由 player 主动 clearAllText() 兜底。 -->
+    <div class="narration-zone" id="narration-zone"></div>
+    <div class="inner-zone" id="inner-zone"></div>
+    <div class="heavy-zone" id="heavy-zone"></div>
+    <div class="npc-zone" id="npc-zone"></div>
+    <div class="bubble-zone" id="bubble-zone"></div>
+
+    <!-- 特效·伴随层：屏震/白闪/雾/灯笼/纸扎人等瞬时或开关型覆盖。
+         覆盖至文字之上、交互 UI 之下——剧情冲击瞬间字也被吃掉，但圆弧仍可点。 -->
+    <div class="fx-burst-layer" id="fx-burst-layer" aria-hidden="true"></div>
+
+    <!-- 圆弧（屏内对话节点弹起） -->
+    <div class="edge-zone" id="edge-zone" hidden>
       <div class="edge-veil" aria-hidden="true"></div>
       <div class="edge-arc-host" id="edge-arc-host">
-        <svg class="edge-svg edge-svg-portrait" viewBox="0 0 1000 220" preserveAspectRatio="none" aria-hidden="true">
+        <svg class="edge-svg" viewBox="0 0 1000 220" preserveAspectRatio="none" aria-hidden="true">
           <defs>
             <linearGradient id="edge-fade-h" x1="0" y1="0" x2="1" y2="0">
               <stop offset="0%"   stop-color="white" stop-opacity="0"/>
@@ -75,84 +100,46 @@
         </svg>
       </div>
 
-      <span class="arc-guide arc-guide-left">
-        <span class="guide-text guide-normal">轻触 打字</span>
-        <span class="guide-text guide-action">轻触 行动</span>
-      </span>
-      <span class="arc-guide arc-guide-right">
-        <span class="guide-text guide-normal">长按 语音（推荐）</span>
-        <span class="guide-text guide-action">长按 感受（推荐）</span>
-      </span>
-      <span class="arc-guide arc-guide-center">
-        <span class="guide-center-text">输入行动</span>
-      </span>
+      <!-- 弧下方居中操作提示（前 2 次出现，与手势教学同步消失） -->
+      <div class="arc-hint" id="arc-hint" aria-hidden="true">长按语音对话</div>
+
+      <!-- 引导文字（对话提示）— 弧上方 -->
+      <div class="edge-prompt" id="edge-prompt"></div>
     </div>
 
-    <!-- 打字输入区: type-text 显示用户敲的内容(所见即所得), send-btn 提交.
-         hidden-input-host 是真正接收键盘事件的离屏 input 容器. -->
-    <div class="type-area" id="type-area">
-      <div class="type-text" id="type-text"><span class="caret"></span></div>
-      <button class="send-btn" id="send-btn" type="button" disabled aria-label="送出">
-        <svg viewBox="0 0 30 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M5 4C5 2.89543 5.89543 2 7 2H23C24.1046 2 25 2.89543 25 4V17C25 18.1046 24.1046 19 23 19H10L5 23V4Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round"/>
-          <circle cx="11" cy="10.5" r="1.2" fill="currentColor"/>
-          <circle cx="15" cy="10.5" r="1.2" fill="currentColor"/>
-          <circle cx="19" cy="10.5" r="1.2" fill="currentColor"/>
-        </svg>
-      </button>
-    </div>
-    <div id="hidden-input-host"></div>
-
-    <div class="subtitle-zone" id="subtitle-zone"></div>
-    <div class="bubble-zone" id="bubble-zone"></div>
-    <div class="narration-zone" id="narration-zone"></div>
-    <div class="inner-zone" id="inner-zone"></div>
-    <div class="heavy-zone" id="heavy-zone"></div>
-    <div class="npc-zone" id="npc-zone"></div>
-
-    <div class="echo-stage" id="echo-stage" hidden>
-      <div class="echo-halo" id="echo-halo">
-        <div class="echo-halo-core"></div>
-        <div class="echo-halo-ring"></div>
-      </div>
-      <div class="echo-text" id="echo-text"></div>
-      <div class="echo-hints" id="echo-hints"></div>
-      <button class="echo-skip" id="echo-skip" type="button" hidden>跳过</button>
+    <!-- 底部尖尖 — 上滑可推进剧情时显现。跟长按圆弧用完全相同的 viewBox
+         和 path（M 60 230 Q 500 30 940 230），元素整体下沉到屏外，只露
+         出顶端约 30px 的尖。弧线 + 弧下方实心半透填充，缓慢呼吸。
+         上滑手势中弧形会跟随手指拱起；上滑成功跟旧屏一起离场，
+         未达阈值则平滑回弹。 -->
+    <div class="swipe-tip" id="swipe-tip" aria-hidden="true">
+      <svg class="swipe-tip-svg" viewBox="0 0 1000 220" preserveAspectRatio="none">
+        <path class="swipe-tip-fill"
+              d="M 60 230 Q 500 30 940 230 Z" />
+      </svg>
     </div>
 
-    <div class="opening-zone" id="opening-zone" hidden>
-      <button class="opening-skip" id="opening-skip" type="button">跳过开场 ›</button>
-      <div class="opening-glow" id="opening-glow" hidden>
-        <div class="opening-glow-core"></div>
-        <div class="opening-glow-hint">长按 · 唤醒</div>
-      </div>
-      <div class="opening-text" id="opening-text"></div>
-    </div>
+    <!-- 触点教学指示（前 2 次出现）— 一个圆点，由 .demo-swipe / .demo-press
+         切换成 上滑示范 / 长按示范 两种动画。元素始终在 DOM，靠 class 控制显隐。 -->
+    <div class="touch-hint" id="touch-hint"></div>
 
-    <div class="run-anchor" id="run-anchor" hidden></div>
+    <!-- 左上角"剧情历史"锚点（点击展开） -->
+    <div class="anchor" id="journal-anchor" aria-label="剧情历史"></div>
 
-    <div class="endmark" id="endmark" hidden>
-      <div class="endmark-text">第一章 完</div>
-      <div class="endmark-hint" id="endmark-hint">试着从左上角拉开这一段的回忆</div>
-    </div>
-
-    <div class="blink-veil" id="blink-veil"></div>
-    <div class="white-veil" id="white-veil"></div>
-
+    <!-- 剧情历史抽屉：从顶部下展，纸面内可滚动，点击空白区域收回 -->
     <div class="journal" id="journal" hidden>
       <div class="journal-paper">
-        <button class="journal-close" id="journal-close" type="button" aria-label="收回事记">
+        <button class="journal-close" id="journal-close" type="button" aria-label="返回">
           <span class="journal-close-arrow"></span>
-          <span class="journal-close-label">收回</span>
         </button>
         <div class="journal-scroll" id="journal-scroll"></div>
-        <div class="journal-hint">点左上角 / 点下方空白 — 收回</div>
       </div>
+      <div class="journal-blank-hint">点击空白处收回</div>
     </div>
 
-    <div class="finale" id="finale" hidden>
-      <p>demo 结束</p>
-      <p class="finale-sub">刷新页面可重头再来</p>
+    <!-- 启动遮罩 -->
+    <div class="boot-veil" id="boot-veil">
+      <div class="boot-tap">点击开始</div>
     </div>
   </div>
 

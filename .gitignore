@@ -6,9 +6,15 @@ node_modules/
 .vscode/
 .idea/
 *.log
+.share-logs/
+others/
 
 # Capacitor build output
 www/
+
+# 录制产物
+echo-concept*.mp4
+echo-hq*.mp4
 
 # Android build artifacts (keep the project, ignore generated files)
 android/.gradle/

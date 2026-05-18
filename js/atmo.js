@@ -53,6 +53,13 @@ const PRESETS = {
   },
 
   // emotion presets (建议挂 emotion)
+  'flush-rose-soft': {
+    // 摸摸阶段 2 浅染：比 flush-rose 弱一半，做 4 阶递进的中间过渡
+    tint: 'rgba(255, 175, 175, 0.18)',
+    blend: 'screen',
+    vignette: 0,
+    mode: 'emotion',
+  },
   'flush-rose': {
     tint: 'rgba(255, 150, 150, 0.35)',
     blend: 'screen',

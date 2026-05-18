@@ -1,13 +1,26 @@
 // Water ripple — plays on every successful swipe-up to mark "narrative
 // advancing forward". Independent of whether the screen actually changes.
 //
-// Visual: a snapshot of the current bg + character is overlaid on top of
-// the stage with an SVG displacement filter. A horizontal wavefront band
-// travels from below the screen to above it (mask-image gradient). Inside
-// the band, content is refracted by smooth low-frequency turbulence;
-// outside the band, content is invisible (mask transparent), so the live
-// stage shows through. Four faint concentric rings expand from the
-// bottom-center as a subtle wave-crest highlight.
+// Visual: a snapshot of the **entire visual stack** (bg + scene-el + atmo
+// coloring + canvas particles + character + front layers + emotion overlay)
+// is overlaid on top of the stage with an SVG displacement filter. A
+// horizontal wavefront band travels from below the screen to above it
+// (mask-image gradient). Inside the band, content is refracted by smooth
+// low-frequency turbulence; outside the band, content is invisible (mask
+// transparent), so the live stage shows through. Four faint concentric rings
+// expand from the bottom-center as a subtle wave-crest highlight.
+//
+// Why a *snapshot* and not a live filter? See plans/v2/上滑涟漪手册.md.
+// Tl;dr: filtering a static clone lets the browser cache the rasterization
+// and only re-run displacement each frame → GPU friendly. Filtering a live
+// container with canvases and mix-blend-modes inside forces a full re-raster
+// per frame and usually drops out of the GPU compositor path.
+//
+// Trade-off accepted: during the ~600ms a given pixel is inside the band,
+// the snapshot is frozen at swipe-time — particles and atmo fades inside
+// the band don't advance. Outside the band the live stage is shown so the
+// scene keeps animating; the freeze is masked further by the displacement
+// jitter.
 //
 // Total duration ~2000ms. Skipped while turbo is on. Concurrent calls
 // (super-fast swipes) are dropped via a busy guard.
@@ -16,6 +29,18 @@ import { $, raf } from './util.js';
 import { isTurbo } from './turbo.js';
 
 const DURATION = 2000;
+
+// 视觉层克隆名单（按 #stage DOM 顺序 = 视觉堆叠顺序）。
+// fx-burst-layer 故意不包含 —— 它要盖在文字之上，不属于"涟漪扭曲对象"。
+const LAYER_IDS = [
+  'screen-host',
+  'atmo-env',
+  'fx-dominant-back',
+  'character-layer',
+  'screen-host-front',
+  'fx-dominant-front',
+  'atmo-emotion',
+];
 
 let _busy = false;
 let _defsInjected = false;
@@ -30,6 +55,7 @@ function injectDefs() {
   const svg = document.createElementNS(NS, 'svg');
   svg.setAttribute('class', 'wave-defs');
   svg.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;pointer-events:none;';
+  // 参数照搬"上滑涟漪手册"：低频噪声 + 柔模糊 + 钟形 scale 6→24→6。
   svg.innerHTML = `
     <defs>
       <filter id="wave-water-distort" x="-10%" y="-10%" width="120%" height="120%">
@@ -68,27 +94,37 @@ function setBand(host, centerPct, halfWidth, fade) {
   host.style.webkitMaskImage = grad;
 }
 
+// 克隆 7 个视觉层组成"整张活画面"的静态快照。
+// 注意：cloneNode 复制 <canvas> 节点但不复制画布像素 —— 必须手动 drawImage。
 function buildSnapshot() {
   const snapshot = document.createElement('div');
   snapshot.className = 'wave-scene-distort';
 
-  // Bg: clone the active screen's .screen-bg so the inline background-image
-  // and the ::after vignette both come along.
-  const screenBg = document.querySelector('.screen.active .screen-bg')
-                || document.querySelector('.screen .screen-bg');
-  if (screenBg) {
-    const bgClone = screenBg.cloneNode(true);
-    snapshot.appendChild(bgClone);
-  }
+  for (const id of LAYER_IDS) {
+    const original = document.getElementById(id);
+    if (!original) continue;
 
-  // Character layer: deep-clone (preserves inline styles → current pos/pose).
-  // Strip ids on clone + descendants to keep the document id-unique.
-  const charLayer = document.getElementById('character-layer');
-  if (charLayer) {
-    const layerClone = charLayer.cloneNode(true);
-    layerClone.removeAttribute('id');
-    layerClone.querySelectorAll('[id]').forEach((n) => n.removeAttribute('id'));
-    snapshot.appendChild(layerClone);
+    const clone = original.cloneNode(true);
+    // 去掉所有 id，避免文档内重复（同 id 影响 querySelector 与某些工具）。
+    clone.removeAttribute('id');
+    clone.querySelectorAll('[id]').forEach((n) => n.removeAttribute('id'));
+
+    // 手动复制 canvas 画布像素。原 canvas 与 clone canvas 一一对应（顺序相同）。
+    const origCanvases  = original.querySelectorAll('canvas');
+    const cloneCanvases = clone.querySelectorAll('canvas');
+    for (let i = 0; i < origCanvases.length; i++) {
+      const o = origCanvases[i];
+      const c = cloneCanvases[i];
+      if (!o || !c) continue;
+      // 把 clone 的 buffer 尺寸对齐原图（cloneNode 通常已带 width/height 属性，
+      // 但稳妥起见再赋值一次）。
+      c.width  = o.width;
+      c.height = o.height;
+      try { c.getContext('2d').drawImage(o, 0, 0); }
+      catch (_) { /* 罕见：cross-origin / 上下文丢失 */ }
+    }
+
+    snapshot.appendChild(clone);
   }
 
   return snapshot;
@@ -117,8 +153,7 @@ export async function playWaterRipple() {
   await raf();
   await raf();
 
-  // 4 rings, delays scaled proportionally for 2000ms (originally tuned at 3000ms
-  // with [0, 380, 760, 1140] → 38% of total before the last ring).
+  // 4 rings, delays tuned for 2000ms run.
   const ringDelays = [0, 250, 500, 760];
   const rings = ringDelays.map(() => {
     const r = document.createElement('div');

@@ -72,10 +72,9 @@
 <h1>v2 · 节奏起伏</h1>
 <div class="sub">场景层覆盖率 × 剧情推进 · 总时长 600s · 当前 v.s. 愿景 · 鼠标悬停看 beat</div>
 
-<div class="banner">
-  ⚠️ <strong style="color:#fff">遗留待办</strong>：场 2/3/7 仍在用 cj1/cj2/cj3 整张 bg（无 reveal mask），暂按 100% 全揭计算。
-  这违反"前段 20-30% 单体"的设计意图——曲线在这些段落顶到 100% 是 <strong style="color:#fff">需要重构的信号</strong>。
-  正式覆盖率口径将在素材重评估后定。详见 <code>素材清单.md §四</code>。
+<div class="banner" style="background: rgba(120,200,140,0.06); border-left-color: var(--vision); color: #b8d8c0;">
+  ✅ <strong style="color:#fff">已对齐愿景</strong>：cj1 跨场 1/2/3 同源椭圆推进；cj5 替代 cj3（cj3 弃用）；cj2 仅在场 2 撕碎瞬间一帧闪现；
+  场 4 回退极暗 bg + ghost-fire + 单体叠加。<strong style="color:#fff">cur 曲线现在与 vis 曲线在 8 场全程匹配</strong>。
 </div>
 
 <div class="legend">
@@ -89,9 +88,9 @@
 <div class="note">
   <strong>读图提示</strong>
   <ul>
-    <li><strong>当前曲线（橙）</strong>：基于 v2/js/script.js 实际推进。橙色加深的点是 cj1/2/3 整张 bg 的"待重评估"位置。</li>
-    <li><strong>愿景曲线（绿虚）</strong>：按用户设计意图——50% 时间停留 20-30%（单体探索期），中段叠加扩到 50-60%，高潮整图全揭 100%。</li>
-    <li><strong>差距</strong>：场 2/3/4/7 是当前曲线偏离愿景最大的区段，分别需要"cj1/2/3 改造"或"补单体填充 0% 谷"。</li>
+    <li><strong>当前曲线（橙）</strong>：基于 v2/js/script.js 实际推进。已按愿景重调 reveal 数值，cur ≈ vis 在 8 场全程对齐。</li>
+    <li><strong>愿景曲线（绿虚）</strong>：按用户设计意图——50% 时间停留 20-30%（单体/小遮罩探索期），中段叠加扩到 50-60%，高潮整图全揭 100%。</li>
+    <li><strong>关键设计</strong>：cj1 跨场 1/2/3 同源椭圆推进（28→32→50×22）；cj5 替代 cj3；场 4 极暗 + 单体叠加；场 7 亲密点 60% 不全揭（焦距感）。</li>
     <li><strong>覆盖率口径</strong>：纯极暗 = 0% / 单体 PNG = 累加 20→70% / 整图 reveal mask = mask 面积 / 整图全揭 = 100%。三种状态互斥（单体可叠加）。</li>
   </ul>
 </div>
@@ -100,45 +99,47 @@
 // ========== Data ==========
 const TOTAL = 600;
 
-// 当前曲线 = v2/js/script.js 实际推进
-// todo: true 表示该点是 cj1/2/3 整张 bg，暂按 100% 处理（待重评估）
+// 当前曲线 = v2/js/script.js 实际推进（已贴愿景重调）
 const cur = [
-  { t: 0,   cov: 0,   scene: '场 1 黑暗水中', beat: 'init · bgColor 黑底' },
+  { t: 0,   cov: 0,   scene: '场 1 黑暗水中', beat: 'init · bgColor 黑底（前 30s 真黑屏渲染孤独）' },
   { t: 12,  cov: 0,   scene: '场 1 黑暗水中', beat: '旁白 1 · pos far-lit · 金瞳 flash 一闪' },
   { t: 35,  cov: 0,   scene: '场 1 黑暗水中', beat: '试探对话 + 圆弧 ×2 + dialogue ×3' },
-  { t: 42,  cov: 25,  scene: '场 1 黑暗水中', beat: '🐟 鱼尾.webp 浮现（PNG 单体）' },
+  { t: 42,  cov: 25,  scene: '场 1 黑暗水中', beat: '🐟 cj1 椭圆 28×26 + 鱼尾.webp 单体（~25%）' },
   { t: 50,  cov: 25,  scene: '场 1 → 场 2',  beat: '场 1 末态 25%' },
 
-  { t: 51,  cov: 100, scene: '场 2 怪鱼与狐狸', beat: 'cj1.jpg 整张 bg', todo: true },
-  { t: 80,  cov: 100, scene: '场 2 怪鱼与狐狸', beat: '当鱼饵段 / 撕碎怪鱼', todo: true },
-  { t: 110, cov: 100, scene: '场 2 → 场 3',  beat: 'cj1.jpg 维持', todo: true },
+  { t: 51,  cov: 28,  scene: '场 2 怪鱼与狐狸', beat: 'cj1 同源椭圆 32×28（~28%）' },
+  { t: 80,  cov: 28,  scene: '场 2 怪鱼与狐狸', beat: '当鱼饵段' },
+  { t: 100, cov: 28,  scene: '场 2 怪鱼与狐狸', beat: '撕碎瞬间（cj2 一帧闪 + red-alert，不计主曲线）' },
+  { t: 110, cov: 28,  scene: '场 2 → 场 3',  beat: 'cj1 维持 28%' },
 
-  { t: 111, cov: 100, scene: '场 3 岸边', beat: 'cj1.jpg 整张 bg', todo: true },
-  { t: 145, cov: 100, scene: '场 3 岸边', beat: '做菜 + 大快朵颐', todo: true },
-  { t: 180, cov: 100, scene: '场 3 → 场 4', beat: '逃跑结尾', todo: true },
+  { t: 111, cov: 35,  scene: '场 3 岸边', beat: 'cj1 椭圆 50×22 cy:75 (~35%) 视觉=岸边视角' },
+  { t: 145, cov: 35,  scene: '场 3 岸边', beat: '做菜 + 大快朵颐' },
+  { t: 180, cov: 35,  scene: '场 3 → 场 4', beat: '逃跑结尾（env 切 cold-blue）' },
 
-  { t: 181, cov: 0,   scene: '场 4 火林', beat: 'init · bgColor 极暗 · 鬼火走特效层' },
-  { t: 210, cov: 0,   scene: '场 4 火林', beat: '食人花来袭 + flame-burst（粒子/burst 不计入）' },
-  { t: 235, cov: 0,   scene: '场 4 火林', beat: '烈焰救场 + 绑你' },
+  { t: 181, cov: 0,   scene: '场 4 火林', beat: 'init · bgColor 极暗 · ghost-fire 主导' },
+  { t: 195, cov: 14,  scene: '场 4 火林', beat: '藤蔓单体 80×18 屏底（~14%）' },
+  { t: 220, cov: 39,  scene: '场 4 火林', beat: '食人花前景 55×45 叠加（破例）' },
+  { t: 235, cov: 0,   scene: '场 4 火林', beat: '烈焰救场（emotion+flash+shake，清单体回 0%）' },
 
   { t: 240, cov: 33,  scene: '场 5 焦土路上', beat: '骸骨.webp 椭圆 35×30 (~33%)' },
-  { t: 270, cov: 78,  scene: '场 5 焦土路上', beat: '椭圆扩到 55×45 (~78%)' },
+  { t: 270, cov: 60,  scene: '场 5 焦土路上', beat: '椭圆扩到 46×42 (~60%) 含肋骨段' },
   { t: 290, cov: 100, scene: '场 5 焦土路上', beat: '远处低吼 · 整图全揭' },
 
-  { t: 300, cov: 54,  scene: '场 6 月夜洞穴', beat: '羊人.webp 椭圆 45×38 (~54%)' },
-  { t: 325, cov: 90,  scene: '场 6 月夜洞穴', beat: '偷看羊人 · 椭圆 60×50 (~90%)' },
+  { t: 300, cov: 30,  scene: '场 6 月夜洞穴', beat: '羊人.webp 椭圆 33×29 (~30%) 入夜' },
+  { t: 325, cov: 89,  scene: '场 6 月夜洞穴', beat: '偷看羊人 · 椭圆 58×49 (~89%)' },
   { t: 350, cov: 31,  scene: '场 6 月夜洞穴', beat: '缩回看墙 · 椭圆 35×28 (~31%)' },
   { t: 380, cov: 31,  scene: '场 6 月夜洞穴', beat: '训狗诗 + 决意' },
 
-  { t: 391, cov: 100, scene: '场 7 晨光讨好', beat: 'cj3.jpg 整张 bg', todo: true },
-  { t: 470, cov: 100, scene: '场 7 晨光讨好', beat: '摸摸 4 阶 + 提议出去', todo: true },
-  { t: 540, cov: 100, scene: '场 7 → 场 8',  beat: 'cj3.jpg 维持', todo: true },
+  { t: 391, cov: 30,  scene: '场 7 晨光讨好', beat: 'cj5 椭圆 33×29 (~30%) 出洞口看晨光' },
+  { t: 440, cov: 51,  scene: '场 7 晨光讨好', beat: '内心 OS 前 · 椭圆 43×38 (~51%)' },
+  { t: 480, cov: 60,  scene: '场 7 晨光讨好', beat: '摸摸 · 椭圆 46×42 (~60%) 亲密点焦距感' },
+  { t: 540, cov: 60,  scene: '场 7 → 场 8',  beat: '提议出去 · 维持 60%' },
 
   { t: 541, cov: 0,   scene: '场 8 钩子', beat: 'init · bgColor 极暗 · cold-shock 闪' },
   { t: 558, cov: 0,   scene: '场 8 钩子', beat: '冷漠睁眼 · "带你转转"' },
   { t: 562, cov: 44,  scene: '场 8 钩子', beat: '雾涌起 · 宅院.webp 椭圆 40×35 (~44%)' },
-  { t: 580, cov: 90,  scene: '场 8 钩子', beat: '宅院扩 65×55 (~90%)' },
-  { t: 590, cov: 90,  scene: '场 8 钩子', beat: '假笑（cold-shock + shake）' },
+  { t: 580, cov: 78,  scene: '场 8 钩子', beat: '宅院扩 55×45 (~78%)' },
+  { t: 590, cov: 78,  scene: '场 8 钩子', beat: '假笑（cold-shock + shake）' },
   { t: 598, cov: 100, scene: '场 8 钩子', beat: '整图全揭 + 纸扎人' },
 ];
 

@@ -1,25 +1,23 @@
+import { initScreen } from './screen.js';
+import { initInput, waitForBoot } from './input.js';
 import { initRing } from './ring.js';
-import { initInput } from './input.js';
-import { initTypeInput } from './type-input.js';
-import { initJournalGestures } from './journal.js';
+import { initCharacter } from './character.js';
+import { initFX } from './fx.js';
+import { initAtmo } from './atmo.js';
+import { initJournal } from './journal.js';
 import { runPlayer } from './player.js';
-import { showCharacter } from './character.js';
-import { initOrientation, expectOrientation, waitForOrientation, PORTRAIT } from './orientation.js';
-import { initFullscreenOnFirstTouch } from './fullscreen.js';
 
 window.addEventListener('DOMContentLoaded', async () => {
-  initRing();
+  initScreen();
   initInput();
-  initTypeInput();
-  initJournalGestures();
-  initFullscreenOnFirstTouch();
-  showCharacter(false);
+  initRing();
+  initCharacter();
+  initFX();
+  initAtmo();
+  initJournal();
 
-  initOrientation();
-  expectOrientation(PORTRAIT, '请将设备竖置 — 准备好了再开始');
-  await waitForOrientation(PORTRAIT);
-
-  await new Promise((r) => setTimeout(r, 200));
+  // Wait for first user tap (releases autoplay restrictions, also primes mobile).
+  await waitForBoot();
 
   try {
     await runPlayer();

@@ -1,71 +1,234 @@
-import { $ } from './util.js';
+// Ring dialogue — drives the v1 state machine on #edge-zone:
+//   idle → invitation (open, breathing arc + prompt + arc-hint until press is learned)
+//   invitation → recording (≥250ms long-press, ripples + arc enlarges)
+//   recording → delivering (release: bubble-user shows preset line; arc fades)
+//   delivering → idle (bubble drifts; ring hides)
+//
+// Tap (short press) does nothing — only long-press commits.
+// Keyboard: hold Space = long-press (input.js suppresses its own Space when
+// _ringActive=true so we get the keydown without conflict).
 
-export const RING = {
-  IDLE: 'idle',
-  RECORDING: 'recording',
-  DELIVERING: 'delivering',
-  THINKING: 'thinking',
-  RESPONDING: 'responding',
-  INPUT: 'input',         // 打字态(短按弹键盘 + type-area 可见)
-  SETTLED: 'settled',     // 落回态(键盘已收, 文字保留, 直线在 12vh)
-  INVITATION: 'invitation',
+import { $, defer, raf, wait, registerCancellable } from './util.js';
+import { setRingActive } from './input.js';
+import { showDialogue, advanceCurrent } from './paragraph.js';
+import { showPressHint, hidePressHint, recordPressSuccess, shouldShowArcHint } from './tutorial.js';
+import { isTurbo, onTurboChange } from './turbo.js';
+import { edgeFlash } from './fx.js';
+
+const LONG_PRESS_MS = 250;
+const POST_DELIVER_HOLD = 200;
+const PRE_FLASH_PAUSE = 500;   // bubble 谢幕 → 边缘亮带
+const POST_FLASH_PAUSE = 1200; // 边缘亮带 → 下一句角色对话
+
+const RING = {
+  IDLE: 'state-idle',
+  INVITATION: 'state-invitation',
+  RECORDING: 'state-recording',
+  DELIVERING: 'state-delivering',
 };
 
-const STATE_CLASS = {
-  [RING.IDLE]: 'state-idle',
-  [RING.RECORDING]: 'state-recording',
-  [RING.DELIVERING]: 'state-delivering',
-  [RING.THINKING]: 'state-thinking',
-  [RING.RESPONDING]: 'state-responding',
-  [RING.INPUT]: 'state-input',
-  [RING.SETTLED]: 'state-settled',
-  [RING.INVITATION]: 'state-invitation',
-};
-
+let _zone, _prompt;
 let _state = RING.IDLE;
-let _actionMode = false;
-let _guideBudget = 4;
-const _stateChangeListeners = new Set();
+let _waiter = null;
+let _longPressTimer = null;
+let _isPressing = false;
+let _committed = false;
 
-export function getRingState() { return _state; }
-
-export function setActionMode(on) {
-  _actionMode = !!on;
-  const zone = $('#edge-zone');
-  if (!zone) return;
-  if (_actionMode) zone.classList.add('mode-action');
-  else zone.classList.remove('mode-action');
-}
-
-export function setRingState(next) {
-  const zone = $('#edge-zone');
-  if (!zone) return;
-  Object.values(STATE_CLASS).forEach((c) => zone.classList.remove(c));
-  zone.classList.add(STATE_CLASS[next]);
-  const prev = _state;
+function setState(next) {
+  if (!_zone) return;
+  Object.values(RING).forEach((c) => _zone.classList.remove(c));
+  _zone.classList.add(next);
   _state = next;
-  if (prev !== next) _stateChangeListeners.forEach((fn) => fn(next, prev));
 }
 
-// 订阅 ring 状态变化 — type-input 子系统、echo-hints 生命周期都需要根据
-// 状态变化做事(比如进 invitation 重启 hints, 进 input 关 hints).
-export function onRingStateChange(fn) {
-  _stateChangeListeners.add(fn);
-  return () => _stateChangeListeners.delete(fn);
+function showArcHint(on) {
+  if (!_zone) return;
+  if (on) _zone.classList.add('arc-hint-active');
+  else _zone.classList.remove('arc-hint-active');
+}
+
+// Render the prompt above the arc.
+// - Array of strings  → cycling upward stream (no brackets), 3.6s per cycle,
+//   each line staggered by 1/N of the cycle so 1–2 lines are visible at once.
+// - Single string     → legacy static bracketed line.
+// - Falsy             → clear.
+function renderPrompt(prompt) {
+  if (!_prompt) return;
+  _prompt.innerHTML = '';
+  _prompt.classList.remove('edge-prompt-cycling');
+  if (!prompt) return;
+
+  if (Array.isArray(prompt)) {
+    const lines = prompt.filter(Boolean);
+    if (!lines.length) return;
+    _prompt.classList.add('edge-prompt-cycling');
+    // Each line owns a time slot of `slotS` and stays invisible the rest of
+    // the cycle. The CSS keyframe `promptDrift` is tuned for the slot = 1/N
+    // shape (visible 0–31%), so adjust the keyframe if N ever ≠ 3.
+    const slotS = 1.6;
+    const totalS = lines.length * slotS;
+    lines.forEach((txt, i) => {
+      const span = document.createElement('span');
+      span.className = 'edge-prompt-line';
+      span.style.animationDelay = `${(i * slotS).toFixed(2)}s`;
+      span.style.animationDuration = `${totalS.toFixed(2)}s`;
+      const inner = document.createElement('span');
+      inner.className = 'edge-prompt-pill';
+      inner.textContent = txt;
+      span.appendChild(inner);
+      _prompt.appendChild(span);
+    });
+  } else {
+    const span = document.createElement('span');
+    span.className = 'edge-prompt-static';
+    const inner = document.createElement('span');
+    inner.className = 'edge-prompt-pill';
+    inner.textContent = `（${prompt}）`;
+    span.appendChild(inner);
+    _prompt.appendChild(span);
+  }
+}
+
+function startPress() {
+  if (!_waiter || _state === RING.DELIVERING) return;
+  if (_isPressing) return;
+  _isPressing = true;
+  _committed = false;
+  _longPressTimer = setTimeout(() => {
+    if (_isPressing) {
+      _committed = true;
+      setState(RING.RECORDING);
+      showArcHint(false);
+      hidePressHint();
+    }
+  }, LONG_PRESS_MS);
+}
+
+function endPress() {
+  if (!_isPressing) return;
+  if (_longPressTimer) { clearTimeout(_longPressTimer); _longPressTimer = null; }
+  _isPressing = false;
+
+  if (_committed) {
+    _committed = false;
+    setState(RING.DELIVERING);
+    const w = _waiter;
+    _waiter = null;
+    if (w) w.resolve();
+  } else {
+    // Short tap — return to invitation, the user is still expected to long-press.
+    if (_state === RING.RECORDING) setState(RING.INVITATION);
+  }
 }
 
 export function initRing() {
-  setRingState(RING.IDLE);
-  onRingStateChange((next) => {
-    if (next !== RING.INVITATION && next !== RING.INPUT && next !== RING.SETTLED) {
-      const zone = $('#edge-zone');
-      if (zone) zone.classList.remove('arc-guide-active');
+  _zone = $('#edge-zone');
+  _prompt = $('#edge-prompt');
+  setState(RING.IDLE);
+
+  const onDown = (e) => {
+    if (!_waiter) return;
+    e.preventDefault();
+    startPress();
+  };
+  const onUp = () => {
+    if (!_waiter && !_isPressing) return;
+    endPress();
+  };
+
+  _zone.addEventListener('pointerdown', onDown);
+  _zone.addEventListener('pointerup', onUp);
+  _zone.addEventListener('pointercancel', onUp);
+  _zone.addEventListener('pointerleave', onUp);
+  _zone.addEventListener('touchstart', onDown, { passive: false });
+  _zone.addEventListener('touchend', onUp);
+  _zone.addEventListener('touchcancel', onUp);
+
+  // Keyboard: Hold Space = long-press the ring (only when ring is open).
+  let spaceHeld = false;
+  window.addEventListener('keydown', (e) => {
+    if (e.repeat) return;
+    if (!_waiter) return;
+    if (e.code === 'Space') {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!spaceHeld) {
+        spaceHeld = true;
+        startPress();
+      }
+    }
+  });
+  window.addEventListener('keyup', (e) => {
+    if (e.code === 'Space' && spaceHeld) {
+      spaceHeld = false;
+      endPress();
     }
   });
 }
 
-export function tryConsumeGuide() {
-  if (_guideBudget <= 0) return false;
-  _guideBudget--;
-  return true;
+// Open the ring with a prompt (引导文字) and the user's preset line.
+// Resolves when the line has been delivered as a bubble.
+// Wrapped in try/finally so a scene-jump cancel still tears down the ring UI.
+export async function ringDialogue({ prompt = '', text = '' } = {}) {
+  // 先把当前旁白漂走，避免 prompt 和多行旁白同框时视觉糊在一起。
+  await advanceCurrent();
+  renderPrompt(prompt);
+  _zone.hidden = false;
+  setRingActive(true);
+
+  // Reveal in a frame so transitions catch.
+  await raf();
+  setState(RING.INVITATION);
+  if (shouldShowArcHint()) showArcHint(true);
+  showPressHint();
+
+  _waiter = defer();
+
+  // Turbo: auto-commit (skip the long-press) so the player walks itself.
+  const autoCommit = () => {
+    if (!_waiter) return;
+    setState(RING.DELIVERING);
+    const w = _waiter;
+    _waiter = null;
+    w.resolve();
+  };
+  if (isTurbo()) Promise.resolve().then(autoCommit);
+  const offTurbo = onTurboChange((on) => { if (on) autoCommit(); });
+
+  // Scene-jump cancel: reject the press waiter to bail out.
+  const offCancel = registerCancellable((err) => {
+    if (_waiter) {
+      const w = _waiter;
+      _waiter = null;
+      w.reject(err);
+    }
+  });
+
+  try {
+    await _waiter.promise;
+    offTurbo();
+    offCancel();
+
+    // Deliver the line as a user bubble (typewriter + drift via paragraph.js).
+    await showDialogue('你', text, { hold: 1200 });
+    recordPressSuccess();
+    await wait(PRE_FLASH_PAUSE);
+    edgeFlash();
+    await wait(POST_FLASH_PAUSE);
+
+    await wait(POST_DELIVER_HOLD);
+  } finally {
+    offTurbo();
+    offCancel();
+    if (_longPressTimer) { clearTimeout(_longPressTimer); _longPressTimer = null; }
+    _isPressing = false;
+    _committed = false;
+    _waiter = null;
+    setState(RING.IDLE);
+    showArcHint(false);
+    hidePressHint();
+    _zone.hidden = true;
+    renderPrompt(null);
+    setRingActive(false);
+  }
 }

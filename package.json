@@ -5,13 +5,20 @@
   "description": "echo · 幕(竖屏版) — packaged via Capacitor",
   "scripts": {
     "dev": "python3 -m http.server 8000",
+    "share": "bash scripts/share.sh",
     "build": "rm -rf www && mkdir -p www && cp index.html style.css www/ && cp -R js src www/",
     "sync": "npm run build && npx cap sync",
-    "open:android": "npm run sync && npx cap open android"
+    "open:android": "npm run sync && npx cap open android",
+    "record:concept": "node 概念片/shots/record.js",
+    "record:concept:hq": "node 概念片/shots/record-hq.js"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.1",
     "@capacitor/cli": "^8.3.1",
     "@capacitor/core": "^8.3.1"
+  },
+  "devDependencies": {
+    "puppeteer": "19.0.0",
+    "puppeteer-screen-recorder": "^3.0.6"
   }
 }

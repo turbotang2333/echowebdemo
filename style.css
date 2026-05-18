@@ -1,426 +1,469 @@
 :root {
-  --bg: #0c0814;
-  --bg-current: #0c0814;
+  --bg: #070811;
   --serif: 'Source Han Serif SC', 'Songti SC', 'STSong', 'SimSun', serif;
   --sans: 'Source Han Sans SC', 'PingFang SC', 'HarmonyOS Sans SC', sans-serif;
-  --subtitle: rgba(255, 255, 255, 0.88);
-  --narration: rgba(255, 255, 255, 0.45);
-  --paper: rgba(238, 228, 210, 0.96);
-  --paper-text: #2a2218;
-  --paper-mark-you: #6e5b3a;
-  --paper-mark-him: #8a7245;
-  --paper-italic: #75603e;
-  --ease-drift: cubic-bezier(0.4, 0, 0.2, 1);
+  --text: rgba(255, 245, 230, 0.95);
+  --text-soft: rgba(255, 235, 210, 0.7);
+  --text-faint: rgba(255, 235, 210, 0.45);
+  --warm: rgba(255, 200, 130, 0.9);
+  --ease-soft: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-paper: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-drift: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 
 html, body {
-  margin: 0;
-  padding: 0;
-  width: 100%;
-  height: 100%;
+  margin: 0; padding: 0;
+  width: 100%; height: 100%;
   background: #000;
-  color: #fff;
-  font-family: var(--sans);
+  color: var(--text);
+  font-family: var(--serif);
   overflow: hidden;
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
+  touch-action: none;
   cursor: default;
   overscroll-behavior: none;
 }
 
-.edge-zone, .opening-glow, .run-anchor, .anchor, .journal, .journal * {
-  -webkit-touch-callout: none;
-  -webkit-user-select: none;
-  user-select: none;
-}
-.edge-zone, .opening-glow, .run-anchor, .anchor {
-  touch-action: none;
-}
-
-#orientation-gate {
-  position: fixed; inset: 0; z-index: 9999;
-  background: #0c0814;
-  color: rgba(255,235,210,0.65);
-  display: flex;
-  align-items: center; justify-content: center;
-  text-align: center;
-  padding: 0 12vw;
-  line-height: 1.8;
-  font-family: var(--serif); font-size: 16px; letter-spacing: 0.16em;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.55s var(--ease-drift);
-}
-#orientation-gate.visible {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-/* ----------------------------- stage ----------------------------- */
-
 .stage {
   position: relative;
   width: 100vw;
-  height: 100vh; /* fallback */
+  height: 100vh;
   height: 100dvh;
   overflow: hidden;
   background: var(--bg);
 }
 
-.stage-bg {
+/* ============== screen stack ============== */
+/* 后景 host：场景·后景（角色之下）。bg + 单体均挂这里。 */
+.screen-host {
   position: absolute; inset: 0;
-  background: var(--bg-current);
-  transition: background 1.6s var(--ease-drift);
+  z-index: 1;
 }
-.stage-bg::after {
-  content: '';
+
+/* 前景 host：场景·前景（角色之上）。镜像 .screen-host 的 .screen 节点结构，
+   随后景同步过场。当前所有素材按后景使用，前景为预留扩展位。
+   z-index 3 与 character/atmo-emotion 同级，靠 DOM 顺序保证排在角色之上、
+   主导特效·前与 emotion 之下。 */
+.screen-host-front {
   position: absolute; inset: 0;
-  background: radial-gradient(ellipse at 50% 60%, rgba(0,0,0,0) 35%, rgba(0,0,0,0.45) 100%);
+  z-index: 3;
   pointer-events: none;
 }
 
-/* ----------------------------- scene-bg (masked image fragments) ----------------------------- */
-
-@property --r {
-  syntax: '<number>';
-  initial-value: 0.1;
-  inherits: false;
-}
-@property --feather {
-  syntax: '<number>';
-  initial-value: 0.15;
-  inherits: false;
-}
-@property --x {
-  syntax: '<number>';
-  initial-value: 0.5;
-  inherits: false;
-}
-@property --y {
-  syntax: '<number>';
-  initial-value: 0.5;
-  inherits: false;
-}
-@property --spot-opacity {
-  syntax: '<number>';
-  initial-value: 1;
-  inherits: false;
-}
-
-.scene-bg {
+.screen {
   position: absolute; inset: 0;
-  z-index: 0;
   pointer-events: none;
-  overflow: hidden;
+  transform: translateY(0);
+  opacity: 1;
+  clip-path: inset(0 0 0 0);
+  transition:
+    transform 600ms var(--ease-paper),
+    opacity 600ms var(--ease-soft),
+    clip-path 700ms var(--ease-soft);
 }
 
-.scene-spot {
+/* 首屏起伏入场 —— 旧路径，仅 mountFirstScreen 使用。 */
+.screen.entering {
+  transform: translateY(100%);
+  opacity: 0.6;
+}
+
+/* 换图入场：自身不位移，clip-path 从「整屏顶部裁掉」收到「不裁」，
+   视觉上是从下向上逐渐揭示。配合涟漪掠过的 ~2s 视觉覆盖，转场轻一些。 */
+.screen.entering-wipe {
+  transform: translateY(0);
+  opacity: 1;
+  clip-path: inset(100% 0 0 0);
+}
+
+.screen.active {
+  transform: translateY(0);
+  opacity: 1;
+  clip-path: inset(0 0 0 0);
+  pointer-events: auto;
+}
+
+/* 旧路径：上滑式离场（首屏被替换时用）。 */
+.screen.leaving {
+  transform: translateY(-100%);
+  opacity: 0;
+}
+
+/* 换图离场：原地渐隐，不再向上滑走。 */
+.screen.leaving-fade {
+  transform: translateY(0);
+  opacity: 0;
+  clip-path: inset(0 0 0 0);
+}
+
+/* 屏内背景（场景图/纯色） */
+.screen-bg {
   position: absolute; inset: 0;
-  background-image: var(--scene-img, none);
+  background-color: #000;
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  opacity: 0;
-  transform: scale(1);
   transition:
-    opacity 1100ms var(--ease-drift),
-    -webkit-mask-image 700ms var(--ease-drift),
-    mask-image 700ms var(--ease-drift),
-    transform 700ms var(--ease-drift),
-    --r 700ms var(--ease-drift),
-    --feather 700ms var(--ease-drift),
-    --x 700ms var(--ease-drift),
-    --y 700ms var(--ease-drift),
-    --spot-opacity 1100ms var(--ease-drift);
-  will-change: opacity, mask-image, transform;
-}
-.scene-spot.entering { opacity: 0; transform: scale(0.92); }
-.scene-spot.shown    { opacity: var(--spot-opacity, 1); transform: scale(1); animation: sceneBreath 7.5s ease-in-out infinite; }
-.scene-spot.leaving  { opacity: 0; transform: scale(0.96); transition: opacity 800ms var(--ease-drift), transform 800ms var(--ease-drift); animation: none; }
-
-@keyframes sceneBreath {
-  0%, 100% { filter: brightness(1) saturate(1); }
-  50%      { filter: brightness(1.04) saturate(1.05); }
+    opacity 800ms var(--ease-soft),
+    filter 800ms var(--ease-soft),
+    background-color 1.2s var(--ease-soft),
+    -webkit-mask-image 900ms var(--ease-soft),
+    mask-image 900ms var(--ease-soft);
+  z-index: 0;
 }
 
-/* spot kind: band (linear gradient mask) */
-/* params via custom props: --amount (0..1), --feather (0..1), --side (top|bottom|left|right) */
-.scene-spot.kind-band-bottom {
-  -webkit-mask-image: linear-gradient(to top,
-    #000 0%,
-    #000 calc(var(--amount, 0.3) * 100%),
-    transparent calc((var(--amount, 0.3) + var(--feather, 0.35)) * 100%));
-  mask-image: linear-gradient(to top,
-    #000 0%,
-    #000 calc(var(--amount, 0.3) * 100%),
-    transparent calc((var(--amount, 0.3) + var(--feather, 0.35)) * 100%));
-}
-.scene-spot.kind-band-top {
-  -webkit-mask-image: linear-gradient(to bottom,
-    #000 0%,
-    #000 calc(var(--amount, 0.3) * 100%),
-    transparent calc((var(--amount, 0.3) + var(--feather, 0.35)) * 100%));
-  mask-image: linear-gradient(to bottom,
-    #000 0%,
-    #000 calc(var(--amount, 0.3) * 100%),
-    transparent calc((var(--amount, 0.3) + var(--feather, 0.35)) * 100%));
-}
-.scene-spot.kind-band-left {
-  -webkit-mask-image: linear-gradient(to right,
-    #000 0%,
-    #000 calc(var(--amount, 0.3) * 100%),
-    transparent calc((var(--amount, 0.3) + var(--feather, 0.35)) * 100%));
-  mask-image: linear-gradient(to right,
-    #000 0%,
-    #000 calc(var(--amount, 0.3) * 100%),
-    transparent calc((var(--amount, 0.3) + var(--feather, 0.35)) * 100%));
-}
-.scene-spot.kind-band-right {
-  -webkit-mask-image: linear-gradient(to left,
-    #000 0%,
-    #000 calc(var(--amount, 0.3) * 100%),
-    transparent calc((var(--amount, 0.3) + var(--feather, 0.35)) * 100%));
-  mask-image: linear-gradient(to left,
-    #000 0%,
-    #000 calc(var(--amount, 0.3) * 100%),
-    transparent calc((var(--amount, 0.3) + var(--feather, 0.35)) * 100%));
-}
-
-/* spot kind: spot (radial gradient mask, sized in vmin so r/feather are
-   fractions of the smaller viewport dimension, not the gradient's
-   farthest-corner extent which would balloon spots into half-screen reveals) */
-/* params: --x (0..1), --y (0..1), --r (0..1, core radius in vmin), --feather (0..1, fade extent in vmin) */
-.scene-spot.kind-spot {
-  -webkit-mask-image: radial-gradient(circle at calc(var(--x, 0.5) * 100%) calc(var(--y, 0.5) * 100%),
-    #000 0,
-    #000 calc(var(--r, 0.1) * 100vmin),
-    transparent calc((var(--r, 0.1) + var(--feather, 0.15)) * 100vmin));
-  mask-image: radial-gradient(circle at calc(var(--x, 0.5) * 100%) calc(var(--y, 0.5) * 100%),
-    #000 0,
-    #000 calc(var(--r, 0.1) * 100vmin),
-    transparent calc((var(--r, 0.1) + var(--feather, 0.15)) * 100vmin));
-}
-
-/* spot kind: wedge (diagonal sliver from a corner) */
-/* params: --angle (deg), --amount (0..1), --feather (0..1) */
-.scene-spot.kind-wedge {
-  -webkit-mask-image: linear-gradient(var(--angle, 135deg),
-    #000 0%,
-    #000 calc(var(--amount, 0.35) * 100%),
-    transparent calc((var(--amount, 0.35) + var(--feather, 0.3)) * 100%));
-  mask-image: linear-gradient(var(--angle, 135deg),
-    #000 0%,
-    #000 calc(var(--amount, 0.35) * 100%),
-    transparent calc((var(--amount, 0.35) + var(--feather, 0.3)) * 100%));
-}
-
-/* spot kind: stripe-h (horizontal thin line of reveal at given --y) */
-/* params: --y (0..1, center), --thickness (0..1, half-width), --feather (0..1) */
-.scene-spot.kind-stripe-h {
-  -webkit-mask-image: linear-gradient(to bottom,
-    transparent calc((var(--y, 0.5) - var(--thickness, 0.04) - var(--feather, 0.05)) * 100%),
-    #000 calc(var(--y, 0.5) * 100%),
-    transparent calc((var(--y, 0.5) + var(--thickness, 0.04) + var(--feather, 0.05)) * 100%));
-  mask-image: linear-gradient(to bottom,
-    transparent calc((var(--y, 0.5) - var(--thickness, 0.04) - var(--feather, 0.05)) * 100%),
-    #000 calc(var(--y, 0.5) * 100%),
-    transparent calc((var(--y, 0.5) + var(--thickness, 0.04) + var(--feather, 0.05)) * 100%));
-}
-
-/* spot kind: stripe-v (vertical thin line of reveal at given --x) */
-.scene-spot.kind-stripe-v {
-  -webkit-mask-image: linear-gradient(to right,
-    transparent calc((var(--x, 0.5) - var(--thickness, 0.04) - var(--feather, 0.05)) * 100%),
-    #000 calc(var(--x, 0.5) * 100%),
-    transparent calc((var(--x, 0.5) + var(--thickness, 0.04) + var(--feather, 0.05)) * 100%));
-  mask-image: linear-gradient(to right,
-    transparent calc((var(--x, 0.5) - var(--thickness, 0.04) - var(--feather, 0.05)) * 100%),
-    #000 calc(var(--x, 0.5) * 100%),
-    transparent calc((var(--x, 0.5) + var(--thickness, 0.04) + var(--feather, 0.05)) * 100%));
-}
-
-/* spot kind: full (whole image with edge feather to black) */
-/* params: --feather (0..1) — width of edge fade */
-.scene-spot.kind-full {
-  -webkit-mask-image: radial-gradient(ellipse at 50% 50%,
-    #000 0%,
-    #000 calc((1 - var(--feather, 0.25)) * 100%),
-    transparent 100%);
-  mask-image: radial-gradient(ellipse at 50% 50%,
-    #000 0%,
-    #000 calc((1 - var(--feather, 0.25)) * 100%),
-    transparent 100%);
-}
-
-/* ----------------------------- character (free positioning) ----------------------------- */
-
-.character-layer {
-  position: absolute;
-  inset: 0;
+.screen-bg::after {
+  content: '';
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse at center, rgba(0,0,0,0) 40%, rgba(0,0,0,0.55) 100%),
+    linear-gradient(to bottom, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0) 30%, rgba(0,0,0,0) 65%, rgba(0,0,0,0.65) 100%);
   pointer-events: none;
 }
+
+/* 整图露出局部：用 mask-image 控制可见区域。变量由 screen.js 注入。
+   --reveal-mask 缺省时不应用 mask（整图全显，受 ::after 渐暗）。 */
+.screen-bg.revealed {
+  -webkit-mask-image: var(--reveal-mask);
+  mask-image: var(--reveal-mask);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-mode: alpha;
+  mask-mode: alpha;
+}
+
+/* 整图露出时压制旧的 ::after 通用 vignette，避免与 reveal 软边叠成"双层暗"。
+   留白由 mask 外的极暗底承担，inside 区域不再叠加 vignette。 */
+.screen-bg.revealed::after { opacity: 0; }
+
+/* 场景层 · 单体槽：在 .screen 内、.screen-bg 之上。
+   每个 .scene-el 是一张 PNG 切图，由 screen.js 创建/移除。 */
+.scene-el-layer {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.scene-el {
+  position: absolute;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 700ms var(--ease-soft), transform 700ms var(--ease-soft);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+.scene-el.shown { opacity: 1; }
+
+/* ============== atmosphere layers (env / emotion) ============== */
+.atmo-env {
+  position: absolute; inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0;
+  background-color: transparent;
+  mix-blend-mode: multiply;
+  transition: opacity 1000ms var(--ease-soft), background-color 1000ms var(--ease-soft);
+}
+.atmo-env.active { opacity: 1; }
+
+/* env 的 vignette 用 ::after 叠在自身之上，不染场景而是再加一层暗角。
+   --vignette-strength 由 atmo.js 注入（0-1）。 */
+.atmo-env::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(0,0,0,0) 50%,
+    rgba(0,0,0, var(--vignette-strength, 0)) 100%
+  );
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  transition: background 800ms var(--ease-soft);
+}
+
+.atmo-emotion {
+  position: absolute; inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0;
+  background-color: transparent;
+  mix-blend-mode: multiply;
+  transition: opacity 600ms var(--ease-soft), background-color 600ms var(--ease-soft);
+}
+.atmo-emotion.active { opacity: 1; }
+
+.atmo-emotion::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(0,0,0,0) 50%,
+    rgba(0,0,0, var(--vignette-strength, 0)) 100%
+  );
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  transition: background 600ms var(--ease-soft);
+}
+
+/* ============== character ============== */
+.character-layer {
+  position: absolute; inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+/* v1 容器结构：100vh × 100vh 见方的"画框"，水平居中（left=calc(50vw-50vh)）。
+   transform-origin 50% 20%（肩部锚点）让 scale 缩放以肩/胸为支点，
+   远→近过渡时人物自然往画面下方推。各档位用 top（默认 5vh）+ translateY 偏移
+   + scale 配合，数值跟 v1 script 里的 char-pos 一一对应。 */
 .character {
   position: absolute;
-  /* 竖屏:立绘按 100vh 见方等比缩放,水平居中。
-     transform-origin 在 50% 20%(约肩部),使景别缩放以肩/胸为锚点。
-     far→mid→close 通过 top+scale 配合实现景别推移。 */
-  left: var(--char-x, calc(50vw - 50vh));
-  top: var(--char-y, 5vh);
-  width: var(--char-w, 100vh);
-  height: var(--char-h, 100vh);
+  left: calc(50vw - 50vh);
+  top: 5vh;
+  width: 100vh;
+  height: 100vh;
+  pointer-events: none;
+  transition: transform 700ms var(--ease-soft), opacity 700ms var(--ease-soft), filter 700ms var(--ease-soft);
   opacity: 0;
-  transform: translateX(40px) scale(var(--char-scale, 1));
   transform-origin: 50% 20%;
-  transition:
-    opacity 1.4s var(--ease-drift),
-    transform 1.4s var(--ease-drift),
-    left 1.6s var(--ease-drift),
-    top 1.6s var(--ease-drift),
-    width 1.6s var(--ease-drift),
-    height 1.6s var(--ease-drift),
-    filter 1.4s var(--ease-drift);
-  filter: drop-shadow(0 0 32px rgba(120,100,180,0.18)) brightness(var(--char-brightness, 1));
-  overflow: visible;
 }
-.character.visible {
-  opacity: var(--char-opacity, 1);
-  transform: translateX(0) scale(var(--char-scale, 1));
+
+.character.visible { opacity: 1; }
+
+/* 摸摸阶段 pet.js 加 .pettable，让立绘临时可接收 pointer 事件。
+   注意 .char-img 仍是 pointer-events: none —— img 不收事件，让事件落到
+   .character 容器上，避免图片之外的透明区域漏判。 */
+.character.pettable { pointer-events: auto; }
+
+.character[data-pos="far"]      { transform: scale(0.35);                   filter: brightness(0.4) blur(1px); }
+.character[data-pos="far-lit"]  { transform: scale(0.36);                   filter: brightness(0.65); }
+.character[data-pos="mid"]      { transform: scale(0.65);                   filter: brightness(1); }
+.character[data-pos="mid-back"] { transform: translateY(5vh)  scale(0.50);  filter: brightness(0.85); }
+.character[data-pos="close"]    { transform: translateY(30vh) scale(1.05);  filter: brightness(1); }
+.character[data-pos="extreme"]  { transform: translateY(35vh) scale(1.15);  filter: brightness(1); }
+.character[data-pos="hidden"]   { opacity: 0; transform: scale(0.5); }
+.character[data-pos="curled"]   { transform: translateY(30vh) scale(0.55);  filter: brightness(0.85); }
+.character[data-pos="walking-away"] {
+  transform: scale(0.65) scaleX(-1);
+  filter: brightness(0.9);
 }
+
+.character[data-pose="tilt"] .char-fig    { transform: rotate(-3deg) translateY(-2px); }
+.character[data-pose="lean-in"] .char-fig { transform: translateY(2vh) scale(1.04); }
+.character[data-pose="step-back"] .char-fig { transform: translateY(-1vh) scale(0.96); }
+.character[data-pose="attack"] .char-fig  { transform: translateY(2vh) scale(1.08) rotate(-2deg); }
+.character[data-pose="cold"] .char-fig    { filter: brightness(0.9) saturate(0.7); }
+.character[data-pose="closed-eye"] .char-fig { filter: brightness(0.85); }
+.character[data-pose="fake-smile"] .char-fig { filter: brightness(0.85) hue-rotate(-10deg); transform: translateY(1vh) scale(1.03); }
+
+/* 摸摸 4 阶 pose（场 7）—— 立绘差分肉眼难辨，靠 filter ramp 撑递进 */
+.character[data-pose="tense"]     .char-fig { filter: brightness(0.95) saturate(0.95); }
+.character[data-pose="relaxing"]  .char-fig { filter: brightness(1.00) saturate(1.05); }
+.character[data-pose="squint"]    .char-fig { filter: brightness(1.05) saturate(1.15) hue-rotate(-5deg); transform: translateY(-0.5vh); }
+.character[data-pose="tail-curl"] .char-fig { filter: brightness(1.10) saturate(1.20) hue-rotate(-8deg); transform: translateY(-1vh) scale(1.02); }
+
 .char-fig {
   width: 100%;
   height: 100%;
-  transform-origin: 50% 100%;
-  transition: transform 0.7s var(--ease-drift);
+  transition: transform 600ms var(--ease-soft), filter 600ms var(--ease-soft);
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
 }
+
 .char-img {
   width: 100%;
   height: 100%;
   object-fit: contain;
   object-position: center bottom;
-  display: block;
   user-select: none;
   -webkit-user-drag: none;
   pointer-events: none;
-  animation: charBreath 4.6s ease-in-out infinite;
-  transform-origin: 50% 100%;
-}
-@keyframes charBreath {
-  0%,100% { transform: scale(1.0) translateY(0); }
-  50%     { transform: scale(1.008) translateY(-2px); }
 }
 
-.pose-tilt .char-fig { transform: rotate(-3deg); transform-origin: 50% 18%; }
-.pose-step-back .character { transform: translateX(40px) scale(calc(var(--char-scale, 1) * 0.95)); }
-.pose-lean-in .character { transform: translateX(-40px) scale(calc(var(--char-scale, 1) * 1.08)); }
-.pose-crouch .char-fig { transform: translateY(40px) scaleY(0.86); }
-.pose-crouch-eye .char-fig { transform: translateY(50px) scaleY(0.82); }
-.pose-turn-back .char-fig { transform: scaleX(-1); }
-.pose-attack .char-fig { transform: translateX(-8px) rotate(-2deg) scale(1.04); }
-.pose-eat .char-fig { transform: translateY(50px) scaleY(0.78) translateX(-6px); }
-
-.char-flash { animation: charFlash 0.5s ease-out; }
-@keyframes charFlash {
-  0%   { filter: drop-shadow(0 0 32px rgba(120,100,180,0.18)) brightness(var(--char-brightness, 1)); }
-  40%  { filter: drop-shadow(0 0 64px rgba(255,240,210,0.55)) brightness(1.3); }
-  100% { filter: drop-shadow(0 0 32px rgba(120,100,180,0.18)) brightness(var(--char-brightness, 1)); }
-}
-
-.character.petable {
-  pointer-events: auto;
-  cursor: pointer;
-  animation: petHint 2.4s ease-in-out infinite;
-}
-@keyframes petHint {
-  0%,100% { filter: drop-shadow(0 0 32px rgba(120,100,180,0.18)) brightness(var(--char-brightness, 1)); }
-  50%     { filter: drop-shadow(0 0 48px rgba(255,200,160,0.35)) brightness(calc(var(--char-brightness, 1) * 1.08)); }
-}
-
-/* ----------------------------- art layer ----------------------------- */
-
-.art-layer { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
-.art-element {
-  position: absolute;
-  opacity: 0;
-  animation: artFadeIn 1.6s var(--ease-drift) forwards, artFloat 7s ease-in-out infinite;
-}
-.art-element.removing { animation: artFadeOut 1.4s var(--ease-drift) forwards; }
-@keyframes artFadeIn {
-  from { opacity: 0; transform: translateY(8px) scale(0.92); }
-  to   { opacity: var(--art-opacity, 0.7); transform: translateY(0) scale(1); }
-}
-@keyframes artFadeOut { to { opacity: 0; transform: translateY(-6px); } }
-@keyframes artFloat {
-  0%,100% { translate: 0 0; }
-  50%     { translate: 0 -10px; }
-}
-.art-element.leaf svg { width: 28px; height: 28px; }
-.art-element.lightpoint svg { width: 14px; height: 14px; }
-.art-element.flame svg { width: 24px; height: 32px; }
-.art-element.water svg { width: 18px; height: 18px; }
-.art-element.thread svg { width: 60px; height: 6px; }
-.art-element.flower svg { width: 16px; height: 16px; }
-.art-element.branch svg { width: 70px; height: 70px; }
-
-/* ----------------------------- past anchor (top-left) ----------------------------- */
-
-.anchor {
-  position: absolute;
-  top: 22px; left: 26px;
-  width: 22px; height: 22px;
-  z-index: 11;
-  cursor: pointer;
-  pointer-events: auto;
-}
-.anchor::before {
-  content: '';
+/* ============== fx layers ============== */
+/* 主导特效·后：角色之后的常驻粒子/光柱。z 2 与 atmo-env 同级，DOM 顺序
+   保证排在 env 之上、character 之下。 */
+.fx-dominant-back {
   position: absolute; inset: 0;
-  background: radial-gradient(circle at 50% 50%, rgba(255,225,200,0.75) 0%, rgba(255,225,200,0.0) 70%);
-  border-radius: 50%;
-  animation: anchorBreath 5s ease-in-out infinite;
-}
-.anchor::after {
-  content: '';
-  position: absolute;
-  left: 7px; top: 7px;
-  width: 8px; height: 8px;
-  background: rgba(255,225,200,0.6);
-  border-radius: 50%;
-  filter: blur(0.4px);
-}
-@keyframes anchorBreath {
-  0%,100% { opacity: 0.4;  transform: scale(0.95); }
-  50%     { opacity: 0.85; transform: scale(1.1); }
-}
-.anchor.attention::before {
-  animation: anchorAttn 1.6s ease-in-out 3;
-}
-@keyframes anchorAttn {
-  0%,100% { opacity: 0.45; transform: scale(0.95); }
-  50%     { opacity: 1;    transform: scale(1.6); }
+  z-index: 2;
+  pointer-events: none;
+  overflow: hidden;
 }
 
-/* ----------------------------- 软幕 · 边缘弧 -----------------------------
-   .edge-zone: 触控热区 (下 1/3 屏)
-   .edge-arc-host: 可见弧的容器 (底部, 长按时缩放展开)
-   ---------------------------------------------------------------- */
+/* 主导特效·前：角色之前的常驻粒子。z 3 与 character/screen-host-front 同级，
+   DOM 顺序保证排在 scene-front 之上、emotion 之下。
+   ★ 与 .fx-dominant-back 二选一，任意时刻只允许一种主导特效在屏。 */
+.fx-dominant-front {
+  position: absolute; inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* 特效·伴随层：屏震/白闪/雾/灯笼/纸扎人等瞬时或开关型覆盖。
+   z 9 与 .heavy-zone 同级，DOM 顺序保证盖在所有文字之上、edge-zone 之下。 */
+.fx-burst-layer {
+  position: absolute; inset: 0;
+  z-index: 9;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.fx-canvas {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+}
+
+.fx-overlay {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  transition: opacity 800ms var(--ease-soft), background-color 800ms var(--ease-soft);
+}
+
+@keyframes screen-shake {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-4px, 2px); }
+  40% { transform: translate(3px, -2px); }
+  60% { transform: translate(-2px, 3px); }
+  80% { transform: translate(2px, -1px); }
+}
+.stage.shaking { animation: screen-shake 400ms ease-in-out; }
+
+.flash-veil {
+  position: absolute; inset: 0;
+  background: white;
+  z-index: 9;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms ease-out;
+}
+.flash-veil.on { opacity: 0.9; transition: opacity 80ms ease-in; }
+
+/* 语音发送后的边缘亮边——气泡谢幕之后单脉冲，向外传送的余韵 */
+.edge-flash-veil {
+  position: absolute; inset: 0;
+  z-index: 9;
+  pointer-events: none;
+  opacity: 0;
+  box-shadow:
+    inset 0 0 40px 4px rgba(255, 215, 165, 0.50),
+    inset 0 0 90px 20px rgba(255, 215, 165, 0.22);
+}
+.edge-flash-veil.on {
+  animation: edge-flash-pulse 1500ms cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+}
+@keyframes edge-flash-pulse {
+  0%   { opacity: 0; }
+  18%  { opacity: 1; }
+  42%  { opacity: 0.9; }
+  100% { opacity: 0; }
+}
+
+.fog-overlay {
+  position: absolute; inset: 0;
+  background: radial-gradient(circle at 50% 60%, rgba(220, 215, 210, 0) 20%, rgba(180, 175, 170, 0.7) 80%);
+  opacity: 0;
+  z-index: 6;
+  pointer-events: none;
+  transition: opacity 1.5s var(--ease-soft);
+}
+.fog-overlay.on { opacity: 1; }
+
+.lantern-overlay {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(circle at 20% 30%, rgba(220, 50, 50, 0.4) 0%, transparent 12%),
+    radial-gradient(circle at 78% 35%, rgba(200, 40, 40, 0.35) 0%, transparent 14%),
+    radial-gradient(circle at 50% 25%, rgba(230, 70, 70, 0.45) 0%, transparent 10%);
+  opacity: 0;
+  z-index: 5;
+  pointer-events: none;
+  transition: opacity 1.2s var(--ease-soft);
+  animation: lantern-flicker 3s ease-in-out infinite;
+}
+.lantern-overlay.on { opacity: 1; }
+@keyframes lantern-flicker {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(0.85); }
+}
+
+.nail-people {
+  position: absolute;
+  left: 0; right: 0;
+  bottom: 8vh;
+  height: 30vh;
+  z-index: 5;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 1s var(--ease-soft);
+}
+.nail-people.on { opacity: 1; }
+.nail-people .figure {
+  position: absolute;
+  bottom: 0;
+  width: 8vw;
+  height: 22vh;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.85) 30%, rgba(0,0,0,0.95) 100%);
+  clip-path: polygon(40% 0, 60% 0, 70% 35%, 70% 100%, 30% 100%, 30% 35%);
+  animation: nail-twitch 2.4s ease-in-out infinite;
+}
+.nail-people .figure::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 30%; right: 30%; height: 18%;
+  background: rgba(255, 245, 230, 0.7);
+  border-radius: 50%;
+  background-image:
+    radial-gradient(circle at 35% 45%, #000 0, #000 8%, transparent 9%),
+    radial-gradient(circle at 65% 45%, #000 0, #000 8%, transparent 9%),
+    linear-gradient(to right, transparent 30%, #000 30%, #000 70%, transparent 70%);
+  background-position: 0 0, 0 0, 0 80%;
+  background-size: 100% 100%, 100% 100%, 100% 8%;
+  background-repeat: no-repeat;
+}
+@keyframes nail-twitch {
+  0%, 100% { transform: rotate(-2deg) scaleY(1); }
+  20% { transform: rotate(3deg) scaleY(1.02); }
+  40% { transform: rotate(-1deg) scaleY(0.98); }
+  60% { transform: rotate(2deg) scaleY(1.01); }
+  80% { transform: rotate(-3deg) scaleY(0.99); }
+}
+
+/* ============================================================
+   软幕 · 边缘弧 (从 v1 移植)
+   .edge-zone: 触控热区
+   .edge-arc-host: 可见弧（呼吸 / 录音 / 派送 多状态）
+   ============================================================ */
+
+.edge-zone, .opening-glow {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: none;
+}
 
 .edge-zone {
   position: absolute;
-  inset: auto 0 0 0;
+  left: 0; right: 0;
+  bottom: 0;
   width: 100vw;
-  height: 33vh;
-  min-height: 200px;
+  height: 36vh;
+  min-height: 220px;
   z-index: 10;
   cursor: pointer;
-  touch-action: none;
 }
+.edge-zone[hidden] { display: none !important; }
+
 .edge-arc-host {
   position: absolute;
   pointer-events: none;
@@ -448,32 +491,28 @@ html, body {
   opacity: 0;
   transition: opacity 0.8s var(--ease-drift);
 }
-.edge-ripple {
-  opacity: 0;
-}
+.edge-ripple { opacity: 0; }
 
-/* 底部输入区暗罩 — 与立绘/场景做区隔
-   linear-gradient 从底向上由暗到透;状态驱动 opacity */
+/* 底部暗罩 — state 驱动 opacity */
 .edge-veil {
   position: absolute;
   left: 0; right: 0; bottom: 0;
   height: 100vh;
   pointer-events: none;
   background: linear-gradient(to top,
-    rgba(0, 0, 0, 0.95) 0%,
+    rgba(0, 0, 0, 0.92) 0%,
     rgba(0, 0, 0, 0) 70%);
   opacity: 0;
   transition: opacity 1s var(--ease-drift);
 }
-.edge-zone.state-invitation .edge-veil { opacity: 0.75; }
-.edge-zone.state-input      .edge-veil { opacity: 0.75; }
+.edge-zone.state-invitation .edge-veil { opacity: 0.7; }
 .edge-zone.state-recording  .edge-veil { opacity: 1; }
-.edge-zone.state-delivering .edge-veil { opacity: 0.75; }
+.edge-zone.state-delivering .edge-veil { opacity: 0.7; }
 
-/* state-idle — invisible, peripheral */
+/* state-idle */
 .edge-zone.state-idle .edge-arc-main { opacity: 0; }
 
-/* state-invitation — 整体缩放呼吸 + 同步明暗发光 */
+/* state-invitation — 呼吸 */
 .edge-zone.state-invitation .edge-arc-main {
   opacity: 1;
   stroke: rgba(255,240,215,0.95);
@@ -495,7 +534,7 @@ html, body {
   }
 }
 
-/* state-recording — 弧整体放大,因 origin 在右侧,视觉上向画内"扩张"出来 */
+/* state-recording — 弧扩张 + 涟漪 */
 .edge-zone.state-recording .edge-arc-main {
   opacity: 1;
   stroke: rgba(255,250,225,1);
@@ -514,127 +553,30 @@ html, body {
   100% { opacity: 0; transform: translateY(-22vh); }
 }
 
-/* state-delivering — fade out fast, host snaps back */
+/* state-delivering — fade out */
 .edge-zone.state-delivering .edge-arc-main {
   opacity: 0;
   transition: opacity 0.6s ease-out;
 }
 
-/* state-thinking, state-responding — gone, stage belongs to her */
-.edge-zone.state-thinking .edge-arc-main,
-.edge-zone.state-responding .edge-arc-main {
-  opacity: 0;
-}
-
-/* state-input (打字态) — 弧线被键盘抬到 26vh, 形态由 JS 切到直线 path,
-   stroke 跟 invitation 同色但变细, 视觉上是"准备承接文字"的状态. */
-.edge-zone.state-input .edge-arc-host {
-  bottom: 26vh;
-  transform: scale(1);
-  transition: bottom 0.55s var(--ease-drift), transform 0.35s var(--ease-drift);
-}
-.edge-zone.state-input .edge-arc-main,
-.edge-zone.state-settled .edge-arc-main {
-  opacity: 1;
-  stroke: rgba(255,240,215,0.95);
-  stroke-width: 2.2;
-  filter: drop-shadow(0 0 12px rgba(255,235,200,0.65));
-  transition: opacity 0.5s var(--ease-drift), stroke 0.5s, stroke-width 0.5s;
-}
-.edge-zone.state-input .edge-svg,
-.edge-zone.state-settled .edge-svg { animation: none; }
-
-/* state-settled (落回态) — 用户输入完成但还没送出, 直线落回 12vh,
-   文字停留在 type-area 里, 等用户送出或重新唤起键盘. */
-.edge-zone.state-settled .edge-arc-host {
-  bottom: 12vh;
-  transform: scale(1);
-  transition: bottom 0.5s var(--ease-drift), transform 0.35s var(--ease-drift);
-}
-
-/* ---- 行动模式:弧线+遮罩→红色系 ---- */
-.edge-zone.mode-action .edge-veil {
-  background: linear-gradient(to top,
-    rgba(80, 10, 10, 0.92) 0%,
-    rgba(80, 10, 10, 0) 70%);
-}
-.edge-zone.mode-action .edge-arc-main {
-  stroke: rgba(255,120,110,0.95);
-}
-.edge-zone.mode-action .edge-ripple {
-  stroke: rgba(255,130,120,0.85);
-}
-.edge-zone.mode-action.state-invitation .edge-arc-main {
-  stroke: rgba(255,120,110,0.95);
-}
-.edge-zone.mode-action.state-invitation .edge-svg {
-  animation-name: edgeBreathAction;
-}
-@keyframes edgeBreathAction {
-  0%, 100% {
-    transform: scale(0.88);
-    opacity: 0.45;
-    filter: drop-shadow(0 0 6px rgba(255,80,70,0.2));
-  }
-  50% {
-    transform: scale(1.22);
-    opacity: 1;
-    filter: drop-shadow(0 0 32px rgba(255,90,80,0.9));
-  }
-}
-.edge-zone.mode-action.state-recording .edge-arc-main {
-  stroke: rgba(255,140,130,1);
-  stroke-width: 3.2;
-  filter: drop-shadow(0 0 36px rgba(255,80,70,1));
-}
-.edge-zone.mode-action.state-input .edge-arc-main,
-.edge-zone.mode-action.state-settled .edge-arc-main {
-  stroke: rgba(255,140,130,0.95);
-  filter: drop-shadow(0 0 10px rgba(255,90,80,0.5));
-}
-
-/* ---- 弧线指引标签 (前4次输入时显示) ---- */
-.arc-guide {
+/* ---- 弧下方居中操作提示（前 2 次出现） ---- */
+.arc-hint {
   position: absolute;
   z-index: 11;
+  left: 0; right: 0;
+  bottom: 9vh;
+  text-align: center;
   font-family: var(--sans);
   font-size: 13px;
   letter-spacing: 0.1em;
-  pointer-events: none;
   white-space: nowrap;
+  pointer-events: none;
   opacity: 0;
   transition: opacity 0.5s var(--ease-drift);
   color: rgba(255,235,210,0.9);
   text-shadow: 0 0 12px rgba(255,225,200,0.4);
 }
-.arc-guide-left {
-  left: 8%;
-  top: calc(12vh - 2px);
-  text-align: left;
-}
-.arc-guide-right {
-  right: 8%;
-  top: calc(12vh - 2px);
-  text-align: right;
-}
-.arc-guide-center {
-  left: 50%;
-  transform: translateX(-50%);
-  top: calc(12vh + 18px);
-  text-align: center;
-  font-size: 14px;
-  opacity: 0;
-}
-.guide-text { display: none; }
-.guide-normal { display: inline; }
-.guide-action { display: none; }
-.guide-center-text {
-  display: none;
-  letter-spacing: 0.15em;
-}
-
-.edge-zone.arc-guide-active.state-invitation .arc-guide-left,
-.edge-zone.arc-guide-active.state-invitation .arc-guide-right {
+.edge-zone.arc-hint-active.state-invitation .arc-hint {
   opacity: 0.85;
   animation: guideBreath 4.2s ease-in-out infinite;
 }
@@ -643,113 +585,206 @@ html, body {
   50% { opacity: 0.9; }
 }
 
-/* Center "输入行动" guide: only shown during first action-mode invitation */
-.edge-zone.arc-guide-active.mode-action.state-invitation .arc-guide-center {
-  opacity: 0.85;
-  animation: guideBreath 4.2s ease-in-out infinite;
-}
-.edge-zone.arc-guide-active.mode-action.state-invitation .arc-guide-left,
-.edge-zone.arc-guide-active.mode-action.state-invitation .arc-guide-right {
+/* ---- 引导文字（对话提示） ----
+   两种渲染：
+   - 数组（多方向提示）：子元素 .edge-prompt-line 在容器锚点处持续上飘，
+     循环淡入淡出；不加括号。目的是让用户感知"方向不止一种、可自由输入"。
+   - 单字符串（向后兼容）：.edge-prompt-static 静态居中，括号包裹。
+   按下圆弧进入 recording / delivering 时整体淡出，让位给充能视觉。 */
+.edge-prompt {
+  position: absolute;
+  left: 0; right: 0;
+  bottom: calc(12vh + 14vh + 14px);
+  height: 0; /* 锚点容器，子元素以 bottom:0 为基线 */
+  pointer-events: none;
   opacity: 0;
-  animation: none;
+  transition: opacity 0.5s var(--ease-drift);
 }
-.edge-zone.arc-guide-active.mode-action .guide-center-text {
-  display: inline;
+.edge-prompt-line,
+.edge-prompt-static {
+  position: absolute;
+  bottom: 0;
+  left: 0; right: 0;
+  text-align: center;
+  white-space: nowrap;
 }
-.edge-zone.arc-guide-active.mode-action .arc-guide-left .guide-normal,
-.edge-zone.arc-guide-active.mode-action .arc-guide-right .guide-normal {
-  display: none;
+/* 内层药丸：承载圆角深色背景 + 大 blur 同色 box-shadow（视觉羽化），
+   外层只负责定位与上飘动画，避免 transform 冲突。 */
+.edge-prompt-pill {
+  display: inline-block;
+  padding: 6px 18px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  box-shadow: 0 0 26px 12px rgba(0, 0, 0, 0.55);
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 16px;
+  letter-spacing: 0.16em;
+  color: rgba(255, 235, 210, 0.92);
+  text-shadow: 0 0 10px rgba(0, 0, 0, 0.7);
 }
-
-.edge-zone.mode-action .arc-guide-left,
-.edge-zone.mode-action .arc-guide-right {
-  color: rgba(255,130,120,0.9);
-  text-shadow: 0 0 12px rgba(255,90,80,0.4);
+.edge-prompt-cycling .edge-prompt-line {
+  opacity: 0;
+  animation-name: promptDrift;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  animation-iteration-count: infinite;
+  animation-fill-mode: both;
+  will-change: transform, opacity;
 }
-.edge-zone.mode-action .arc-guide-center {
-  color: rgba(255,140,130,0.95);
-  text-shadow: 0 0 14px rgba(255,90,80,0.5);
+/* 可见窗口压到 0–31%：N=3 时每条独占 1/3 周期，互不重叠，留 ~2% 间隙。 */
+@keyframes promptDrift {
+  0%   { transform: translateY(12px);  opacity: 0; }
+  5%   { transform: translateY(4px);   opacity: 0.9; }
+  25%  { transform: translateY(-14px); opacity: 0.9; }
+  31%  { transform: translateY(-22px); opacity: 0; }
+  100% { transform: translateY(-22px); opacity: 0; }
 }
-.edge-zone.mode-action .guide-normal { display: none; }
-.edge-zone.mode-action .guide-action { display: inline; }
+.edge-zone.state-invitation .edge-prompt { opacity: 1; }
+.edge-zone.state-recording  .edge-prompt { opacity: 0; }
+.edge-zone.state-delivering .edge-prompt { opacity: 0; }
 
 /* ============================================================
-   两套文字语言
+   底部尖尖 — 上滑就绪时显现
+   - 跟长按圆弧同一族（同形 + 同色系），但只露出 ~12px 的尖
+   - 弧线 + 弧内半透明填充，构成"水面下浮起"的语义
+   - 缓慢呼吸（4s）— 时显时隐，提示"可上滑"
+   - 上滑离场时跟着旧屏一起向上滑出（700ms，与 screen 切换同步）
+   - 长按弧激活时强制隐藏（保险，正常流程不应共存）
+   ============================================================ */
 
-   说话(他 ↔ 你):.subtitle / .bubble
+/* 几何对齐：用与长按弧完全相同的 viewBox 1000×220 和 path，
+   元素高 88px，bottom: calc(--peek - 36px)，
+   ⇒ 弧的几何峰值（viewBox y=130 处的 t=0.5）露出屏底 ~ --peek。
+   --peek 调露出量；其它别动。
+
+   动画语汇与长按弧同源：transform-origin: center bottom（底边中央
+   永远不动），手势期间只改 scale（path d 永远不变）。leaving 用
+   translate（独立 CSS 属性）滑出，跟 scale 互不打架。 */
+.swipe-tip {
+  --peek: 30px;
+  position: absolute;
+  left: 0; right: 0;
+  bottom: calc(var(--peek) - 36px);
+  height: 88px;
+  pointer-events: none;
+  z-index: 4;
+  /* 默认 = 入场前 / 离场已落定的姿态：藏在屏幕下方 24px、不可见。
+     showSwipeTip → 加 .visible：translate 0 24px → 0、opacity 0 → 1，
+     形成"从水面下浮起"的入场，与 .leaving 的下沉退场对称。 */
+  opacity: 0;
+  scale: 1;
+  translate: 0 24px;
+  filter: blur(0);
+  transform-origin: 50% 100%;
+  transition: opacity 0.5s var(--ease-drift),
+              translate 0.55s cubic-bezier(0.2, 0.7, 0.2, 1),
+              filter 0.25s var(--ease-drift);
+}
+.swipe-tip.visible {
+  opacity: 1;
+  translate: 0 0;
+}
+
+/* leaving = "让位给水波，安静下沉"：
+   - scale 还原到 1（清掉手势期间的放大）
+   - 轻微下沉 6px（沉回水面）
+   - blur 0 → 8px + opacity 1 → 0，~400ms 内淡出
+   不再用大幅 scale 3.5 + translate -10vh 抢戏 — "推进"由 wave.js 的
+   水波层独立提供，swipe-tip 只负责自己消失。仍需 hideSwipeTip() 清
+   inline scale 让 class 的 scale:1 生效（inline 高于 class）。 */
+.swipe-tip.leaving {
+  opacity: 0;
+  translate: 0 6px;
+  scale: 1;
+  filter: blur(8px);
+  transition:
+    opacity 0.35s ease-out,
+    translate 0.4s ease-out,
+    scale 0.4s ease-out,
+    filter 0.3s ease-out;
+}
+.swipe-tip-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  animation: swipe-tip-breathe 4s ease-in-out infinite;
+  /* 顶部羽化：让弧顶溶进透明，避免大幅拉起时上沿读作"贴一块色块"。
+     mask 在父级 transform 之前作用，所以缩放后羽化比例不变，弧顶
+     永远是软边。下半 50% 全可见，上半 50% 渐变到透明。 */
+  mask-image: linear-gradient(to top, black 50%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to top, black 50%, transparent 100%);
+}
+@keyframes swipe-tip-breathe {
+  0%, 100% { opacity: 0.55; translate: 0 0; }
+  50%      { opacity: 1;    translate: 0 -3px; }
+}
+
+/* 长按弧 = 只描边、无填充（"线"，邀请触发动作）
+   上滑尖 = 只填充、无描边（"面"，等待揭开的内容）— 完全分掉视觉语汇
+   drop-shadow 给一圈柔光，让纯填充在深色背景上有"光"的活感而非死颜色 */
+.swipe-tip-fill {
+  fill: rgba(255, 235, 210, 0.28);
+  filter: drop-shadow(0 -2px 18px rgba(255, 235, 210, 0.25));
+}
+
+/* ============================================================
+   两套文字语言（移植 v1）
+   说话(他 ↔ 你): .bubble
      17px / 衬线 / 暖白 / 打字机 / 离场轻轻向上散
-
-   世界声音(旁白 / 内心 / NPC / 重旁白):.narration / .inner / .npc-text / .heavy
+   世界声音(旁白 / 内心 / NPC / 重旁白): .narration / .inner / .npc-text / .heavy
      14px / 衬线斜体 / 白 50% / 字距统一
      差别只在位置和入场方向
    ============================================================ */
-
-.subtitle {
-  font-family: var(--serif);
-  font-size: 17px;
-  color: rgba(255, 235, 210, 0.95);
-  letter-spacing: 0.08em;
-  line-height: 1.7;
-  text-shadow: 0 0 14px rgba(255, 225, 200, 0.18);
-}
 
 .narration, .inner, .npc-text, .heavy {
   font-family: var(--serif);
   font-style: italic;
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.6);
   letter-spacing: 0.14em;
   line-height: 1.9;
   text-shadow: 0 0 12px rgba(0, 0, 0, 0.5);
 }
 
-/* ----------------------------- 文字暗罩(横向 banner) -----------------------------
-   每段文字身后是一条跨屏幕的横向暗带,垂直方向"透明 → 暗 → 透明"渐变,
-   软淡入淡出避免硬边。文字本身保持 inline-block,暗带通过 ::before 把
-   pseudo-element 横向撑出 viewport (left:-50vw / right:-50vw) 来实现全宽覆盖。
-   ::before z-index:-1 让暗带在文字本体之下、zone 容器之内。
-   :not(:empty) 守住"文字真正存在时才上暗带", 避免空 div 阶段闪一条带。
-   ---------------------------------------------------------------- */
-
-.subtitle, .narration, .inner, .npc-text {
+.narration, .inner, .npc-text {
   display: inline-block;
   max-width: 100%;
   position: relative;
   z-index: 0;
 }
 
-.subtitle:not(:empty)::before {
-  content: '';
-  position: absolute;
-  left: -50vw; right: -50vw;
-  top: -8px; bottom: -8px;
-  background: linear-gradient(to bottom,
-    rgba(0, 0, 0, 0)    0%,
-    rgba(0, 0, 0, 0.78) 22%,
-    rgba(0, 0, 0, 0.78) 78%,
-    rgba(0, 0, 0, 0)    100%);
-  z-index: -1;
-  pointer-events: none;
-}
-
+/* 文字身后的横向暗带 — 字真出来了才上 banner */
 .narration:not(:empty)::before,
 .inner:not(:empty)::before,
 .npc-text:not(:empty)::before {
   content: '';
   position: absolute;
   left: -50vw; right: -50vw;
-  top: -6px; bottom: -6px;
+  top: -22px; bottom: -22px;
+  /* 像素切渐变（不随行数变厚）；上下各 18px 羽化过渡 + 中间 0.72 实色，
+     再用 -22px 延伸把实色边缘外推到字的外侧，避免羽化吃到首尾行字。
+     min/max clamp 让暗带在生长动画中（高度可能 < 36px）渐变不交叉。 */
   background: linear-gradient(to bottom,
-    rgba(0, 0, 0, 0)    0%,
-    rgba(0, 0, 0, 0.55) 22%,
-    rgba(0, 0, 0, 0.55) 78%,
+    rgba(0, 0, 0, 0)    0,
+    rgba(0, 0, 0, 0.72) min(18px, 50%),
+    rgba(0, 0, 0, 0.72) max(calc(100% - 18px), 50%),
     rgba(0, 0, 0, 0)    100%);
   z-index: -1;
   pointer-events: none;
 }
 
-/* .heavy 自己的 ::before/::after 在画上下横线, 不能复用。
-   text.js 把 .heavy 包到 .heavy-wrap 里, banner 挂在 wrapper 上。 */
+/* token 模式：暗带顶端固定在文字上方 -22，高度由 JS 控制
+   （随每出一行推进），使带子从第一行起逐行向下展开。 */
+.narration.line-banner:not(:empty)::before,
+.inner.line-banner:not(:empty)::before {
+  bottom: auto;
+  height: var(--banner-h, 0);
+  transition: height 0.55s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* heavy 自己有横线装饰，banner 包到外层 .heavy-wrap */
 .heavy-wrap {
   display: inline-block;
   position: relative;
@@ -773,130 +808,12 @@ html, body {
   pointer-events: none;
 }
 
-/* ----------------------------- 打字输入区 -----------------------------
-   .type-area 在 type-input 子系统里被 .visible 切显隐. 默认 bottom: 32vh,
-   键盘弹起时 JS 在 inline style 上写 transform: translateY(-Npx) 把它顶到
-   键盘上方. 文字色/caret 色/send 按钮色都用 currentColor, 由父级 color 控制,
-   这样 mode-action 下只换 color 就整套变红.
-
-   #hidden-input-host 把真实接收键盘事件的 input 钉在屏外, type-text 只是
-   把 typedText 渲染出来(所见即所得), 不直接接 input. */
-.type-area {
-  position: absolute;
-  left: 8vw; right: 8vw;
-  bottom: 32vh;
-  display: flex;
-  flex-direction: row;
-  align-items: flex-end;
-  justify-content: center;
-  gap: 14px;
-  pointer-events: none;
-  z-index: 16;
-  opacity: 0;
-  transform: translateY(8px);
-  transition: opacity 0.4s var(--ease-drift), transform 0.4s var(--ease-drift);
-  color: rgba(255, 235, 210, 0.95);
-}
-.type-area.visible {
-  opacity: 1;
-  transform: translateY(0);
-  pointer-events: auto;
-}
-.type-text {
-  font-family: var(--serif);
-  font-size: 17px;
-  color: inherit;
-  letter-spacing: 0.08em;
-  line-height: 1.7;
-  text-align: center;
-  min-height: 1.7em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  flex: 0 1 auto;
-  max-width: 70vw;
-  text-shadow: 0 0 8px rgba(0, 0, 0, 0.6);
-}
-.type-text .caret {
-  display: inline-block;
-  width: 1.5px;
-  height: 1.1em;
-  background: currentColor;
-  vertical-align: text-bottom;
-  margin-left: 2px;
-  animation: caretBlink 0.9s steps(1) infinite;
-}
-@keyframes caretBlink {
-  0%, 50% { opacity: 1; }
-  51%, 100% { opacity: 0; }
-}
-.send-btn {
-  background: none;
-  border: none;
-  outline: none;
-  width: 28px;
-  height: 26px;
-  padding: 0;
-  cursor: pointer;
-  pointer-events: auto;
-  color: inherit;
-  opacity: 0.2;
-  transition: opacity 0.25s var(--ease-drift), filter 0.25s var(--ease-drift);
-  flex-shrink: 0;
-  align-self: flex-end;
-}
-.send-btn:disabled { opacity: 0.15; cursor: default; }
-.send-btn:not(:disabled) { opacity: 0.65; }
-.send-btn:not(:disabled):hover,
-.send-btn:not(:disabled):active {
-  opacity: 1;
-  filter: drop-shadow(0 0 8px currentColor);
-}
-.send-btn svg { width: 100%; height: 100%; display: block; }
-
-/* state-settled: 键盘已收, 没有真实编辑, caret 不闪. */
-.edge-zone.state-settled ~ .type-area .caret { display: none; }
-
-/* mode-action 下 type-area 全套变红 — 跟 .bubble-action 主题一致.
-   依赖 #edge-zone 在 DOM 里位于 #type-area 之前(见 index.html 顺序). */
-.edge-zone.mode-action ~ .type-area {
-  color: rgba(255, 140, 130, 0.95);
-}
-
-/* hidden input 钉在屏外但保持 16px 字号防 iOS 自动放大 */
-.hidden-input {
-  position: fixed;
-  top: -100px;
-  left: -100px;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  font-size: 16px;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: transparent;
-}
-#hidden-input-host {
-  position: fixed;
-  top: -200px;
-  left: -200px;
-  width: 0;
-  height: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-/* ----------------------------- 对话气泡 (角色 ↔ 你) -----------------------------
-   .bubble-zone 是覆盖整屏的定位容器,bubble 用 viewport % 定位。
-
-   .bubble-char (紫):跟随头部 — JS 在 left/top|bottom 上写 head.xPct/yPct,
-                     啾啾(::after)沿气泡边沿滑动以对准头(--tail-pos 由 JS 写)
-   .bubble-user (金):固定在底部弧线上方,啾啾朝下指向呼吸弧
-
-   .tail-top    啾啾长在气泡顶,向上指(气泡在头下方)
-   .tail-bottom 啾啾长在气泡底,向下指(气泡在头上方,或用户气泡指弧)
-   ---------------------------------------------------------------- */
+/* ============================================================
+   对话气泡 (角色 ↔ 你)
+   .bubble-zone 是覆盖整屏的定位容器，bubble 用 viewport % 定位
+   .bubble-char (紫): 跟随头部 — JS 写 head.xPct/yPct，啾啾沿气泡边沿
+   .bubble-user (金): 固定在底部弧线上方
+   ============================================================ */
 
 .bubble-zone {
   position: absolute;
@@ -928,7 +845,6 @@ html, body {
 }
 .bubble.visible { opacity: 1; }
 
-/* ---- 角色:暗紫底 + 浅紫文字 ---- */
 .bubble-char {
   background: rgba(34, 24, 50, 0.82);
   color: #d8c2f0;
@@ -956,7 +872,6 @@ html, body {
   border-top: none;
 }
 
-/* ---- 你:暗金底 + 淡金文字,固定在弧线上方 ---- */
 .bubble-user {
   left: 50%;
   bottom: 30vh;
@@ -978,105 +893,115 @@ html, body {
   transform: translateX(-50%) rotate(45deg);
 }
 
-/* ---- 行动:暗红底 + 浅红文字,无啾啾,文字加括号 ---- */
-.bubble-action {
-  left: 50%;
-  bottom: 30vh;
-  background: rgba(60, 16, 16, 0.88);
-  color: #f0a8a0;
-  border: 1px solid rgba(240, 120, 110, 0.3);
-  text-shadow: 0 0 8px rgba(0, 0, 0, 0.7);
-  border-radius: 20px;
-  font-style: italic;
-}
-
-/* ---- 漂散 ----
-   气泡有 transform: translateX(-50%) 把自己居中;通用的 gentleUp 只设
-   translate Y, 一启动会覆盖掉 translateX 让气泡突然向右弹半个宽。
-   专门给气泡一组 keyframe, 把 translateX(-50%) 保留进去。 */
 @keyframes bubbleDrift {
-  0%   { opacity: var(--drift-from-opacity, 0.85); transform: translateX(-50%) translateY(0);     filter: blur(0); }
-  100% { opacity: 0;                               transform: translateX(-50%) translateY(-14px); filter: blur(0.8px); }
+  0%   { opacity: 0.85; transform: translateX(-50%) translateY(0);     filter: blur(0); }
+  100% { opacity: 0;    transform: translateX(-50%) translateY(-14px); filter: blur(0.8px); }
 }
-.bubble.drifting {
-  animation: bubbleDrift 1.0s var(--ease-drift) forwards;
-}
+.bubble.drifting { animation: bubbleDrift 1.0s var(--ease-drift) forwards; }
 
-/* heavy-active 时压暗气泡,与 .subtitle 同步 */
+/* heavy-active 时压暗气泡 */
 .stage.heavy-active .bubble {
   filter: brightness(0.55);
   transition: filter 0.7s var(--ease-drift);
 }
 
-/* ----------------------------- 他的话 (横向居中, y 跟立绘走) ----------------------------- */
-
-.subtitle-zone {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: var(--subtitle-y, 50%);
-  z-index: 6;
-  pointer-events: none;
-  text-align: center;
-  transition: top 0.6s var(--ease-drift);
-}
-.subtitle {
-  margin: 4px 0;
-  opacity: 1;
-}
-
-/* ----------------------------- 旁白 (中下) ----------------------------- */
+/* ============================================================
+   旁白 / 内心 / 重旁白 / NPC 缺席旁白 — 各自分区
+   旁白(narration-zone): 屏下方字幕区（bottom:14vh），文字向上展开
+                         立绘永远在文字上方，避免和头部重合
+   内心(inner-zone):     与旁白同位置，仅靠括号区分
+   重旁白(heavy-zone):   屏中央，加横线装饰
+   NPC(npc-zone):        从方向入场（top/right）
+   ============================================================ */
 
 .narration-zone {
   position: absolute;
   left: 50%;
-  top: 10%;
+  bottom: 14vh;
   transform: translateX(-50%);
-  max-width: 50vw;
+  max-width: 70vw;
   text-align: center;
   z-index: 5;
   pointer-events: none;
 }
 .narration {
   margin: 6px 0;
+  font-size: 17px;
+  letter-spacing: 0.12em;
   opacity: 0;
   transition: opacity 0.7s var(--ease-drift);
 }
 .narration.visible { opacity: 1; }
-
-/* ----------------------------- 内心独白 (中下, 与旁白同位置, 仅靠括号区分) ----------------------------- */
+.narration.aside {
+  font-size: 13px;
+  letter-spacing: 0.18em;
+  color: rgba(255, 240, 220, 0.55);
+}
 
 .inner-zone {
   position: absolute;
   left: 50%;
-  top: 10%;
+  bottom: 14vh;
   transform: translateX(-50%);
-  max-width: 50vw;
+  max-width: 70vw;
   text-align: center;
   z-index: 6;
   pointer-events: none;
 }
 .inner {
   margin: 6px 0;
+  font-size: 17px;
+  letter-spacing: 0.12em;
   opacity: 0;
   transition: opacity 0.7s var(--ease-drift);
 }
 .inner.visible { opacity: 1; }
 
-/* ----------------------------- 重旁白 (中央, 仅靠 ── 横线区分) ----------------------------- */
+/* Token-stream reveal (LLM-feel for 旁白 / 内心 / aside)：
+   每个 chunk 是 inline-block 的纯文字，无自带背景；暗带由父级
+   .narration:not(:empty)::before / .inner:not(:empty)::before 一道整体提供。
+   chunk 在第 0 帧就按最终布局占位（pending: opacity:0），所以盒子大小不
+   会随字增长 — 没有打字机居中扩展的视觉。reveal 时 fade + 微上浮 + 模糊
+   清除，错峰出现。 */
+.gen-chunk {
+  display: inline-block;
+  /* 默认 baseline 对齐会让父级行盒在 inline-block 下方预留 descender 间隙，
+     让 .narration 盒子比直接文字模式高 3–5px → 暗带（基于盒子的 -6/-6 定位）
+     整体下移、跟文字垂直中线对不上。改为 top 对齐消除该间隙。 */
+  vertical-align: top;
+}
+
+.gen-chunk.pending {
+  opacity: 0;
+}
+
+.gen-chunk.reveal {
+  animation: genChunkIn 0.7s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  will-change: opacity, transform, filter;
+}
+
+@keyframes genChunkIn {
+  0%   { opacity: 0; transform: translateY(4px); filter: blur(4px); }
+  100% { opacity: 1; transform: translateY(0);   filter: blur(0); }
+}
 
 .heavy-zone {
   position: absolute;
   left: 50%; top: 50%;
   transform: translate(-50%, -50%);
-  max-width: 56vw;
+  max-width: 70vw;
   text-align: center;
   z-index: 9;
   pointer-events: none;
 }
 .heavy {
-  /* opacity / drift / visibility 由外层 .heavy-wrap 控制 */
   padding: 14px 0;
+  font-size: 17px;
+  color: rgba(255, 245, 230, 0.95);
+  font-style: normal;
+  letter-spacing: 0.16em;
+  line-height: 1.8;
+  white-space: pre-line;
 }
 .heavy::before, .heavy::after {
   content: '── ── ── ── ── ──';
@@ -1087,17 +1012,13 @@ html, body {
   margin: 8px 0;
 }
 
-.stage.heavy-active .subtitle,
 .stage.heavy-active .narration,
 .stage.heavy-active .inner,
 .stage.heavy-active .character,
-.stage.heavy-active .art-element,
 .stage.heavy-active .edge-arc-main {
   filter: brightness(0.55);
   transition: filter 0.7s var(--ease-drift);
 }
-
-/* ----------------------------- NPC 缺席旁白 (中下, 入场方向区分) ----------------------------- */
 
 .npc-zone { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
 .npc-text {
@@ -1106,10 +1027,11 @@ html, body {
   opacity: 0;
 }
 .npc-text.from-top {
-  top: 8%; left: 50%; transform: translateX(-50%);
+  top: 14%; left: 50%; transform: translateX(-50%);
   animation: npcTop 4.5s ease-in-out forwards;
 }
 .npc-text.from-right {
+  top: 38%; right: 8%;
   animation: npcRight 4.5s ease-in-out forwards;
 }
 @keyframes npcTop {
@@ -1118,242 +1040,261 @@ html, body {
   70%  { opacity: 1; transform: translate(-50%, 0); }
   100% { opacity: 0; transform: translate(-50%, -10px); }
 }
+@keyframes npcRight {
+  0%   { opacity: 0; transform: translateX(20px); }
+  20%  { opacity: 1; transform: translateX(0); }
+  70%  { opacity: 1; transform: translateX(0); }
+  100% { opacity: 0; transform: translateX(10px); }
+}
 
-/* ----------------------------- 漂散 · 一切轻轻向上 ----------------------------- */
-
+/* 漂散 · 一切轻轻向上 */
 @keyframes gentleUp {
-  0%   { opacity: var(--drift-from-opacity, 0.85); transform: translateY(0); filter: blur(0); }
+  0%   { opacity: 0.85; transform: translateY(0); filter: blur(0); }
   100% { opacity: 0; transform: translateY(-14px); filter: blur(0.8px); }
 }
-.subtitle.drifting,
 .narration.drifting,
 .inner.drifting {
   animation: gentleUp 1.0s var(--ease-drift) forwards;
 }
-/* .heavy 的 drift 由 .heavy-wrap.drifting 提供, 见上方 banner 一节 */
 
-/* ----------------------------- opening (Scene 0) ----------------------------- */
+/* ============== touch hint (教学动画) ==============
+   一个半透明圆点，模拟"指尖"。两套动画通过 modifier class 切换:
+     .demo-swipe  上滑示范 — 从屏底往上飘
+     .demo-press  长按示范 — 停在弧上 + 向外脉冲
+   tutorial.js 控制 hidden / class，前 2 次成功后停显。 */
+.touch-hint {
+  position: absolute;
+  left: 50%;
+  margin-left: -18px;     /* 水平居中：圆点宽 36px / 2；避开 transform（keyframes 占用 transform） */
+  bottom: 18vh;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 245, 230, 0.55);
+  box-shadow: 0 0 18px rgba(255, 235, 210, 0.45);
+  pointer-events: none;
+  opacity: 0;
+  z-index: 12;
+}
 
-.opening-zone {
+/* ---- 上滑示范 + 拖尾 ----
+   用多层 box-shadow 在圆点下方堆叠 3 个虚影 (越远越小越淡, 都带模糊),
+   形成"刚走过的轨迹"。整体随 element 移动 + opacity 一起渐隐。 */
+.touch-hint.demo-swipe {
+  bottom: 18vh;
+  animation: touch-swipe 1.8s ease-out infinite;
+  box-shadow:
+    0 0 18px rgba(255, 235, 210, 0.45),       /* 原有的辉光 */
+    0 10px 6px 0 rgba(255, 245, 230, 0.42),   /* 紧贴的尾 */
+    0 22px 12px 0 rgba(255, 245, 230, 0.24),  /* 中段尾 */
+    0 36px 18px 0 rgba(255, 245, 230, 0.10);  /* 最远端尾 */
+}
+@keyframes touch-swipe {
+  0%   { opacity: 0;   transform: translateY(0)    scale(0.85); }
+  8%   { opacity: 0.9; transform: translateY(0)    scale(0.82); }  /* 出现 + 按下 */
+  18%  { opacity: 0.9; transform: translateY(0)    scale(0.95); }  /* 微弹 */
+  85%  { opacity: 0;   transform: translateY(-12vh) scale(0.95); } /* 一气呵成上飘+渐隐 */
+  100% { opacity: 0;   transform: translateY(-12vh) scale(0.95); }
+}
+
+/* ---- 长按示范 ----
+   总时长 2.6s: 0.2s 出现+按下 → 1.6s 持续按 → 0.6s 放开+消失 → 0.2s 间隙
+   按住期间圆圈一直保持 scale 0.82 (按下态), 不再变 — 视觉上"被按住" */
+.touch-hint.demo-press {
+  bottom: 14vh;            /* 紧贴「长按语音对话」文字上方（文字在 bottom:9vh） */
+  animation: touch-press 2.6s ease-in-out infinite;
+}
+@keyframes touch-press {
+  0%   { opacity: 0;   transform: scale(0.95); }
+  8%   { opacity: 0.9; transform: scale(0.82); }  /* 按下 (~210ms) */
+  70%  { opacity: 0.9; transform: scale(0.82); }  /* 持续按住 ~1.6s */
+  85%  { opacity: 0.4; transform: scale(0.95); }  /* 放开 */
+  95%  { opacity: 0;   transform: scale(0.95); }
+  100% { opacity: 0;   transform: scale(0.95); }  /* 间隙停顿 */
+}
+/* 按住期间，连续 2 次向外脉冲 — 每次 ~780ms, 比之前慢一倍。
+   ease-in-out 让扩散两端柔和; 中段保持峰值 opacity 一小段, 形成
+   "呼吸"感而非"爆开"。脉冲间在 opacity:0 时复位 scale (用户不可见)。 */
+.touch-hint.demo-press::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border: 1.5px solid rgba(255, 245, 230, 0.7);
+  border-radius: 50%;
+  animation: touch-press-pulse 2.6s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes touch-press-pulse {
+  0%, 8%   { opacity: 0;    transform: scale(1); }
+  /* pulse 1 — 跟按下同时开始, ~780ms */
+  14%      { opacity: 0.5;  transform: scale(1.2); }   /* 柔和淡入 */
+  22%      { opacity: 0.5;  transform: scale(1.6); }   /* 保持峰值, 继续扩 */
+  38%      { opacity: 0;    transform: scale(2.6); }   /* 慢淡出 */
+  /* 不可见瞬间复位 */
+  38.5%    { opacity: 0;    transform: scale(1); }
+  /* pulse 2 — ~780ms */
+  46%      { opacity: 0.5;  transform: scale(1.2); }
+  54%      { opacity: 0.5;  transform: scale(1.6); }
+  70%      { opacity: 0;    transform: scale(2.6); }
+  100%     { opacity: 0;    transform: scale(1); }
+}
+
+/* ============== boot ============== */
+.boot-veil {
   position: absolute; inset: 0;
-  z-index: 30;
   background: #000;
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
   pointer-events: auto;
+  transition: opacity 0.8s var(--ease-soft);
 }
-.opening-skip {
-  position: absolute; top: 18px; right: 22px;
-  background: transparent;
-  border: 1px solid rgba(255,225,200,0.25);
-  border-radius: 14px;
-  color: rgba(255,225,200,0.55);
-  font-family: var(--sans);
-  font-size: 11px; letter-spacing: 0.25em;
-  padding: 6px 14px 6px 16px;
-  cursor: pointer;
-  transition: opacity 0.4s, color 0.3s, border-color 0.3s;
-  -webkit-touch-callout: none;
-  -webkit-user-select: none;
-  user-select: none;
-  touch-action: manipulation;
-  z-index: 31;
-}
-.opening-skip:hover, .opening-skip:active {
-  color: rgba(255,235,210,0.85);
-  border-color: rgba(255,235,210,0.55);
-}
-
-.opening-text {
+.boot-veil.gone { opacity: 0; pointer-events: none; }
+.boot-tap {
   font-family: var(--serif);
-  font-size: 19px;
-  color: rgba(255,235,225,0.78);
-  letter-spacing: 0.18em;
-  line-height: 2.1;
-  text-align: center;
-  max-width: 60vw;
+  font-size: 16px;
+  letter-spacing: 0.4em;
+  color: var(--text-faint);
+  padding-left: 0.4em;
+  animation: boot-breath 2.4s ease-in-out infinite;
 }
-.opening-line { display: block; opacity: 0; transition: opacity 1.4s var(--ease-drift); }
-.opening-line.visible { opacity: 0.92; }
-.opening-line.fading  { opacity: 0; }
-
-.opening-glow {
-  position: absolute;
-  left: 50%; top: 50%;
-  transform: translate(-50%, -50%);
-  display: flex; flex-direction: column;
-  align-items: center; gap: 24px;
-  cursor: pointer; user-select: none;
-}
-.opening-glow-core {
-  width: 96px; height: 96px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 50% 50%,
-    rgba(255,235,210,0.7) 0%,
-    rgba(255,225,200,0.25) 40%,
-    rgba(255,225,200,0) 70%);
-  animation: openingBreath 4.2s ease-in-out infinite;
-}
-.opening-glow.holding .opening-glow-core {
-  animation: openingHold 1.4s ease-out forwards;
-}
-@keyframes openingBreath {
-  0%,100% { transform: scale(1); opacity: 0.85; }
-  50%     { transform: scale(1.1); opacity: 1; }
-}
-@keyframes openingHold {
-  to { transform: scale(7); opacity: 1; filter: blur(8px); }
-}
-.opening-glow-hint {
-  font-family: var(--serif);
-  font-size: 12px;
-  color: rgba(255,235,225,0.55);
-  letter-spacing: 0.45em;
-  padding-left: 0.45em;
+@keyframes boot-breath {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
 }
 
-/* ----------------------------- run anchor (scene 6) ----------------------------- */
-
-.run-anchor {
-  position: absolute;
-  left: 50%; top: 50%;
-  transform: translate(-50%, -50%);
-  width: 56px; height: 56px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255,240,220,0.95) 0%, rgba(255,200,160,0.4) 50%, rgba(255,200,160,0) 80%);
-  cursor: pointer;
-  z-index: 20;
-  animation: runAnchorPulse 1s ease-in-out infinite;
-}
-@keyframes runAnchorPulse {
-  0%,100% { transform: translate(-50%, -50%) scale(1);   opacity: 0.85; }
-  50%     { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
-}
-
-/* ----------------------------- transitions ----------------------------- */
-
-.blink-veil, .white-veil {
-  position: absolute; inset: 0;
-  z-index: 50;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.4s ease-in;
-}
-.blink-veil { background: #000; }
-.white-veil { background: rgba(255,245,225,1); }
-.blink-veil.dark { opacity: 1; }
-.white-veil.lit  { opacity: 1; transition-duration: 0.6s; }
-
-.shake { animation: shake 0.4s ease-in-out; }
-@keyframes shake {
-  0%,100% { translate: 0 0; }
-  25% { translate: -6px 2px; }
-  50% { translate: 4px -2px; }
-  75% { translate: -3px 1px; }
-}
-
-/* ----------------------------- end mark ----------------------------- */
-
-.endmark {
-  position: absolute; inset: 0;
-  display: flex; flex-direction: column;
+/* ============== orientation gate ============== */
+#orientation-gate {
+  position: fixed; inset: 0; z-index: 9999;
+  background: #070811;
+  color: var(--text-faint);
+  display: flex;
   align-items: center; justify-content: center;
-  z-index: 18;
-  pointer-events: none;
-  background: rgba(0,0,0,0.55);
-  opacity: 0;
-  transition: opacity 1.6s var(--ease-drift);
+  text-align: center;
+  font-family: var(--serif); font-size: 16px; letter-spacing: 0.16em;
 }
-.endmark.visible { opacity: 1; }
-.endmark-text {
-  font-family: var(--serif);
-  font-size: 22px;
-  color: rgba(255,235,210,0.92);
-  letter-spacing: 0.6em;
-  padding-left: 0.6em;
-}
-.endmark-hint {
-  margin-top: 28px;
-  font-family: var(--serif);
-  font-size: 13px;
-  color: rgba(255,225,200,0.5);
-  letter-spacing: 0.25em;
-  opacity: 0;
-  transition: opacity 1.4s ease-in 1.2s;
-}
-.endmark.visible .endmark-hint { opacity: 1; }
 
-/* ----------------------------- journal ----------------------------- */
+/* ============== journal · 剧情历史（竖版） ============== */
+/* 左上角锚点：呼吸光点。点击展开抽屉。 */
+.anchor {
+  position: absolute;
+  top: 18px; left: 18px;
+  width: 28px; height: 28px;
+  z-index: 60;
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.anchor::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(circle at 50% 50%,
+    rgba(255,225,200,0.7) 0%,
+    rgba(255,225,200,0) 70%);
+  border-radius: 50%;
+  animation: anchorBreath 5s ease-in-out infinite;
+}
+.anchor::after {
+  content: '';
+  position: absolute;
+  left: 10px; top: 10px;
+  width: 8px; height: 8px;
+  background: rgba(255,225,200,0.6);
+  border-radius: 50%;
+  filter: blur(0.4px);
+}
+@keyframes anchorBreath {
+  0%,100% { opacity: 0.4;  transform: scale(0.95); }
+  50%     { opacity: 0.85; transform: scale(1.1); }
+}
 
+/* 抽屉外层：覆盖整个 stage，半透明遮罩，点击空白处收回 */
 .journal {
   position: absolute; inset: 0;
-  z-index: 40;
+  z-index: 80;
   pointer-events: none;
+  background: rgba(0,0,0,0);
+  transition: background 0.55s var(--ease-soft);
 }
-.journal.visible { pointer-events: auto; }
+.journal.visible {
+  pointer-events: auto;
+  background: rgba(7, 8, 17, 0.96);
+}
+
+/* 纸面：从顶部下展，占上 ~2/3 屏。盒子高度（70vh）略大于 clip-path
+   椭圆底沿（68vh），保证椭圆中段不被盒子边缘横切；可视边界由椭圆决定。
+   下方 ~30vh 自然作为空白收回区。 */
 .journal-paper {
-  position: absolute; inset: 0;
-  background: var(--paper);
-  /* 从左上角点绽开成上 2/3 屏的弧形:
-     关闭态——零半径点位于左上角 (0, 0), 从这里展开/收回
-     展开态——rx=115vw / ry=72vh, 中心位于画外上方 5vh 的水平中央
-     展开过程中椭圆中心从左上角推移到顶部中央, 视觉上是"从左上角绽开";
-     深/跨比 ≈ 7.2vh / 100vw = 0.072, 与底部呼吸弧 (6.36vh / 88vw) 同比例 ——
-     中段约 67vh, 两侧约 60vh, 与下方弧呼应 */
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 70vh;
+  background: rgba(238, 228, 210, 0.97);
   clip-path: ellipse(0 0 at 0 0);
-  transition: clip-path 0.55s var(--ease-paper);
-  display: flex; flex-direction: column;
+  transition: clip-path 0.6s var(--ease-paper);
   overflow: hidden;
+  display: flex; flex-direction: column;
 }
 .journal.visible .journal-paper {
-  clip-path: ellipse(115vw 72vh at 50% -5vh);
+  clip-path: ellipse(140vw 78vh at 50% -10vh);
 }
+
+/* 左上角返回按钮：只有一个向左的细箭头 */
 .journal-close {
-  position: absolute; top: 14px; left: 14px;
-  display: flex; align-items: center; gap: 8px;
-  padding: 10px 14px;
+  position: absolute;
+  top: 14px; left: 14px;
+  width: 36px; height: 36px;
   border: none; background: transparent;
-  color: var(--paper-mark-you);
-  font-family: var(--serif);
-  font-size: 13px; letter-spacing: 0.25em;
+  padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: #6e5b3a;
   cursor: pointer;
   z-index: 3;
-  border-radius: 14px;
+  border-radius: 50%;
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
   touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
   transition: background 0.2s, color 0.2s;
 }
 .journal-close:hover, .journal-close:active {
   background: rgba(110,91,58,0.08);
-  color: var(--paper-text);
+  color: #2a2218;
 }
 .journal-close-arrow {
-  width: 14px; height: 14px;
+  width: 12px; height: 12px;
   border-left: 1.5px solid currentColor;
   border-top: 1.5px solid currentColor;
-  transform: rotate(45deg);
-  margin-right: 2px;
+  transform: rotate(-45deg) translate(2px, 2px);
 }
-.journal-close-label { padding-left: 0.25em; }
 
+/* 内部滚动区 */
 .journal-scroll {
   flex: 1;
   overflow-y: auto;
-  /* 顶部留收回按钮空间, 底部留给下弧曲线
-     弧两侧最低到 ~60vh, 文字 padding-left/right=6vw 时该列弧到 ~62vh
-     padding-bottom 38vh 让最末行文字停在 ~62vh, 不会被两侧弧线吃掉 */
-  padding: 9vh 6vw 38vh 6vw;
+  padding: 6vh 8vw 5vh 8vw;
   font-family: var(--serif);
-  color: var(--paper-text);
+  color: #2a2218;
   font-size: 15px;
   line-height: 2;
   letter-spacing: 0.06em;
   touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
 }
 .journal-scroll::-webkit-scrollbar { width: 4px; }
-.journal-scroll::-webkit-scrollbar-thumb { background: rgba(110,91,58,0.3); border-radius: 2px; }
+.journal-scroll::-webkit-scrollbar-thumb {
+  background: rgba(110,91,58,0.3); border-radius: 2px;
+}
+
+.journal-scroll .j-empty {
+  text-align: center;
+  color: rgba(110,91,58,0.55);
+  font-style: italic;
+  margin-top: 4vh;
+}
 .journal-scroll .j-entry { margin: 6px 0; }
 .journal-scroll .j-tag {
   display: inline-block;
@@ -1361,30 +1302,26 @@ html, body {
   text-align: center;
   font-size: 12px; letter-spacing: 0;
 }
-.journal-scroll .j-you { color: var(--paper-mark-you); }
-.journal-scroll .j-him { color: var(--paper-mark-him); }
-.journal-scroll .j-narration {
-  color: var(--paper-italic);
-  font-style: italic;
-  padding-left: 2em;
-  font-size: 14px;
-}
+.journal-scroll .j-you { color: #6e5b3a; }
+.journal-scroll .j-him { color: #8a7245; }
+.journal-scroll .j-narration,
+.journal-scroll .j-aside,
 .journal-scroll .j-inner {
-  color: var(--paper-italic);
+  color: #75603e;
   font-style: italic;
   padding-left: 2em;
   font-size: 14px;
 }
-.journal-scroll .j-action {
-  color: #e88;
-  font-style: italic;
+.journal-scroll .j-npc {
+  color: #8a7245;
+  padding-left: 2em;
   font-size: 14px;
 }
 .journal-scroll .j-heavy {
   text-align: center;
   margin: 22px 0;
   font-size: 16px;
-  color: var(--paper-text);
+  color: #2a2218;
 }
 .journal-scroll .j-heavy::before,
 .journal-scroll .j-heavy::after {
@@ -1394,213 +1331,261 @@ html, body {
   letter-spacing: 0.3em;
   margin: 6px 0;
 }
-.journal-hint {
+
+/* 空白区提示（仅在打开后渐显） */
+.journal-blank-hint {
+  position: absolute;
+  left: 0; right: 0; bottom: 5vh;
   text-align: center;
-  padding: 14px 6vw 14px 6vw;
   font-family: var(--sans);
   font-size: 11px;
-  color: rgba(110,91,58,0.5);
+  color: rgba(255,235,210,0.55);
   letter-spacing: 0.3em;
-}
-
-/* ----------------------------- finale ----------------------------- */
-
-.finale {
-  position: absolute; inset: 0;
-  z-index: 60;
-  background: #000;
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  font-family: var(--serif);
-  color: rgba(255,225,200,0.7);
-  font-size: 18px;
-  letter-spacing: 0.3em;
-  padding-left: 0.3em;
-  gap: 20px;
-  opacity: 0;
-  transition: opacity 1.6s var(--ease-drift);
-  pointer-events: none;
-}
-.finale.visible { opacity: 1; pointer-events: auto; }
-.finale-sub {
-  font-size: 12px;
-  color: rgba(255,225,200,0.35);
-  letter-spacing: 0.2em;
-}
-
-/* ----------------------------- echo prologue ----------------------------- */
-
-.echo-stage {
-  position: absolute; inset: 0;
-  z-index: 25;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 1.4s var(--ease-drift);
+  transition: opacity 0.4s var(--ease-soft) 0.25s;
 }
-.echo-stage.visible { opacity: 1; }
-.echo-stage.dissolving { opacity: 0; transition-duration: 1.4s; }
+.journal.visible .journal-blank-hint { opacity: 1; }
 
-.echo-halo {
+/* small viewport tweaks */
+@media (max-height: 640px) {
+  .narration-zone, .inner-zone { bottom: 12vh; }
+}
+
+/* ===== Wave: water ripple on every swipe-up advance ===== */
+/* z-index 4 puts wave above all visual layers (atmo-emotion z 3 included)
+   and below all text zones (z-index 5+). 上滑过场的水波装饰，不算"伴随特效"，
+   不进 fx-burst-layer。
+   .wave-scene-distort 是 wave.js 创建的"全画面快照"容器：克隆 7 个视觉层
+   （screen-host / atmo-env / fx-dominant-back / character-layer /
+    screen-host-front / fx-dominant-front / atmo-emotion），整体经过 SVG
+   displacement filter 扭曲，再用 CSS mask 限制只有一条横向波带可见。
+   挂的是静态克隆而非活层 → 浏览器能缓存光栅化结果，性能开销与画面里有多少
+   canvas/特效无关。详见 plans/v2/上滑涟漪手册.md。 */
+.wave-scene-distort {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 4;
+  /* 必须和 #stage 同底色：atmo-env / atmo-emotion 用 mix-blend-mode: multiply，
+     需要黑底做相乘对象。快照若无底色，multiply 跟透明相乘 → 蓝色叠加层
+     "原色透出来"，形成可见的蓝色横带（涟漪带内画面比舞台外更亮且偏蓝）。 */
+  background: var(--bg);
+  filter: url(#wave-water-distort);
+  -webkit-mask-image: linear-gradient(to top, transparent 0%, transparent 0%);
+  mask-image: linear-gradient(to top, transparent 0%, transparent 0%);
+  will-change: mask-image;
+}
+.wave-rings {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 4;
+}
+.wave-ring {
   position: absolute;
-  left: 50vw;
-  top: 36vh;
-  width: 22vh;
-  height: 22vh;
+  left: 50%; top: 100%;
+  width: 0; height: 0;
   transform: translate(-50%, -50%);
-  pointer-events: none;
-}
-.echo-halo-core {
-  position: absolute; inset: 28%;
   border-radius: 50%;
-  background: radial-gradient(circle at 50% 50%,
-    rgba(255, 235, 210, 0.95) 0%,
-    rgba(255, 210, 170, 0.55) 35%,
-    rgba(255, 190, 150, 0.15) 65%,
-    rgba(255, 190, 150, 0) 100%);
-  filter: blur(2px);
-  animation: echoHaloBreath 4.2s ease-in-out infinite;
-}
-.echo-halo-ring {
-  position: absolute; inset: 0;
-  border-radius: 50%;
-  background: radial-gradient(circle at 50% 50%,
-    rgba(255, 220, 190, 0.18) 0%,
-    rgba(255, 220, 190, 0.08) 45%,
-    rgba(255, 220, 190, 0) 75%);
-  filter: blur(8px);
-  animation: echoHaloHalo 5s ease-in-out infinite;
-}
-@keyframes echoHaloBreath {
-  0%, 100% { transform: scale(0.92); opacity: 0.78; }
-  50%      { transform: scale(1.08); opacity: 1; }
-}
-@keyframes echoHaloHalo {
-  0%, 100% { transform: scale(0.96); opacity: 0.5; }
-  50%      { transform: scale(1.18); opacity: 0.95; }
+  border: 1px solid rgba(255, 250, 240, 0.30);
+  pointer-events: none;
+  mix-blend-mode: screen;
+  filter: blur(0.6px);
+  will-change: width, height, opacity;
 }
 
-.echo-text {
+/* ================================================================
+   时空门 · 回响视频（场 6 段 4 后）
+   挂 #fx-burst-layer。屏幕上半中央漂着的一团暖色柔光，无硬边。
+   "回响"色谱：蜜糖中心 → 琥珀过渡 → 边缘羽化到透明。
+   全靠多层 radial-gradient + blur 堆叠，避免任何机械几何。
+   ================================================================ */
+
+.portal-host {
   position: absolute;
-  left: 50vw;
-  top: 43vh;
-  transform: translateX(-50%);
-  max-width: 84vw;
-  font-family: var(--serif);
-  font-size: 17px;
-  color: rgba(255, 235, 210, 0.95);
-  letter-spacing: 0.08em;
-  line-height: 1.7;
-  text-align: center;
-  text-shadow: 0 1px 12px rgba(0,0,0,0.6);
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* 入口容器：屏幕上半中央，220×220 的可点击区域（光本身会溢出更大）。 */
+.portal-entry {
+  position: absolute;
+  top: 20%;
+  left: 50%;
+  width: 220px;
+  height: 220px;
+  transform: translateX(-50%) scale(0.85);
   opacity: 0;
-  pointer-events: none;
-  --drift-from-opacity: 1;
-  transition: opacity 0.5s var(--ease-drift);
-}
-.echo-text.visible { opacity: 1; }
-.echo-text.drifting {
-  animation: echoTextDrift 1.0s var(--ease-drift) forwards;
-}
-@keyframes echoTextDrift {
-  0%   { opacity: 1; transform: translateX(-50%) translateY(0);    filter: blur(0); }
-  100% { opacity: 0; transform: translateX(-50%) translateY(-14px); filter: blur(0.8px); }
-}
-
-.echo-hints {
-  position: absolute;
-  left: 0;
-  top: 68vh;
-  width: 100vw;
-  height: 8vh;
-  pointer-events: none;
-}
-.echo-hint {
-  position: absolute;
-  right: auto;
-  font-family: var(--serif);
-  font-style: italic;
-  font-size: 17px;
-  color: rgba(255, 235, 210, 0.7);
-  letter-spacing: 0.18em;
-  white-space: nowrap;
-  text-align: center;
-  text-shadow: 0 1px 10px rgba(0,0,0,0.55);
-  pointer-events: none;
-  opacity: 0;
-  /* lane gives a left: X% inline; centering handled in keyframe */
-}
-.echo-hint.live {
-  animation: echoHintLife 5s var(--ease-drift) forwards;
-}
-@keyframes echoHintLife {
-  0%   { opacity: 0;   transform: translateX(-50%) translateY(36px); }
-  22%  { opacity: 0.7; transform: translateX(-50%) translateY(0); }
-  78%  { opacity: 0.7; transform: translateX(-50%) translateY(-22px); }
-  100% { opacity: 0;   transform: translateX(-50%) translateY(-44px); }
-}
-
-.white-veil.echo-flash {
-  opacity: 1;
-  transition-duration: 0.06s;
-}
-
-.echo-skip {
-  position: absolute;
-  top: 3vh;
-  right: 5vw;
-  z-index: 28;
-  background: none;
-  border: none;
-  outline: none;
-  padding: 6px 8px;
-  font-family: var(--serif);
-  font-size: 14px;
-  color: rgba(255, 235, 210, 0.45);
-  letter-spacing: 0.2em;
-  cursor: pointer;
+  transition: transform 900ms cubic-bezier(.2,.8,.2,1),
+              opacity 800ms ease-out;
   pointer-events: auto;
-  transition: color 0.3s var(--ease-drift);
-}
-.echo-skip:hover { color: rgba(255, 235, 210, 0.85); }
-
-/* ----------------------------- 竖屏剧情段排版 -----------------------------
-   立绘 / 字幕 / 旁白 / 重旁白 / NPC 在窄屏下的尺寸与位置
-   字幕跟立绘走,可压在立绘身上,加黑色阴影提升可读性
-   ---------------------------------------------------------------- */
-
-/* 字幕加黑色阴影 — 压在立绘身上仍清晰 */
-.subtitle {
-  text-shadow:
-    0 0 8px rgba(0, 0, 0, 0.95),
-    0 0 16px rgba(0, 0, 0, 0.85),
-    0 1px 2px rgba(0, 0, 0, 1);
+  cursor: pointer;
 }
 
-/* 字幕本体在竖屏下的最大宽度(zone 已是全宽,这里限制 inline-block 自身) */
-.subtitle {
-  max-width: 84vw;
+.portal-host.visible .portal-entry {
+  transform: translateX(-50%) scale(1);
+  opacity: 1;
 }
 
-/* 旁白 / 内心 — 中下,拉宽 */
-.narration-zone,
-.inner-zone {
-  max-width: 80vw;
-  top: 8%;
+/* ---- 三层柔光：远晕 / 中晕 / 核心。
+       各自 radial-gradient + blur + 缓慢呼吸（错相位，整体会"轻微荡漾"）。
+       transform: scale 决定每层覆盖范围；opacity 由 keyframe 推动。 ---- */
+.portal-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  mix-blend-mode: screen;     /* 让暖光在暗景上叠加更通透 */
+  will-change: opacity;
+  animation: portal-breath 5.2s ease-in-out infinite;
 }
 
-/* 重旁白 — 居中,拉宽 */
-.heavy-zone {
-  max-width: 84vw;
+/* 远晕：最大、最虚、低饱和。撑开"散射"边缘。 */
+.portal-glow-far {
+  background: radial-gradient(circle,
+    rgba(255, 195, 130, 0.42) 0%,
+    rgba(255, 170, 95,  0.22) 35%,
+    rgba(255, 150, 80,  0.08) 60%,
+    rgba(255, 130, 60,  0)    80%);
+  filter: blur(34px);
+  transform: scale(1.25);
+  animation-delay: 0s;
 }
 
-/* NPC — 从右侧滑入,锚点改成屏幕中右 */
-.npc-text.from-right {
-  top: 50%;
-  right: 6vw;
+/* 中晕：中等大小、中等虚化、稍亮。 */
+.portal-glow-mid {
+  background: radial-gradient(circle,
+    rgba(255, 220, 165, 0.6)  0%,
+    rgba(255, 190, 120, 0.32) 40%,
+    rgba(255, 160, 90,  0.1)  70%,
+    rgba(255, 140, 70,  0)    90%);
+  filter: blur(18px);
+  transform: scale(0.85);
+  animation-delay: -1.7s;
 }
-@keyframes npcRight {
-  0%   { opacity: 0; transform: translateX(40px); }
-  20%  { opacity: 0.85; transform: translateX(0); }
-  70%  { opacity: 0.85; transform: translateX(-20px); }
-  100% { opacity: 0; transform: translateX(-60px); }
+
+/* 核心：最亮、最实、最小。蜜糖白接琥珀。 */
+.portal-glow-core {
+  background: radial-gradient(circle,
+    rgba(255, 240, 215, 0.85) 0%,
+    rgba(255, 215, 160, 0.55) 35%,
+    rgba(255, 185, 110, 0.18) 65%,
+    rgba(255, 160, 90,  0)    85%);
+  filter: blur(10px);
+  transform: scale(0.55);
+  animation-delay: -3.2s;
 }
+
+@keyframes portal-breath {
+  0%, 100% { opacity: 0.62; }
+  50%      { opacity: 1; }
+}
+
+/* ---- 涟漪：柔光带向外散开（呼应"回响"），无清晰边线。
+       用 radial-gradient 做一圈"中间亮、两侧透"的虚化光环 + blur。 ---- */
+.portal-ripples {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.portal-ripple {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle,
+    rgba(255, 200, 140, 0)    52%,
+    rgba(255, 200, 140, 0.32) 64%,
+    rgba(255, 200, 140, 0.12) 72%,
+    rgba(255, 200, 140, 0)    82%);
+  filter: blur(10px);
+  mix-blend-mode: screen;
+  opacity: 0;
+  animation: portal-ripple 4.2s ease-out infinite;
+}
+.portal-ripple:nth-child(2) { animation-delay: 1.4s; }
+.portal-ripple:nth-child(3) { animation-delay: 2.8s; }
+@keyframes portal-ripple {
+  0%   { transform: scale(0.6); opacity: 0; }
+  18%  { opacity: 0.85; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+
+/* ---- 视频 ----
+   入口中心 y = 20% + 110px（top + 220 / 2）。clip-path 从这里径向开合。
+   filter 给画面打"回忆"基调：微暖泛黄 + 轻微压暗，
+   配合下方 .portal-host::after 的四角 vignette 一起出"老胶片记忆"质感。 */
+.portal-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #000;
+  pointer-events: none;
+  clip-path: circle(0px at 50% calc(20% + 110px));
+  -webkit-clip-path: circle(0px at 50% calc(20% + 110px));
+  transition: clip-path 700ms cubic-bezier(.6,.2,.4,1),
+              -webkit-clip-path 700ms cubic-bezier(.6,.2,.4,1);
+  filter: sepia(0.32) saturate(1.05) brightness(0.96) contrast(1.04);
+  z-index: 1;
+}
+
+/* 回忆叠层：暖黄轻染 + 四角压暗（vignette）。
+   与 .portal-video 共用同一组 clip-path，随视频开合一起显现/收回，
+   避免在圆环阶段就提前露出黑角。 */
+.portal-host::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  background:
+    linear-gradient(rgba(255, 208, 140, 0.10), rgba(255, 208, 140, 0.10)),
+    radial-gradient(ellipse at center,
+      rgba(0, 0, 0, 0)    48%,
+      rgba(0, 0, 0, 0.22) 78%,
+      rgba(0, 0, 0, 0.55) 100%);
+  clip-path: circle(0px at 50% calc(20% + 110px));
+  -webkit-clip-path: circle(0px at 50% calc(20% + 110px));
+  transition: clip-path 700ms cubic-bezier(.6,.2,.4,1),
+              -webkit-clip-path 700ms cubic-bezier(.6,.2,.4,1);
+}
+
+/* 阶段 B：opening —— clip 扩张全屏，入口光晕淡出 */
+.portal-host.opening .portal-video {
+  clip-path: circle(150% at 50% 50%);
+  -webkit-clip-path: circle(150% at 50% 50%);
+}
+.portal-host.opening::after {
+  clip-path: circle(150% at 50% 50%);
+  -webkit-clip-path: circle(150% at 50% 50%);
+}
+.portal-host.opening .portal-entry {
+  opacity: 0;
+  transition: opacity 320ms ease-out;
+  pointer-events: none;
+}
+
+/* 阶段 C：closing —— clip 缩回入口；光晕短暂回浮 */
+.portal-host.closing .portal-video {
+  clip-path: circle(0px at 50% calc(20% + 110px));
+  -webkit-clip-path: circle(0px at 50% calc(20% + 110px));
+}
+.portal-host.closing::after {
+  clip-path: circle(0px at 50% calc(20% + 110px));
+  -webkit-clip-path: circle(0px at 50% calc(20% + 110px));
+}
+.portal-host.closing .portal-entry {
+  opacity: 0.9;
+  transform: translateX(-50%) scale(1);
+  transition: opacity 360ms ease-in 200ms;
+}
+
+/* 整组淡出 */
+.portal-host.gone {
+  opacity: 0;
+  transition: opacity 480ms ease-out;
+}
+

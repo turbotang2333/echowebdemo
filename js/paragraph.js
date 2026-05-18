@@ -34,7 +34,6 @@ const HEAVY_DRIFT_DUR = 1400;
 let _activeTyper = null;          // current running typer { skip(), donePromise }
 let _activeReveal = null;         // current running token reveal { skip() }
 let _activeNarration = null;      // narration/inner/aside node currently visible
-let _bubbleSide = 'bottom';       // hysteresis for char bubble flip
 
 onTurboChange((on) => {
   if (!on) return;
@@ -270,7 +269,7 @@ async function showNarrationLike(text, opts = {}) {
   if (_activeNarration && _activeNarration.parentNode) {
     const prev = _activeNarration;
     _activeNarration = null;
-    driftAway(prev);
+    driftAway(prev).catch(() => {}); // swallow scene-jump cancel
   }
 
   const wrap = (t) => kind === 'inner' ? `（${t}）` : t;
@@ -313,8 +312,10 @@ export async function advanceCurrent() {
 }
 
 // Hard clear (used at scene transition): kill typer, drift everything out.
+// finally-removes nodes so a scene-jump cancel mid-drift still cleans the DOM.
 export async function clearAllText() {
   if (_activeTyper) _activeTyper.skip();
+  if (_activeReveal) _activeReveal.skip();
   _activeNarration = null;
   const zones = ['#narration-zone', '#inner-zone', '#heavy-zone', '#npc-zone', '#bubble-zone'];
   const nodes = [];
@@ -326,8 +327,11 @@ export async function clearAllText() {
       nodes.push(c);
     });
   });
-  await wait(DRIFT_DUR);
-  nodes.forEach((n) => { if (n.parentNode) n.parentNode.removeChild(n); });
+  try {
+    await wait(DRIFT_DUR);
+  } finally {
+    nodes.forEach((n) => { if (n.parentNode) n.parentNode.removeChild(n); });
+  }
 }
 
 // =========================================================
@@ -377,38 +381,31 @@ export async function showNPCText(text, opts = {}) {
 // 对话气泡 (角色 ↔ 你)
 // =========================================================
 
-const FLIP_TO_BELOW_AT = 18;
-const FLIP_TO_ABOVE_AT = 22;
-const HEAD_CROWN_OFFSET_VH = 13;
-const HEAD_CHIN_OFFSET_VH  = 12;
-const BUBBLE_EDGE_GAP_VH   = 1.5;
-const BUBBLE_X_MARGIN_VW   = 4;
+const BUBBLE_GAP_VH      = 1.0;   // 啾啾到头顶/下巴的固定间隙
+const BUBBLE_X_MARGIN_VW = 4;     // 左右安全边距
+const BUBBLE_Y_MARGIN_VH = 2;     // 上下安全边距（clamp 触发线）
 
-function pickCharSide(headYPct) {
-  if (_bubbleSide === 'top') {
-    if (headYPct >= FLIP_TO_ABOVE_AT) _bubbleSide = 'bottom';
+// 把气泡贴到 head 上方或下方。side='bottom' 表示气泡在头上方（尾巴朝下指向头）。
+function placeBubbleSide(node, side, head) {
+  node.style.left = `${head.xPct}%`;
+  if (side === 'top') {
+    node.style.top = `${head.chinYPct + BUBBLE_GAP_VH}%`;
+    node.style.bottom = '';
   } else {
-    if (headYPct < FLIP_TO_BELOW_AT) _bubbleSide = 'top';
+    node.style.bottom = `${100 - head.crownYPct + BUBBLE_GAP_VH}%`;
+    node.style.top = '';
   }
-  return _bubbleSide;
 }
 
 async function showCharBubble(text, opts = {}) {
   const zone = $('#bubble-zone');
   if (!zone) return;
   const head = getHeadAnchor();
-  const side = pickCharSide(head.yPct);
 
+  // 默认放头上方，量出来如果顶到屏幕顶就翻到下方；都不行选空间更大的那边并钉到边距。
+  let side = 'bottom';
   const node = el('div', { cls: `bubble bubble-char tail-${side}` });
-
-  node.style.left = `${head.xPct}%`;
-  if (side === 'top') {
-    node.style.top = `${head.yPct + HEAD_CHIN_OFFSET_VH + BUBBLE_EDGE_GAP_VH}%`;
-    node.style.bottom = '';
-  } else {
-    node.style.bottom = `${100 - head.yPct + HEAD_CROWN_OFFSET_VH + BUBBLE_EDGE_GAP_VH}%`;
-    node.style.top = '';
-  }
+  placeBubbleSide(node, side, head);
 
   // Pre-render full text to measure final size, then clear for typewriter.
   // Locking width AND height avoids tail "sliding" + empty→full flash.
@@ -420,8 +417,44 @@ async function showCharBubble(text, opts = {}) {
   node.style.width = `${rect.width}px`;
   node.style.height = `${rect.height}px`;
 
-  // Clamp inside viewport — if head is too close to an edge, shift bubble in
-  // and let the tail slide along the bubble's edge to still point at head.x.
+  // 纵向：如果上方放不下，翻到下方；下方也放不下，选空间更大的一边并钉死。
+  const topMargin = window.innerHeight * (BUBBLE_Y_MARGIN_VH / 100);
+  const bottomMargin = window.innerHeight - topMargin;
+  const overflowsTop = () => rect.top < topMargin;
+  const overflowsBottom = () => rect.bottom > bottomMargin;
+
+  if (side === 'bottom' && overflowsTop()) {
+    side = 'top';
+    node.classList.remove('tail-bottom');
+    node.classList.add('tail-top');
+    placeBubbleSide(node, side, head);
+    rect = node.getBoundingClientRect();
+  }
+  if (overflowsTop() || overflowsBottom()) {
+    // 角色顶天立地，无论哪边都装不下：贴到空间更大的一边，按安全边距钉住。
+    const spaceAbove = (head.crownYPct / 100) * window.innerHeight;
+    const spaceBelow = window.innerHeight - (head.chinYPct / 100) * window.innerHeight;
+    const preferTop = spaceBelow > spaceAbove; // 下方空间更大→气泡放在头下方
+    if (preferTop && side !== 'top') {
+      side = 'top';
+      node.classList.remove('tail-bottom');
+      node.classList.add('tail-top');
+    } else if (!preferTop && side !== 'bottom') {
+      side = 'bottom';
+      node.classList.remove('tail-top');
+      node.classList.add('tail-bottom');
+    }
+    if (side === 'top') {
+      node.style.top = `${BUBBLE_Y_MARGIN_VH}%`;
+      node.style.bottom = '';
+    } else {
+      node.style.bottom = `${BUBBLE_Y_MARGIN_VH}%`;
+      node.style.top = '';
+    }
+    rect = node.getBoundingClientRect();
+  }
+
+  // 横向 clamp — 头部贴近左右边时整体内推，尾巴沿气泡边沿滑动指向 head.x。
   const margin = window.innerWidth * (BUBBLE_X_MARGIN_VW / 100);
   let shiftPx = 0;
   if (rect.left < margin) shiftPx = margin - rect.left;
