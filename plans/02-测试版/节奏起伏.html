@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>v2 · 节奏起伏 · 场景覆盖率 × 剧情推进</title>
+<title>测试版 · 节奏起伏 · 场景覆盖率 × 剧情推进</title>
 <style>
   :root {
     --bg: #0a0a12;
@@ -69,7 +69,7 @@
 </style>
 </head>
 <body>
-<h1>v2 · 节奏起伏</h1>
+<h1>测试版 · 节奏起伏</h1>
 <div class="sub">场景层覆盖率 × 剧情推进 · 总时长 600s · 当前 v.s. 愿景 · 鼠标悬停看 beat</div>
 
 <div class="banner" style="background: rgba(120,200,140,0.06); border-left-color: var(--vision); color: #b8d8c0;">
@@ -88,7 +88,7 @@
 <div class="note">
   <strong>读图提示</strong>
   <ul>
-    <li><strong>当前曲线（橙）</strong>：基于 v2/js/script.js 实际推进。已按愿景重调 reveal 数值，cur ≈ vis 在 8 场全程对齐。</li>
+    <li><strong>当前曲线（橙）</strong>：基于 js/script.js 实际推进。已按愿景重调 reveal 数值，cur ≈ vis 在 8 场全程对齐。</li>
     <li><strong>愿景曲线（绿虚）</strong>：按用户设计意图——50% 时间停留 20-30%（单体/小遮罩探索期），中段叠加扩到 50-60%，高潮整图全揭 100%。</li>
     <li><strong>关键设计</strong>：cj1 跨场 1/2/3 同源椭圆推进（28→32→50×22）；cj5 替代 cj3；场 4 极暗 + 单体叠加；场 7 亲密点 60% 不全揭（焦距感）。</li>
     <li><strong>覆盖率口径</strong>：纯极暗 = 0% / 单体 PNG = 累加 20→70% / 整图 reveal mask = mask 面积 / 整图全揭 = 100%。三种状态互斥（单体可叠加）。</li>
@@ -99,7 +99,7 @@
 // ========== Data ==========
 const TOTAL = 600;
 
-// 当前曲线 = v2/js/script.js 实际推进（已贴愿景重调）
+// 当前曲线 = js/script.js 实际推进（已贴愿景重调）
 const cur = [
   { t: 0,   cov: 0,   scene: '场 1 黑暗水中', beat: 'init · bgColor 黑底（前 30s 真黑屏渲染孤独）' },
   { t: 12,  cov: 0,   scene: '场 1 黑暗水中', beat: '旁白 1 · pos far-lit · 金瞳 flash 一闪' },
