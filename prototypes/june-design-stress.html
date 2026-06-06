@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>回响弧 · 文字层极限静态测试</title>
+<style>
+/* ============================================================
+   极限状态静态测试页：3 张静态定格图横向铺一排
+   - 设备基准：iPhone 14 Pro Max 430×932（u ≈ 1.10）
+   - 字数上限：角色气泡 30 / 用户气泡 135 / 角色动作旁白 138
+   - 关掉所有动画、状态机、手势；只看排版
+   ============================================================ */
+:root {
+  --bg: #1a1a2e; --phone-bg: #070811; --sat: 0px;
+  --serif: 'Source Han Serif SC VF', 'Source Han Serif SC', 'Songti SC', 'STSong', serif;
+  --sans:  'Source Han Sans CN', 'Source Han Sans SC', 'PingFang SC', 'HarmonyOS Sans SC', sans-serif;
+}
+@property --stack-shift { syntax: '<length>'; initial-value: 0px; inherits: false; }
+@property --enter-y     { syntax: '<length>'; initial-value: 0px; inherits: false; }
+@property --breath-y    { syntax: '<length>'; initial-value: 0px; inherits: false; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  width: 100%;
+  background: var(--bg);
+  font-family: var(--sans);
+  color: rgba(255,235,210,0.9);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ---- 页头 ---- */
+.page-head {
+  padding: 32px 40px 16px;
+  border-bottom: 1px solid rgba(255,235,210,0.08);
+}
+.page-head h1 { font-size: 18px; font-weight: 500; letter-spacing: 0.12em; color: rgba(255,235,210,0.9); }
+.page-head p { margin-top: 8px; font-size: 12px; letter-spacing: 0.08em; color: rgba(255,235,210,0.45); line-height: 1.7; }
+
+/* ---- 三张定格图横向排列 ---- */
+.stress-row {
+  display: flex; gap: 40px;
+  padding: 32px 40px 64px;
+  overflow-x: auto;
+}
+.stress-cell { display: flex; flex-direction: column; gap: 12px; flex-shrink: 0; }
+.stress-label { font-size: 13px; letter-spacing: 0.1em; color: rgba(255,235,210,0.85); font-weight: 500; }
+.stress-caption {
+  width: 430px;
+  font-size: 11px; letter-spacing: 0.06em; line-height: 1.7;
+  color: rgba(255,235,210,0.4);
+}
+.stress-caption b { color: rgba(255,220,170,0.7); font-weight: 500; }
+
+/* ---- 手机框 ---- */
+.phone-frame {
+  width: 430px; height: 932px;
+  background: var(--phone-bg);
+  position: relative; overflow: hidden;
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.08), 0 20px 60px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.04);
+  flex-shrink: 0;
+}
+
+/* ---- 舞台 ---- */
+.stage { position:absolute; inset:0; overflow:hidden; }
+
+/* 场景 & 角色 */
+.scene-bg {
+  position:absolute; inset:0; z-index:0;
+  background: url('../src/images/cj5.jpg') center/cover no-repeat;
+  opacity: 1;
+}
+/* 角色：固定按手机框高度算（不用 vh，避免被外层页面 viewport 影响） */
+.character {
+  position:absolute; z-index:1;
+  left:calc(50% - 466px); top:5%;
+  width:932px; height:932px;
+  transform: translateY(140px) scale(0.7);
+  transform-origin: 50% 20%;
+  pointer-events:none;
+  opacity: 1;
+}
+.character img {
+  width:100%; height:100%;
+  object-fit:contain; object-position:center bottom;
+}
+
+canvas { position:absolute; inset:0; width:100%; height:100%; }
+#c-glow, .c-glow { z-index:4; }
+#c, .c-main { z-index:5; }
+
+/* ---- 文字层 ⑨：旁白 / 动作（narration-zone）+ 对话气泡（bubble-zone） ---- */
+.narration-zone {
+  position:absolute; left:50%; top:70%; width:88%;
+  transform:translate(-50%, -50%);
+  text-align:center; z-index:2; pointer-events:none;
+}
+.narration {
+  display:inline-block; position:relative; max-width:100%; margin:0;
+  font-family: var(--serif); font-style:italic; font-weight:300;
+  font-size:calc(14 * var(--u)); line-height:1.8; letter-spacing:0.06em;
+  color:rgba(255,240,215,0.92);
+  text-shadow:0 0 6px rgba(0,0,0,0.85), 0 1px 0 rgba(0,0,0,0.6);
+  z-index:0;
+}
+.narration.narration-action { color:rgba(195,210,255,0.96); }
+.narration.line-banner:not(:empty)::before {
+  content:''; position:absolute; left:-50vw; right:-50vw;
+  top:calc(-20 * var(--u)); bottom:auto; height:var(--banner-h, 0);
+  background:linear-gradient(to bottom,
+    rgba(6,6,12,0) 0,
+    rgba(6,6,12,0.78) calc(14 * var(--u)),
+    rgba(6,6,12,0.78) calc(100% - 14 * var(--u)),
+    rgba(6,6,12,0) 100%);
+  z-index:-1; pointer-events:none;
+}
+
+.bubble-zone { position:absolute; inset:0; z-index:3; pointer-events:none; overflow:hidden; }
+.bubble {
+  position:absolute; width:max-content; max-width:calc(286 * var(--u)); min-width:calc(80 * var(--u));
+  --stack-shift: 0px;
+  --enter-y: 0px;
+  --breath-y: 0px;
+  transform: translate(-50%, calc(var(--stack-shift) + var(--enter-y) + var(--breath-y)));
+  padding:calc(10 * var(--u)) calc(16 * var(--u)); border-radius:calc(18 * var(--u));
+  font-family: var(--serif); font-size:calc(16 * var(--u)); line-height:1.5; font-weight:400;
+  letter-spacing:0.05em; text-align:center; white-space:normal;
+  opacity:1;
+}
+.bubble-char {
+  color:rgba(195,210,255,0.96);
+  background:rgba(30,28,38,0.66);
+  box-shadow:0 0 18px rgba(0,0,0,0.42);
+  text-shadow:0 1px 2px rgba(0,0,0,0.7);
+}
+.bubble-user {
+  color:rgba(255,255,255,1);
+  background:rgba(40,30,22,0.66);
+  box-shadow:0 0 18px rgba(0,0,0,0.42);
+  text-shadow:0 1px 2px rgba(0,0,0,0.7);
+}
+
+/* ---- 左上角锚点（state 3 panel-open 态） ---- */
+.history-anchor {
+  position: absolute;
+  top: calc(18 * var(--u) + var(--sat)); left: calc(18 * var(--u));
+  width: calc(28 * var(--u)); height: calc(28 * var(--u));
+  z-index: 1010;
+}
+.history-anchor::after {
+  content: '';
+  position: absolute; top: calc(9 * var(--u)); left: calc(9 * var(--u));
+  width: calc(10 * var(--u)); height: calc(10 * var(--u));
+  background: #6e5b3a;
+  clip-path: polygon(50% 0%, 0% 86.6%, 100% 86.6%);
+}
+
+/* ---- 历史面板（state 3） ---- */
+.history-dim {
+  position: absolute; inset: 0;
+  z-index: 999;
+  background: rgba(7, 8, 17, 0.85);
+  opacity: 1;
+}
+.history-panel {
+  position: absolute; inset: 0;
+  z-index: 1000;
+  background: rgb(238, 228, 210);
+  opacity: 1;
+}
+.history-scroll {
+  position: absolute;
+  top: calc(52 * var(--u) + var(--sat)); left: 0; right: 0; bottom: 26%;
+  overflow-y: auto;
+  padding: calc(16 * var(--u)) calc(32 * var(--u)) calc(32 * var(--u));
+  font-family: var(--serif);
+  color: #2a2218;
+  line-height: 1.8;
+  letter-spacing: 0.06em;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 85%, transparent 100%);
+          mask-image: linear-gradient(to bottom, #000 0%, #000 85%, transparent 100%);
+}
+.history-scroll::-webkit-scrollbar { width: 3px; }
+.history-scroll::-webkit-scrollbar-thumb { background: rgba(110,91,58,0.3); border-radius: 2px; }
+.history-hint {
+  position: absolute;
+  left: 0; right: 0; bottom: calc(40 * var(--u));
+  z-index: 1001;
+  text-align: center;
+  font-family: var(--sans);
+  font-size: calc(11 * var(--u));
+  color: rgba(255, 235, 210, 0.55);
+  letter-spacing: 0.3em;
+  pointer-events: none;
+  opacity: 1;
+}
+
+.history-entry { margin: calc(26 * var(--u)) 0; }
+.history-entry:first-child { margin-top: 0; }
+.history-entry:last-child { margin-bottom: 0; }
+.h-narration {
+  color: #a08c66;
+  font-style: italic;
+  font-weight: 400;
+  font-size: calc(14 * var(--u));
+  padding-left: 1.5em;
+}
+.h-dialogue .h-speaker {
+  display: block;
+  font-size: calc(14 * var(--u));
+  font-weight: 700;
+  line-height: 1.3;
+  margin-bottom: 0;
+  letter-spacing: 0.04em;
+}
+.h-dialogue.h-speaker-you .h-speaker { color: #6e5b3a; }
+.h-dialogue.h-speaker-him .h-speaker { color: #8a7245; }
+.h-dialogue-text {
+  font-size: calc(15 * var(--u));
+  font-weight: 700;
+  padding-left: 1.5em;
+  color: #2a2218;
+}
+</style>
+</head>
+<body>
+
+<div class="page-head">
+  <h1>回响弧 · 文字层极限状态测试</h1>
+  <p>
+    设备基准：iPhone 14 Pro Max 430×932（u ≈ 1.10）&nbsp;&nbsp;|&nbsp;&nbsp;
+    上限以行数为准：角色气泡 <b>≤2 行</b>（=30 字，后端硬上限）/ 用户气泡 <b>≤9 行</b>（≈135 字）/ 角色动作旁白 <b>≤6 行</b>（≈138 字）<br>
+    所有动画、状态机、手势均关闭，纯静态定格，用于检查极限文字量下的排版问题。
+  </p>
+</div>
+
+<div class="stress-row">
+
+  <!-- ① 极限叠加：6 行动作旁白(≤138字) + 3 个 2 行角色气泡(=30字) + arc-invite -->
+  <div class="stress-cell">
+    <div class="stress-label">① 极限叠加（邀请态 + 满栈）</div>
+    <div class="phone-frame" data-state="stack3">
+      <div class="stage">
+        <div class="scene-bg"></div>
+        <div class="character"><img src="../src/images/xiaohuli.png" alt=""></div>
+        <div class="narration-zone"></div>
+        <div class="bubble-zone"></div>
+        <canvas class="c-glow"></canvas>
+        <canvas class="c-main"></canvas>
+      </div>
+    </div>
+    <div class="stress-caption">
+      <b>动作旁白 6 行</b>（≤138 字）+ <b>3 条角色气泡 2 行</b>（=30 字，后端硬上限）满栈（旧条带衰减透明 / 上推）+ 底部 <b>arc-invite 邀请态弧</b>覆盖最上层（z-index 5）。
+      检查：旁白顶端是否擦到头顶、3 条气泡是否顶到屏幕顶、邀请弧跟最底条气泡的距离。
+    </div>
+  </div>
+
+  <!-- ② 用户气泡 9 行(≤135 字) + arc-invite -->
+  <div class="stress-cell">
+    <div class="stress-label">② 用户气泡上限触顶</div>
+    <div class="phone-frame" data-state="user100">
+      <div class="stage">
+        <div class="scene-bg"></div>
+        <div class="character"><img src="../src/images/xiaohuli.png" alt=""></div>
+        <div class="bubble-zone"></div>
+        <canvas class="c-glow"></canvas>
+        <canvas class="c-main"></canvas>
+      </div>
+    </div>
+    <div class="stress-caption">
+      <b>用户气泡 9 行</b>（≤135 字）定位 bottom:28%。检查：气泡顶到屏幕约 40%（**会盖住角色脸约一半**，trade-off 已确认）；气泡跟底部 <b>arc-invite</b> 的间距是否够。
+    </div>
+  </div>
+
+  <!-- ③ 历史面板满屏 -->
+  <div class="stress-cell">
+    <div class="stress-label">③ 历史面板满屏</div>
+    <div class="phone-frame" data-state="history">
+      <div class="stage">
+        <div class="scene-bg"></div>
+        <div class="character"><img src="../src/images/xiaohuli.png" alt=""></div>
+        <canvas class="c-glow"></canvas>
+        <canvas class="c-main"></canvas>
+        <div class="history-anchor"></div>
+        <div class="history-dim"></div>
+        <div class="history-panel">
+          <div class="history-scroll"></div>
+        </div>
+        <div class="history-hint">点击空白处收回</div>
+      </div>
+    </div>
+    <div class="stress-caption">
+      <b>3 轮循环</b>（共 15 条）：每轮 = 1 条 6 行动作旁白(≤138 字)+ 3 条 2 行角色对话(=30 字，连续发言)+ 1 条 9 行用户长回复(≤135 字)。检查：圆形 mask 裁切边缘文字是否清晰、连续 3 条短气泡之间的节奏、长段落在窄列里的可读性。
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+// 极限文案
+// ============================================================
+const TEXT = {
+  // 6 行 角色动作旁白（≤138 字，约 23 字/行 × 6）
+  narrAction138: '（他靠在栏杆上，听见门响才慢慢转过头来，眼里的笑意先是淡淡浮起又被风吹散开去，手指无意识地在栏杆上敲了两下，又像是不知道该往哪儿放似的收回到袖子里，嘴唇动了动似乎想说什么，最终还是没能说出来，只是抬手把额前被风吹乱的一缕碎发轻轻别到耳后，连呼吸都好像跟海浪打到了同一节拍上。）',
+  // 9 条 2 行角色气泡（=30 字后端硬上限，约 15 字/行 × 2）—— 够 3 轮历史循环用，状态①取前 3 条
+  charBubbles30: [
+    '你来得正好，再晚一会儿天就要黑透了，那点橘色就要散在海里了。',
+    '今天天气真好，正好适合下班以后我们一起出门走一走再吃个晚饭。',
+    '我以为你今天可能不会再来了，没想到你还是按时出现在我面前了。',
+    '你看那夜色已经把最后那一点橘色吞掉了，只剩下天边一点点紫色。',
+    '其实我等你等了挺久，不过这种等待对我来说从来都不是一件苦事。',
+    '海风渐渐凉了，你把外套先披上吧，别真的站太久着凉就不好玩了。',
+    '昨天起就一直在盼今天，可真站到了你面前，一句话都说不出来了。',
+    '出门之前还在脑子里排过台词，到了这儿才发现什么都用不上来了。',
+    '你看今天的星比平时多，那颗最亮的也露脸了，先前一直藏着没出。',
+  ],
+  // 3 条 9 行用户气泡（≤135 字，约 15 字/行 × 9）—— 状态②取第 1 条，历史每轮取 1 条
+  userBubbles135: [
+    '也没多久。刚才在楼下路边遇见一个老人在卖白色的小雏菊，看着挺好看的就停下来挑了一束本来想送给你，结果走到一半被风一吹花瓣都散了一地我又折回去想换一束，所以才晚了几分钟，真是没想到你这么早就到了这里站着等我，下次我一定会提前出门，绝不会让你像今天这样在这里白白地等着我了。',
+    '我刚才在路上一直在想见到你应该先说什么，本来想了几句很妥帖的开头，结果走到楼下又突然全都忘了，最后只想着快点上来见你，所以连外套都没拿就直接跑过来了，到这里风一吹才反应过来今天其实挺冷的，你看我整个人都还在发抖，回去之前你能不能稍微陪我先在这边的栏杆旁边再多走走停一停。',
+    '其实我以前来过这里好几次，但每次都只是一个人坐在那边的长椅上看一会儿天就回去了，今天是我第一次有人陪我一起看这片海，感觉跟以前自己一个人的时候完全不一样，原来同一个地方有人一起会变得这样不一样，难怪以前总觉得这边的风冷，今天竟然一点都不觉得冷了反而还想再多陪你站一会儿。',
+  ],
+  // 3 条 6 行旁白（≤138 字）—— 历史每轮 1 条
+  narrations138: [
+    '（他靠在栏杆上，听见门响才慢慢转过头来，眼里的笑意先是淡淡浮起又被风吹散开去，手指无意识地在栏杆上敲了两下，又像是不知道该往哪儿放似的收回到袖子里，嘴唇动了动似乎想说什么，最终还是没能说出来，只是抬手把额前被风吹乱的一缕碎发轻轻别到耳后，连呼吸都好像跟海浪打到了同一节拍上。）',
+    '（他从口袋里摸出一支烟又放了回去，转身把目光重新落在天际线上，最后那点橘色正慢慢被夜色一点吞掉，他叹了一声像是在惋惜什么又像是在松一口气，伸手把衣领往上拽了拽挡住从海面吹上来的凉风，又把手插进口袋里靠在栏杆上没说话，只是侧过脸朝你这边偷偷看了一眼，灯光在他眼底映出一点暖色。）',
+    '（他没回头，只是抬手指了指远处一盏摇晃的渔火，那点光在浪里忽明忽暗，看得人心也跟着浮一下沉一下，他的侧脸映在剩下的余晖里下颌的线条比白天看上去更柔和，连呼吸都好像跟海浪打到了同一节拍上，过了一会儿他才把手慢慢收回来，转过来看你的时候眼睛里有一种你从来没见过的安静。）',
+  ],
+};
+
+// 历史脚本：3 轮循环 = 旁白 + 他×3 + 你 ×1
+TEXT.historyScript = (() => {
+  const out = [];
+  for (let cycle = 0; cycle < 3; cycle++) {
+    out.push({ type: 'narration', text: TEXT.narrations138[cycle] });
+    out.push({ type: 'dialogue', speaker: 'him', text: TEXT.charBubbles30[cycle * 3 + 0] });
+    out.push({ type: 'dialogue', speaker: 'him', text: TEXT.charBubbles30[cycle * 3 + 1] });
+    out.push({ type: 'dialogue', speaker: 'him', text: TEXT.charBubbles30[cycle * 3 + 2] });
+    out.push({ type: 'dialogue', speaker: 'you', text: TEXT.userBubbles135[cycle] });
+  }
+  return out;
+})();
+
+// ============================================================
+// 主流程：枚举每个手机框，按 data-state 渲染
+// ============================================================
+const BASE_H = 844;
+const P = { radiusVW: 120, arcPeekVH: 16, strokeWidth: 3, glowBlur: 14 };
+const CHAR_PAD_OVERLAP = 10;
+const CHAR_OPACITY_STEP = 0.35;
+const CHAR_OPACITY_FLOOR = 0.2;
+
+// ---- 单图渲染模式：?single=stack3|user100|history 时只渲染该帧、占满 1280×2800 视窗 ----
+const _singleState = new URLSearchParams(location.search).get('single');
+if (_singleState) {
+  document.documentElement.style.cssText = 'margin:0;padding:0;background:#070811;overflow:hidden';
+  document.body.style.cssText = 'margin:0;padding:0;background:#070811;overflow:hidden';
+  const head = document.querySelector('.page-head');
+  if (head) head.style.display = 'none';
+  document.querySelectorAll('.stress-row').forEach(r => { r.style.padding = '0'; r.style.gap = '0'; });
+  document.querySelectorAll('.stress-cell').forEach(cell => {
+    const frame = cell.querySelector('.phone-frame');
+    if (!frame || frame.dataset.state !== _singleState) {
+      cell.style.display = 'none';
+      return;
+    }
+    cell.style.cssText = 'gap:0;width:1280px;height:2800px';
+    cell.querySelectorAll('.stress-label, .stress-caption').forEach(el => el.style.display = 'none');
+    frame.style.cssText = 'width:1280px;height:2800px;background:#070811;position:relative;overflow:hidden;box-shadow:none;flex-shrink:0';
+    // 角色立绘改成跟新帧高度对齐（保持原本 5% top / scale 0.7 / 中心对齐的版型）
+    const ch = frame.querySelector('.character');
+    if (ch) ch.style.cssText = 'position:absolute;z-index:1;left:calc(50% - 1400px);top:5%;width:2800px;height:2800px;transform:translateY(420px) scale(0.7);transform-origin:50% 20%;pointer-events:none;opacity:1';
+  });
+}
+
+document.querySelectorAll('.phone-frame').forEach(initPhone);
+
+function initPhone(phone) {
+  const W = phone.clientWidth, H = phone.clientHeight;
+  const dpr = window.devicePixelRatio || 1;
+  const u = (n) => n * H / BASE_H;
+  const vw = (n) => n * W / 100;
+  const vh = (n) => n * H / 100;
+  phone.style.setProperty('--u', (H / BASE_H) + 'px');
+
+  const cGlow = phone.querySelector('.c-glow');
+  const cMain = phone.querySelector('.c-main');
+  if (cGlow) { cGlow.width = W * dpr; cGlow.height = H * dpr; cGlow.style.width = W + 'px'; cGlow.style.height = H + 'px'; }
+  if (cMain) { cMain.width = W * dpr; cMain.height = H * dpr; cMain.style.width = W + 'px'; cMain.style.height = H + 'px'; }
+  if (cGlow) cGlow.style.filter = `blur(${u(P.glowBlur)}px)`;
+
+  const ctxM = cMain && cMain.getContext('2d');
+  const ctxG = cGlow && cGlow.getContext('2d');
+
+  const state = phone.dataset.state;
+  if (state === 'stack3')   renderStack3(phone, { W, H, dpr, u, vw, vh, ctxM, ctxG });
+  if (state === 'user100')  renderUser100(phone, { W, H, dpr, u, vw, vh, ctxM, ctxG });
+  if (state === 'history')  renderHistory(phone, { W, H, dpr, u, vw, vh, ctxM, ctxG });
+}
+
+// ---- arc 几何（跟主原型一致） ----
+function arcAngles(W, cx, cy, r) {
+  const m = W * 0.20;
+  const a0 = Math.asin(Math.max(-1, Math.min(1, (cx-(W+m))/r)));
+  const a1 = Math.asin(Math.max(-1, Math.min(1, (cx-(-m))/r)));
+  return { s: -Math.PI/2+a0, e: -Math.PI/2+a1 };
+}
+function arcAnglesDown(W, cx, cy, r) {
+  const m = W * 0.20;
+  const cosR = Math.max(-1, Math.min(1, (W + m - cx) / r));
+  const cosL = Math.max(-1, Math.min(1, (-m - cx) / r));
+  return { s: Math.acos(cosR), e: Math.acos(cosL) };
+}
+
+// arc-invite 静态：底部呼吸弧的中点位置（不带呼吸偏移）
+function drawArcInvite({ W, H, dpr, u, vw, vh, ctxM, ctxG }) {
+  const r = vw(P.radiusVW);
+  const cx = W / 2;
+  const baseCy = H + r - vh(P.arcPeekVH);
+  const { s, e } = arcAngles(W, cx, baseCy, r);
+  // 主笔
+  ctxM.save(); ctxM.scale(dpr, dpr);
+  ctxM.beginPath(); ctxM.arc(cx, baseCy, r, s, e);
+  ctxM.strokeStyle = 'rgba(255,235,210,0.85)'; ctxM.lineWidth = u(P.strokeWidth); ctxM.lineCap = 'round';
+  ctxM.stroke();
+  ctxM.restore();
+  // glow
+  ctxG.save(); ctxG.scale(dpr, dpr);
+  ctxG.beginPath(); ctxG.arc(cx, baseCy, r, s, e);
+  ctxG.strokeStyle = 'rgba(255,235,210,0.22)'; ctxG.lineWidth = u(P.strokeWidth + 6); ctxG.lineCap = 'round';
+  ctxG.stroke();
+  ctxG.restore();
+}
+
+// 历史面板向下凸弧（state 3）
+function drawHistoryArc({ W, H, dpr, u, vw, vh, ctxM, ctxG }) {
+  const r = vw(P.radiusVW);
+  const cx = W / 2;
+  const cy = (H * 2 / 3 - r + u(120));
+  const { s, e } = arcAnglesDown(W, cx, cy, r);
+  // 描边
+  ctxM.save(); ctxM.scale(dpr, dpr);
+  ctxM.beginPath(); ctxM.arc(cx, cy, r, s, e);
+  ctxM.strokeStyle = 'rgba(255,235,210,0.15)'; ctxM.lineWidth = u(1);
+  ctxM.stroke();
+  ctxM.restore();
+  // glow
+  ctxG.save(); ctxG.scale(dpr, dpr);
+  ctxG.beginPath(); ctxG.arc(cx, cy, r, s, e);
+  ctxG.strokeStyle = 'rgba(255,235,210,0.10)'; ctxG.lineWidth = u(12);
+  ctxG.stroke();
+  ctxG.restore();
+}
+
+// ============================================================
+// 状态①：3 气泡满栈 + 100 字动作旁白 + arc-invite
+// ============================================================
+function renderStack3(phone, ctx) {
+  const { u } = ctx;
+  const narrZone = phone.querySelector('.narration-zone');
+  const bubbleZone = phone.querySelector('.bubble-zone');
+
+  // 旁白（动作类，自带 line-banner 暗带）
+  const narr = document.createElement('div');
+  narr.className = 'narration narration-action line-banner';
+  narr.textContent = TEXT.narrAction138;
+  narrZone.appendChild(narr);
+  // banner 高度跟着内容来
+  narr.style.setProperty('--banner-h', `${narr.offsetHeight + u(40)}px`);
+
+  // 3 个角色气泡：栈顶（最新）在 top:26%，底下两个分别上移 1 / 2 倍 shift，opacity 衰减
+  // 先全部插入，再算每个的 offsetHeight，最后回填 stack-shift / opacity
+  const bubbles = TEXT.charBubbles30.slice(0, 3).map((text, i) => {
+    const b = document.createElement('div');
+    b.className = 'bubble bubble-char';
+    b.style.left = '50%';
+    b.style.top = '26%';
+    b.textContent = text;
+    bubbleZone.appendChild(b);
+    return b;
+  });
+
+  // shift 用"上一条的实际高度 - u(10) overlap"做累计
+  // 模拟运行时的栈：i=0 是最早出现的（最老），i=2 最新（最亮，shift=0）
+  const newest = bubbles[bubbles.length - 1];
+  newest.style.opacity = 1;
+  newest.style.setProperty('--stack-shift', '0px');
+  // 反向累加：从最新（栈顶 i=N-1）往老（栈底 i=0）
+  let accShift = 0;
+  for (let i = bubbles.length - 2; i >= 0; i--) {
+    // 当前更新的"上一条"是栈索引 i+1，它的高度决定本条要让出多少
+    const prevHeight = bubbles[i + 1].offsetHeight;
+    accShift -= (prevHeight - u(CHAR_PAD_OVERLAP));
+    bubbles[i].style.setProperty('--stack-shift', `${accShift}px`);
+    const step = bubbles.length - 1 - i;     // 离栈顶多少层
+    const opacity = Math.max(CHAR_OPACITY_FLOOR, 1 - step * CHAR_OPACITY_STEP);
+    bubbles[i].style.opacity = String(opacity);
+  }
+
+  // 邀请态弧
+  drawArcInvite(ctx);
+}
+
+// ============================================================
+// 状态②：60 字用户气泡 + arc-invite
+// ============================================================
+function renderUser100(phone, ctx) {
+  const bubbleZone = phone.querySelector('.bubble-zone');
+  const b = document.createElement('div');
+  b.className = 'bubble bubble-user';
+  b.style.left = '50%';
+  b.style.bottom = '28%';
+  b.style.transform = 'translateX(-50%)';
+  b.textContent = TEXT.userBubbles135[0];
+  bubbleZone.appendChild(b);
+
+  drawArcInvite(ctx);
+}
+
+// ============================================================
+// 状态③：历史面板满屏
+// ============================================================
+function renderHistory(phone, ctx) {
+  const { u, vw, vh, W, H } = ctx;
+  const scroll = phone.querySelector('.history-scroll');
+  scroll.innerHTML = TEXT.historyScript.map(e => {
+    if (e.type === 'narration') {
+      const isAction = e.text.trim().startsWith('（');
+      const cls = 'history-entry h-narration' + (isAction ? ' h-narration-action' : '');
+      return `<div class="${cls}">${e.text}</div>`;
+    }
+    const speakerCls = e.speaker === 'you' ? 'h-speaker-you' : 'h-speaker-him';
+    const speakerLabel = e.speaker === 'you' ? '你' : '他';
+    return `<div class="history-entry h-dialogue ${speakerCls}"><div class="h-speaker">${speakerLabel}：</div><div class="h-dialogue-text">${e.text}</div></div>`;
+  }).join('');
+  // 默认滚到底（模拟刚打开历史的"最新在底"的视觉）
+  scroll.scrollTop = scroll.scrollHeight;
+
+  // 应用 mask：圆形剪裁，圆心在弧上方
+  const r = vw(P.radiusVW);
+  const cx = W / 2;
+  const cy = (H * 2 / 3 - r + u(120));
+  const clip = `circle(${r - u(7)}px at ${cx}px ${cy}px)`;
+  const panel = phone.querySelector('.history-panel');
+  panel.style.clipPath = clip;
+  panel.style.webkitClipPath = clip;
+
+  drawHistoryArc(ctx);
+}
+</script>
+</body>
+</html>

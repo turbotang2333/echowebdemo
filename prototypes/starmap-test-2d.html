@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Star Map 2D Prototype</title>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.164.0/build/three.module.js"
+  }
+}
+</script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+
+#stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+/* Content flow mock layer */
+.content-flow {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  transition: transform 600ms ease-out, opacity 400ms ease-out;
+  z-index: 1;
+}
+
+.content-flow h1 {
+  color: #e0e0e0;
+  font-size: 1.5rem;
+  font-family: system-ui, sans-serif;
+  margin-bottom: 1rem;
+}
+
+.content-flow p {
+  color: #999;
+  font-size: 0.9rem;
+  font-family: system-ui, sans-serif;
+  text-align: center;
+  padding: 0 2rem;
+  line-height: 1.6;
+}
+
+#enter-starmap {
+  margin-top: 2rem;
+  padding: 0.8rem 2rem;
+  background: rgba(179,136,255,0.12);
+  border: 1px solid rgba(179,136,255,0.3);
+  border-radius: 8px;
+  color: #b388ff;
+  font-size: 1rem;
+  font-family: system-ui, sans-serif;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+#enter-starmap:active {
+  background: rgba(179,136,255,0.25);
+}
+
+.content-flow .hint {
+  position: absolute;
+  bottom: 3rem;
+  color: #666;
+  font-size: 0.75rem;
+  font-family: system-ui, sans-serif;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+/* Star map canvas */
+#starmap-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 500ms ease-in;
+  z-index: 0;
+}
+
+/* Active state */
+#stage.starmap-active .content-flow {
+  transform: scale(1.5);
+  opacity: 0;
+  pointer-events: none;
+}
+
+#stage.starmap-active #starmap-canvas {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+#stage.starmap-active #exit-starmap {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Exit button */
+#exit-starmap {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: #ccc;
+  font-size: 1.2rem;
+  line-height: 2.5rem;
+  text-align: center;
+  cursor: pointer;
+  z-index: 200;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#exit-starmap:active {
+  background: rgba(255,255,255,0.25);
+}
+
+#hint-btn {
+  position: fixed;
+  top: 4.5rem;
+  right: 1rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background: rgba(179,136,255,0.15);
+  border: 1px solid rgba(179,136,255,0.3);
+  color: rgba(179,136,255,0.8);
+  font-size: 1.1rem;
+  line-height: 2.5rem;
+  text-align: center;
+  cursor: pointer;
+  z-index: 200;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+  -webkit-tap-highlight-color: transparent;
+}
+#hint-btn.visible { opacity: 1; pointer-events: auto; }
+#hint-btn:active { background: rgba(179,136,255,0.3); }
+
+/* Mode indicator */
+#mode-label {
+  position: fixed;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #fff;
+  font-size: 0.7rem;
+  font-family: monospace;
+  background: rgba(0,0,0,0.5);
+  padding: 0.3rem 0.8rem;
+  border-radius: 4px;
+  z-index: 100;
+  pointer-events: none;
+}
+
+/* Black hole bottom arc */
+#blackhole-arc {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%) translateY(78%);
+  width: 130vw;
+  height: 130vw;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at center,
+    rgba(179, 136, 255, 0) 0%,
+    rgba(179, 136, 255, 0) 15%,
+    rgba(179, 136, 255, 0.25) 35%,
+    rgba(179, 136, 255, 0.45) 50%,
+    rgba(179, 136, 255, 0.2) 68%,
+    rgba(179, 136, 255, 0.05) 85%,
+    transparent 100%
+  );
+  pointer-events: none;
+  opacity: 0;
+  z-index: 10;
+  transition: opacity 1.5s ease-out, transform 2s cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+#blackhole-arc.visible {
+  opacity: 1;
+}
+
+#blackhole-arc.entering {
+  transform: translateX(-50%) translateY(98%);
+  opacity: 0;
+  transition: none;
+}
+
+.bh-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at center,
+    transparent 55%,
+    rgba(179, 136, 255, 0.5) 70%,
+    rgba(179, 136, 255, 0.6) 80%,
+    rgba(179, 136, 255, 0.15) 92%,
+    transparent 100%
+  );
+  animation: ring-collapse 4s linear infinite;
+  opacity: 0;
+}
+
+#blackhole-arc.visible .bh-ring { opacity: 1; }
+
+.bh-ring:nth-child(1) { animation-delay: 0s; }
+.bh-ring:nth-child(2) { animation-delay: -0.8s; }
+.bh-ring:nth-child(3) { animation-delay: -1.6s; }
+.bh-ring:nth-child(4) { animation-delay: -2.4s; }
+.bh-ring:nth-child(5) { animation-delay: -3.2s; }
+
+@keyframes ring-collapse {
+  0% { transform: scale(1) rotate(0deg); opacity: 0; }
+  10% { opacity: 0.5; }
+  85% { opacity: 0.5; }
+  100% { transform: scale(0.2) rotate(25deg); opacity: 0; }
+}
+
+/* Puzzle slots */
+#puzzle-slots {
+  position: fixed;
+  left: 50%;
+  bottom: 18vh;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 2.5rem;
+  z-index: 15;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.6s ease-out;
+}
+#puzzle-slots.visible { opacity: 1; }
+
+.puzzle-slot {
+  width: 3.2rem;
+  height: 3.2rem;
+  border-radius: 50%;
+  border: 2px solid rgba(179, 136, 255, 0.35);
+  background: rgba(179, 136, 255, 0.05);
+  box-shadow: 0 0 12px rgba(179, 136, 255, 0.12);
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+}
+.puzzle-slot.near {
+  border-color: rgba(179, 136, 255, 0.8);
+  box-shadow: 0 0 20px rgba(179, 136, 255, 0.4);
+}
+.puzzle-slot.filled {
+  border-color: rgba(230, 230, 255, 0.6);
+  background: radial-gradient(circle, rgba(232,232,255,0.5) 0%, rgba(232,232,255,0.08) 60%, transparent 100%);
+}
+
+/* Drag ghost */
+#drag-ghost {
+  position: fixed;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(232,232,255,0.9) 0%, rgba(232,232,255,0.3) 40%, transparent 70%);
+  pointer-events: none;
+  z-index: 20;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  transition: opacity 0.15s;
+}
+#drag-ghost.active { opacity: 1; }
+
+/* Flash animations */
+@keyframes rainbow-flash {
+  0%   { filter: hue-rotate(0deg) brightness(2); }
+  25%  { filter: hue-rotate(90deg) brightness(2.5); }
+  50%  { filter: hue-rotate(180deg) brightness(2); }
+  75%  { filter: hue-rotate(270deg) brightness(2.5); }
+  100% { filter: hue-rotate(360deg) brightness(2); }
+}
+.puzzle-slot.flash-wrong { animation: rainbow-flash 0.8s ease-in-out; }
+
+@keyframes gold-flash {
+  0%   { box-shadow: 0 0 10px rgba(255,215,0,0.5); border-color: rgba(255,215,0,0.8); }
+  50%  { box-shadow: 0 0 30px rgba(255,215,0,1); border-color: rgba(255,215,0,1); }
+  100% { box-shadow: 0 0 10px rgba(255,215,0,0.5); border-color: rgba(255,215,0,0.8); }
+}
+.puzzle-slot.flash-correct { animation: gold-flash 0.8s ease-in-out; }
+
+/* Back link */
+.back-link {
+  position: fixed;
+  bottom: 1rem;
+  left: 1rem;
+  color: #666;
+  font-size: 0.75rem;
+  font-family: system-ui, sans-serif;
+  text-decoration: none;
+  z-index: 200;
+}
+.back-link:hover { color: #999; }
+</style>
+</head>
+<body>
+
+<div id="mode-label">MODE: content (2D)</div>
+<button id="exit-starmap">&times;</button>
+<button id="hint-btn">?</button>
+<div id="blackhole-arc">
+  <div class="bh-ring"></div>
+  <div class="bh-ring"></div>
+  <div class="bh-ring"></div>
+  <div class="bh-ring"></div>
+  <div class="bh-ring"></div>
+</div>
+<div id="puzzle-slots">
+  <div class="puzzle-slot" data-slot="0"></div>
+  <div class="puzzle-slot" data-slot="1"></div>
+  <div class="puzzle-slot" data-slot="2"></div>
+</div>
+<div id="drag-ghost"></div>
+
+<div id="stage">
+  <canvas id="starmap-canvas"></canvas>
+  <div class="content-flow">
+    <h1>内容流（模拟）</h1>
+    <p>这里代表正常的叙事内容层。<br>2D 平面星图版本</p>
+    <button id="enter-starmap">进入星图（2D）</button>
+    <span class="hint">点击按钮进入星图 &nbsp;|&nbsp; 桌面 S=切换 O=全览 B=黑洞</span>
+  </div>
+</div>
+
+<a class="back-link" href="starmap-test.html">&larr; 返回 3D 版</a>
+
+<script type="module">
+import { init, getMode, getLevel } from './starmap-2d/starmap-2d-mode.js';
+
+const stage = document.getElementById('stage');
+const canvas = document.getElementById('starmap-canvas');
+const label = document.getElementById('mode-label');
+
+init(stage, canvas);
+
+setInterval(() => {
+  const mode = getMode();
+  const level = mode === 'starmap' ? ` [${getLevel()}]` : '';
+  label.textContent = `MODE: ${mode}${level} (2D)`;
+}, 200);
+</script>
+</body>
+</html>

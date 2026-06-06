@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>回响 · 登录（现代版）</title>
+<style>
+:root {
+  --bg: #0a0a0c;
+  --surface: rgba(255,255,255,0.05);
+  --surface-strong: rgba(255,255,255,0.09);
+  --border: rgba(255,255,255,0.08);
+  --border-focus: rgba(255,255,255,0.45);
+  --text-1: #ffffff;
+  --text-2: rgba(255,255,255,0.55);
+  --text-3: rgba(255,255,255,0.35);
+  --text-disabled: rgba(255,255,255,0.25);
+  --primary-bg: #ffffff;
+  --primary-text: #0a0a0c;
+  --sheet: #16161b;
+  --error: #ff7a6c;
+  --sans: system-ui, -apple-system, BlinkMacSystemFont, "PingFang SC", "Source Han Sans CN", "HarmonyOS Sans SC", sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  width: 100%; height: 100%;
+  font-family: var(--sans);
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+body {
+  background: #14141a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: var(--text-1);
+}
+
+/* ===== 手机壳：桌面端模拟手机 ===== */
+.phone-frame {
+  position: relative;
+  height: 95vh;
+  aspect-ratio: 9 / 19.5;
+  background: var(--bg);
+  border-radius: 0;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.06),
+    0 30px 80px rgba(0,0,0,0.6);
+}
+@media (max-width: 768px) {
+  body { background: var(--bg); }
+  .phone-frame {
+    width: 100vw; height: 100vh;
+    aspect-ratio: auto;
+    box-shadow: none;
+  }
+}
+
+/* ===== 回响弧 canvas =====
+   两层 canvas：#c 画主弧 + 光浪；#c-glow 画柔光，用 CSS blur 给柔化（同 test 页）
+   弧 + 光浪都由 JS 在 requestAnimationFrame 里持续重绘 */
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+#c-glow { z-index: 0; }
+#c      { z-index: 1; }
+
+/* ===== 左上角"切登录态"小圆点（审稿用） ===== */
+.state-toggle {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 18px);
+  left: 18px;
+  width: 30px; height: 30px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 300;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0;
+  transition: background 0.2s, border-color 0.2s;
+}
+.state-toggle:hover { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.3); }
+.state-toggle .dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--text-3);
+  transition: background 0.2s, box-shadow 0.2s;
+}
+.state-toggle.logged-in .dot {
+  background: #6bd99a;
+  box-shadow: 0 0 8px rgba(107, 217, 154, 0.55);
+}
+
+/* ===== 主内容：从屏幕 22% 处往下排 ===== */
+.content {
+  position: absolute;
+  top: 22%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 88%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  z-index: 5;
+}
+
+.title {
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text-1);
+  margin-bottom: 36px;
+  transition: opacity 0.25s;
+}
+
+/* ===== 输入框：深色实底圆角矩形（完全挡住后面浪/光池） ===== */
+.input-wrap {
+  display: flex;
+  align-items: center;
+  height: 52px;
+  background: #16161b;                 /* 比页面 bg #0a0a0c 浅一档，自带"凸起感" */
+  border-radius: 12px;
+  border: 1px solid transparent;
+  transition: background 0.2s, border-color 0.2s;
+  overflow: hidden;
+}
+.input-wrap + .input-wrap { margin-top: 12px; }
+.input-wrap:focus-within {
+  background: #1c1c24;                 /* 聚焦时再浅一档 */
+  border-color: var(--border-focus);
+}
+.input-wrap.shake { animation: shake 0.32s ease-in-out; }
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-5px); }
+  40% { transform: translateX(5px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(3px); }
+}
+
+.country-code {
+  display: flex; align-items: center; justify-content: center;
+  height: 100%;
+  padding: 0 16px;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-1);
+  border-right: 1px solid var(--border);
+  flex-shrink: 0;
+  letter-spacing: 0.02em;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 0 16px;
+  color: var(--text-1);
+  caret-color: var(--text-1);
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+.input::placeholder { color: var(--text-3); font-weight: 400; letter-spacing: 0.05em; }
+
+/* 获取验证码：贴在码框右侧，无底色、纯文字 */
+.get-code-btn {
+  flex-shrink: 0;
+  height: 100%;
+  padding: 0 16px;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-1);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.2s;
+  white-space: nowrap;
+}
+.get-code-btn:disabled {
+  color: rgba(255, 255, 255, 0.65);    /* 提亮到激活感（仍比 enabled 100% 略暗） */
+  cursor: default;
+}
+
+.error-text {
+  font-size: 12px;
+  color: var(--error);
+  margin-top: 10px;
+  min-height: 16px;
+  opacity: 0;
+  transition: opacity 0.25s;
+  letter-spacing: 0.02em;
+}
+.error-text.visible { opacity: 1; }
+
+/* 主按钮：未激活实色深底灰字；激活后白底黑字高对比 */
+.primary-btn {
+  margin-top: 24px;
+  height: 52px;
+  background: #16161b;                 /* 实色挡住后面浪，跟输入框同色 */
+  color: var(--text-disabled);
+  border: none;
+  outline: none;
+  border-radius: 12px;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: default;
+  transition: background 0.2s, color 0.2s, transform 0.08s;
+}
+.primary-btn.active {
+  background: var(--primary-bg);
+  color: var(--primary-text);
+  cursor: pointer;
+}
+.primary-btn.active:active { transform: translateY(1px); }
+
+/* ===== 底部"我有邀请码"：落在光池上，用深色字适配暖光底 ===== */
+.footer {
+  position: absolute;
+  bottom: 10%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.85);               /* 提亮到激活感（印章式清晰落款） */
+  z-index: 5;
+}
+.footer .link {
+  cursor: pointer;
+  transition: color 0.2s;
+  padding: 4px 2px;
+}
+.footer .link:hover { color: rgba(0, 0, 0, 1); }
+
+/* ===== "账号密码登录" / "切换账号"：紧贴主按钮下方 ===== */
+.below-btn-link {
+  display: block;
+  margin-top: 14px;
+  text-align: center;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.75);    /* 提亮到激活感 */
+  cursor: pointer;
+  transition: color 0.2s;
+  letter-spacing: 0.02em;
+}
+.below-btn-link:hover { color: var(--text-1); }
+.below-btn-link.hidden { display: none; }
+
+/* ===== 已登录态：上半留空 + "您已登录"贴按钮上方 + "切换账号"贴按钮下方 ===== */
+.content-login, .content-welcome { display: none; }
+.content-login.active  { display: flex; }
+.content-welcome.active { display: flex; align-items: stretch; }
+.welcome-top-spacer {
+  /* 70 (title) + 116 (两个 input 含 12 间距) + 26 (error min-height + margin) - 18 (welcome-message 高度) = 194 */
+  height: 194px;
+}
+.welcome-message {
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--text-2);
+  text-align: center;
+  margin-bottom: 0;
+}
+.welcome-btn { margin-top: 24px; }
+
+/* ===== 表单组切换：手机号 ↔ 账号密码（同页 inline 切换） ===== */
+.fields {
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  left: 0; right: 0;
+  transition: opacity 0.25s ease;
+}
+.fields.active {
+  position: static;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ===== Modal：邀请码 ===== */
+.modal-backdrop {
+  position: absolute; inset: 0;
+  background: rgba(0,0,0,0.65);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  z-index: 200;
+}
+.modal-backdrop.visible { opacity: 1; pointer-events: auto; }
+.modal {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 86%;
+  max-width: 340px;
+  background: var(--sheet);
+  border-radius: 18px;
+  padding: 22px 22px 22px;
+  z-index: 210;
+  opacity: 0;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  transform: translate(-50%, calc(-50% + 16px)) scale(0.97);
+  transition: opacity 0.28s ease, transform 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.modal.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, -50%) scale(1);
+}
+.modal-close {
+  position: absolute;
+  top: 10px; right: 10px;
+  width: 32px; height: 32px;
+  background: transparent;
+  border: none;
+  color: var(--text-3);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 8px;
+  transition: background 0.2s, color 0.2s;
+}
+.modal-close:hover { background: rgba(255,255,255,0.06); color: var(--text-1); }
+.modal-title {
+  font-size: 19px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.modal-subtitle {
+  font-size: 13px;
+  color: var(--text-2);
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+</style>
+</head>
+<body>
+
+<div class="phone-frame" id="phone-frame">
+  <!-- 回响弧 + 上升光浪：两层 canvas，下层柔光、上层主弧 + 光浪 -->
+  <canvas id="c-glow"></canvas>
+  <canvas id="c"></canvas>
+
+  <!-- 左上角"切登录态"小圆点：审稿用，真实产品看不到 -->
+  <button class="state-toggle" id="state-toggle" aria-label="切换登录状态">
+    <span class="dot"></span>
+  </button>
+
+  <!-- 未登录态：登录表单 -->
+  <div class="content content-login active" id="content-login">
+    <h1 class="title" id="title">手机号注册/登录</h1>
+
+    <!-- 手机号 / 验证码 表单组：两个框一进来都显示 -->
+    <div class="fields fields-phone" id="fields-phone">
+      <div class="input-wrap" id="phone-wrap">
+        <span class="country-code">+86</span>
+        <input class="input" id="phone-input" type="tel" inputmode="numeric"
+               placeholder="手机号" maxlength="13" autocomplete="off">
+      </div>
+
+      <div class="input-wrap" id="code-wrap" style="margin-top:12px">
+        <input class="input" id="code-input" type="text" inputmode="numeric"
+               placeholder="验证码" maxlength="6" autocomplete="off">
+        <button class="get-code-btn" id="get-code-btn">获取验证码</button>
+      </div>
+    </div>
+
+    <!-- 账号 / 密码 表单组：点按钮下方"账号密码登录"切到这里 -->
+    <div class="fields fields-password" id="fields-password">
+      <div class="input-wrap">
+        <input class="input" id="account-input" placeholder="账号" autocomplete="off">
+      </div>
+      <div class="input-wrap" style="margin-top:12px">
+        <input class="input" id="pwd-input" type="password" placeholder="密码" autocomplete="off">
+      </div>
+    </div>
+
+    <div class="error-text" id="error"></div>
+
+    <button class="primary-btn" id="primary-btn">注册 / 登录</button>
+
+    <!-- 主按钮正下方紧贴：模式切换链接（手机号模式→"账号密码登录"，账密模式→"手机号注册/登录"） -->
+    <span class="below-btn-link" id="mode-toggle" data-mode="password">账号密码登录</span>
+  </div>
+
+  <!-- 已登录态：上半留空，"您已登录"+按钮+"切换账号"贴在登录页按钮的位置 -->
+  <div class="content content-welcome" id="content-welcome">
+    <div class="welcome-top-spacer" aria-hidden="true"></div>
+    <p class="welcome-message">您已登录</p>
+    <button class="primary-btn active welcome-btn" id="welcome-btn">进 入</button>
+    <span class="below-btn-link" id="welcome-toggle">切换账号</span>
+  </div>
+
+  <!-- 页面最底部：我有邀请码（已登录或账密模式下隐藏） -->
+  <div class="footer" id="footer">
+    <span class="link" id="invite-link">我有邀请码</span>
+  </div>
+
+  <!-- Modal: 邀请码 -->
+  <div class="modal-backdrop" id="modal-backdrop"></div>
+  <div class="modal" id="modal">
+    <button class="modal-close" id="modal-close" aria-label="关闭">×</button>
+    <h2 class="modal-title">输入邀请码</h2>
+    <p class="modal-subtitle">凭一段邀请，加入回响</p>
+    <div class="input-wrap" id="invite-wrap">
+      <input class="input" id="invite-input" placeholder="邀请码" autocomplete="off">
+    </div>
+    <div class="error-text" id="invite-error">邀请码无效，再试一次</div>
+    <button class="primary-btn" id="invite-btn">验证</button>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// 主登录页：mode = 'phone' / 'password'
+//   phone:    手机号 + 验证码（两个框一进来都显示）→ 注册/登录
+//   password: 账号密码登录（按钮下方链接切过来/切回）
+// ============================================================
+let mode = 'phone';
+
+const $ = id => document.getElementById(id);
+
+// ============================================================
+// 回响弧 + 上升光浪（完全照搬 june-design-test.html arc-invite + drawFillTutorial）
+//   主弧：半径 vw(120)、弧顶在屏幕底起 16% 处、4.2s 缓慢呼吸（alpha 0.5~0.9）
+//   光浪：3s 周期、ease-out、从屏下 5% 升到 H/3、垂直渐变填充、错相叠两浪
+// ============================================================
+const phoneFrame = $('phone-frame');
+const cMain = $('c');
+const cGlow = $('c-glow');
+const ctxM  = cMain.getContext('2d');
+const ctxG  = cGlow.getContext('2d');
+
+const P = {
+  radiusVW: 120,
+  arcPeekVH: 22,                  // 弧顶在屏幕 78% 处 = 下方留 22% 给光池
+  strokeWidth: 3, arcBreathAmp: 2.75, arcBreathPeriod: 4.2,
+  glowBlur: 14,
+  fillAlpha: 0.10,                // 上升光浪峰值（已降亮、减少抢戏）
+  poolAlphaBase: 0.70,            // 光池圆心基础 alpha（径向渐变的圆心值）
+  poolAlphaBreath: 0.30,          // 光池呼吸幅度（swing 翻倍，呼吸更明显）
+};
+
+let W, H, dpr;
+function resizeCanvas() {
+  dpr = window.devicePixelRatio || 1;
+  W = phoneFrame.clientWidth;
+  H = phoneFrame.clientHeight;
+  for (const cv of [cMain, cGlow]) {
+    cv.width = W * dpr; cv.height = H * dpr;
+    cv.style.width = W + 'px'; cv.style.height = H + 'px';
+  }
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+function vw(n) { return n * W / 100; }
+function vh(n) { return n * H / 100; }
+
+// 弧顶角度（沿用 test 页 arcAngles）
+function arcAngles(cx, cy, r) {
+  const m = vw(20);
+  const a0 = Math.asin(Math.max(-1, Math.min(1, (cx - (W + m)) / r)));
+  const a1 = Math.asin(Math.max(-1, Math.min(1, (cx - (-m)) / r)));
+  return { s: -Math.PI / 2 + a0, e: -Math.PI / 2 + a1 };
+}
+
+// 主弧描边 + 柔光（沿用 test 页 drawStroke）
+function drawStroke(cx, cy, r, sw, alpha, glowAlpha) {
+  const { s, e } = arcAngles(cx, cy, r);
+  if (alpha > 0.005) {
+    ctxM.save(); ctxM.scale(dpr, dpr);
+    ctxM.beginPath(); ctxM.arc(cx, cy, r, s, e);
+    ctxM.strokeStyle = `rgba(255,235,210,${alpha})`;
+    ctxM.lineWidth = sw; ctxM.lineCap = 'round'; ctxM.stroke();
+    ctxM.restore();
+  }
+  if (glowAlpha > 0.005) {
+    ctxG.save(); ctxG.scale(dpr, dpr);
+    ctxG.beginPath(); ctxG.arc(cx, cy, r, s, e);
+    ctxG.strokeStyle = `rgba(255,235,210,${glowAlpha})`;
+    ctxG.lineWidth = sw + 6; ctxG.lineCap = 'round'; ctxG.stroke();
+    ctxG.restore();
+  }
+}
+
+// 上升光浪：细弧带（不再有长尾巴），从弧顶升起到屏顶
+// phase = 当前浪在生命周期的进度 [0, 1]
+function drawRisingWave(phase) {
+  const r = vw(P.radiusVW);
+  const t = 1 - Math.pow(1 - phase, 2);                  // ease-out 二次（先快后慢）
+  const startY = H + vh(5);                              // 起点：屏外深处（不再突然出现）
+  const endY   = vh(5);                                  // 终点：屏幕近顶
+  const arcTopY = startY + (endY - startY) * t;
+  const bandCy = arcTopY + r;
+  // 包络：前 5% phase 用 sin 淡入避免 pop，之后线性衰减到 0
+  // 浪在弧位刚冒出时最亮，向上一路淡出 —— 最亮区跟内容区在垂直方向上分离
+  const FADE_IN_END = 0.05;
+  let envelope;
+  if (phase < FADE_IN_END) {
+    envelope = Math.sin(phase / FADE_IN_END * Math.PI / 2);
+  } else {
+    envelope = 1 - (phase - FADE_IN_END) / (1 - FADE_IN_END);
+  }
+  const fadeA = P.fillAlpha * envelope;
+  if (fadeA < 0.005) return;
+
+  ctxM.save(); ctxM.scale(dpr, dpr);
+  const { s, e } = arcAngles(W / 2, bandCy, r);
+  ctxM.beginPath(); ctxM.arc(W / 2, bandCy, r, s, e);
+  ctxM.lineTo(W / 2 + r * Math.cos(e), H + 40);
+  ctxM.lineTo(W / 2 + r * Math.cos(s), H + 40);
+  ctxM.closePath();
+
+  // 径向渐变：圆心 = 弧的圆心（bandCy），等亮度线跟弧同心
+  // 浪的"底部边界"变成跟弧形同心的曲线，不再是水平线 — 消除眼睛感知的"水平硬切"
+  const trailDown = vh(15);
+  const grad = ctxM.createRadialGradient(
+    W / 2, bandCy, r - trailDown,                         // 内圈：alpha 0（弧下方 vh(15) 处）
+    W / 2, bandCy, r                                      // 外圈：peak alpha（在弧位）
+  );
+  grad.addColorStop(0, 'rgba(255,235,210,0)');
+  grad.addColorStop(1, `rgba(255,235,210,${fadeA})`);
+  ctxM.fillStyle = grad; ctxM.fill();
+  ctxM.restore();
+}
+
+// 方案 B 光池：径向渐变 — 圆心最亮、弧边透明
+// 圆心在屏外深处（屏底下方很远），光强按到圆心的距离衰减
+// 视觉上光池里的亮度沿弧形等高线分布，跟弧的几何契合
+function drawLightPool(cx, cy, r, alpha) {
+  if (alpha < 0.005) return;
+  ctxM.save(); ctxM.scale(dpr, dpr);
+  const { s, e } = arcAngles(cx, cy, r);
+  ctxM.beginPath(); ctxM.arc(cx, cy, r, s, e);
+  ctxM.lineTo(cx + r * Math.cos(e), H + 40);
+  ctxM.lineTo(cx + r * Math.cos(s), H + 40);
+  ctxM.closePath();
+  // 径向渐变：圆心 → 半径 r 的弧边
+  const grad = ctxM.createRadialGradient(cx, cy, 0, cx, cy, r);
+  grad.addColorStop(0, `rgba(255,235,210,${alpha})`);
+  grad.addColorStop(1, 'rgba(255,235,210,0)');
+  ctxM.fillStyle = grad; ctxM.fill();
+  ctxM.restore();
+}
+
+// 主循环：清屏 → 光池（呼吸）→ 上升光浪（与弧呼吸同周期）
+function tick(now) {
+  ctxM.clearRect(0, 0, cMain.width, cMain.height);
+  ctxG.clearRect(0, 0, cGlow.width, cGlow.height);
+
+  const r  = vw(P.radiusVW);
+  const cx = W / 2;
+  const tSec = now / 1000;
+  const baseCy = H + r - vh(P.arcPeekVH);
+  const b = Math.sin(tSec / P.arcBreathPeriod * Math.PI * 2);
+  const arcCy = baseCy - vh(P.arcBreathAmp) * b * 0.5;
+
+  // 光池：alpha = 0.40 ± 0.10，屏底最亮，弧位边界透明
+  drawLightPool(cx, arcCy, r, P.poolAlphaBase + P.poolAlphaBreath * b);
+
+  // 上升光浪：单浪、周期 = 弧呼吸周期、sin 包络无 pop
+  const phase = (tSec % P.arcBreathPeriod) / P.arcBreathPeriod;
+  drawRisingWave(phase);
+
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+const phoneInput   = $('phone-input');
+const codeInput    = $('code-input');
+const accountInput = $('account-input');
+const pwdInput     = $('pwd-input');
+const primaryBtn   = $('primary-btn');
+const title        = $('title');
+const getCodeBtn   = $('get-code-btn');
+const fieldsPhone  = $('fields-phone');
+const fieldsPwd    = $('fields-password');
+const modeToggle   = $('mode-toggle');
+const inviteLink   = $('invite-link');
+
+// 初始：手机号表单组激活
+fieldsPhone.classList.add('active');
+
+// 左上角"切登录态"按钮 + 欢迎态
+const stateToggle    = $('state-toggle');
+const contentLogin   = $('content-login');
+const contentWelcome = $('content-welcome');
+const welcomeBtn     = $('welcome-btn');
+const welcomeToggle  = $('welcome-toggle');
+const footer         = $('footer');
+let isLoggedIn = false;
+
+function setLoggedIn(value) {
+  isLoggedIn = value;
+  if (value) {
+    contentLogin.classList.remove('active');
+    contentWelcome.classList.add('active');
+    footer.style.display = 'none';
+    stateToggle.classList.add('logged-in');
+    // 重置欢迎按钮文案
+    welcomeBtn.textContent = '进 入';
+    welcomeBtn.classList.add('active');
+  } else {
+    contentWelcome.classList.remove('active');
+    contentLogin.classList.add('active');
+    footer.style.display = '';
+    stateToggle.classList.remove('logged-in');
+  }
+}
+
+stateToggle.addEventListener('click', () => setLoggedIn(!isLoggedIn));
+
+welcomeBtn.addEventListener('click', () => {
+  welcomeBtn.textContent = '进入中…';
+  welcomeBtn.classList.remove('active');
+  setTimeout(() => { welcomeBtn.textContent = '✓ 已进入'; }, 800);
+});
+
+// "切换账号"小字：从欢迎态退回登录页
+welcomeToggle.addEventListener('click', () => setLoggedIn(false));
+
+// 手机号：自动按 3-4-4 分段空格；只接受数字
+phoneInput.addEventListener('input', () => {
+  const digits = phoneInput.value.replace(/\D/g, '').slice(0, 11);
+  let formatted = digits;
+  if (digits.length > 7)      formatted = digits.slice(0,3) + ' ' + digits.slice(3,7) + ' ' + digits.slice(7);
+  else if (digits.length > 3) formatted = digits.slice(0,3) + ' ' + digits.slice(3);
+  phoneInput.value = formatted;
+  syncPrimaryBtn();
+  syncGetCodeBtn();
+});
+
+codeInput.addEventListener('input', () => {
+  codeInput.value = codeInput.value.replace(/\D/g, '').slice(0, 6);
+  syncPrimaryBtn();
+});
+
+[accountInput, pwdInput].forEach(i => {
+  i.addEventListener('input', syncPrimaryBtn);
+  i.addEventListener('keydown', e => { if (e.key === 'Enter') primaryBtn.click(); });
+});
+
+function getDigits(el) { return el.value.replace(/\D/g, ''); }
+
+function syncPrimaryBtn() {
+  let ok = false;
+  if (mode === 'phone')         ok = getDigits(phoneInput).length > 0 && codeInput.value.length === 6;
+  else if (mode === 'password') ok = accountInput.value.trim() && pwdInput.value.trim();
+  primaryBtn.classList.toggle('active', ok);
+}
+
+// 获取验证码按钮：手机号非空就可点；倒计时进行中禁用
+function syncGetCodeBtn() {
+  if (countdownTimer) return;                              // 倒计时进行中不动它
+  const hasPhone = getDigits(phoneInput).length > 0;
+  getCodeBtn.disabled = !hasPhone;
+  getCodeBtn.textContent = '获取验证码';
+}
+
+primaryBtn.addEventListener('click', () => {
+  if (!primaryBtn.classList.contains('active')) return;
+  primaryBtn.textContent = '登录中…';
+  primaryBtn.classList.remove('active');
+  setTimeout(() => { primaryBtn.textContent = '✓ 已登录'; }, 900);
+});
+
+// 验证码倒计时（手机号非空时点"获取验证码"触发）
+let countdownTimer = null;
+function startCountdown(seconds = 60) {
+  if (countdownTimer) clearInterval(countdownTimer);
+  let remain = seconds;
+  getCodeBtn.disabled = true;
+  getCodeBtn.textContent = `${remain}s`;
+  countdownTimer = setInterval(() => {
+    remain--;
+    if (remain <= 0) {
+      clearInterval(countdownTimer); countdownTimer = null;
+      syncGetCodeBtn();                                    // 倒计时完恢复（看手机号是否还有内容）
+      getCodeBtn.textContent = '重发';
+    } else {
+      getCodeBtn.textContent = `${remain}s`;
+    }
+  }, 1000);
+}
+getCodeBtn.addEventListener('click', () => {
+  if (getCodeBtn.disabled) return;
+  startCountdown(60);
+});
+
+phoneInput.addEventListener('keydown', e => { if (e.key === 'Enter') primaryBtn.click(); });
+codeInput.addEventListener('keydown',  e => { if (e.key === 'Enter') primaryBtn.click(); });
+
+// 初始按钮状态
+syncGetCodeBtn();
+
+// ============================================================
+// 模式切换：手机号 ↔ 账号密码（同页 inline 切换）
+// ============================================================
+function switchToPasswordMode() {
+  mode = 'password';
+  fieldsPhone.classList.remove('active');
+  fieldsPwd.classList.add('active');
+  resetPhoneState();
+  title.textContent = '账号登录';
+  primaryBtn.textContent = '登 录';
+  modeToggle.textContent = '手机号注册/登录';
+  modeToggle.dataset.mode = 'phone';
+  // 账密模式藏掉底部"我有邀请码"——已注册用户不需要
+  inviteLink.classList.add('hidden');
+  syncPrimaryBtn();
+  setTimeout(() => accountInput.focus(), 240);
+}
+
+function switchToPhoneMode() {
+  mode = 'phone';
+  fieldsPwd.classList.remove('active');
+  fieldsPhone.classList.add('active');
+  resetPhoneState();
+  resetPasswordState();
+  title.textContent = '手机号注册/登录';
+  primaryBtn.textContent = '注册 / 登录';
+  modeToggle.textContent = '账号密码登录';
+  modeToggle.dataset.mode = 'password';
+  inviteLink.classList.remove('hidden');
+  syncPrimaryBtn();
+}
+
+function resetPhoneState() {
+  codeInput.value = '';
+  if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+  syncGetCodeBtn();
+  primaryBtn.textContent = '注册 / 登录';
+}
+function resetPasswordState() {
+  accountInput.value = '';
+  pwdInput.value = '';
+}
+
+modeToggle.addEventListener('click', () => {
+  if (modeToggle.dataset.mode === 'password') switchToPasswordMode();
+  else switchToPhoneMode();
+});
+
+// "我有邀请码"链接（页面底部）：打开 modal
+inviteLink.addEventListener('click', () => openModal());
+
+// ============================================================
+// Modal：邀请码（demo：≥4 字符成功；少于 4 失败）
+// ============================================================
+const modal         = $('modal');
+const modalBackdrop = $('modal-backdrop');
+const modalClose    = $('modal-close');
+const inviteInput   = $('invite-input');
+const inviteBtn     = $('invite-btn');
+const inviteWrap    = $('invite-wrap');
+const inviteError   = $('invite-error');
+
+function openModal()  { modal.classList.add('visible');    modalBackdrop.classList.add('visible'); setTimeout(()=>inviteInput.focus(), 280); }
+function closeModal() {
+  modal.classList.remove('visible'); modalBackdrop.classList.remove('visible');
+  setTimeout(() => {
+    inviteInput.value = '';
+    inviteError.classList.remove('visible');
+    inviteBtn.classList.remove('active');
+    inviteBtn.textContent = '验 证';
+  }, 320);
+}
+modalBackdrop.addEventListener('click', closeModal);
+modalClose.addEventListener('click', closeModal);
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && modal.classList.contains('visible')) closeModal(); });
+
+inviteInput.addEventListener('input', () => {
+  inviteBtn.classList.toggle('active', inviteInput.value.trim().length > 0);
+});
+inviteInput.addEventListener('keydown', e => { if (e.key === 'Enter') inviteBtn.click(); });
+
+inviteBtn.addEventListener('click', () => {
+  if (!inviteBtn.classList.contains('active')) return;
+  const v = inviteInput.value.trim();
+  if (v.length >= 4) {
+    inviteBtn.textContent = '✓ 验证通过';
+    setTimeout(closeModal, 800);
+  } else {
+    inviteWrap.classList.remove('shake'); void inviteWrap.offsetWidth; inviteWrap.classList.add('shake');
+    inviteError.classList.add('visible');
+    setTimeout(() => inviteError.classList.remove('visible'), 1800);
+  }
+});
+</script>
+</body>
+</html>

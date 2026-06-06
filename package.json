@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "python3 -m http.server 8000",
     "share": "bash scripts/share.sh",
-    "build": "rm -rf www && mkdir -p www && cp index.html style.css www/ && cp -R js src www/",
+    "build": "rm -rf www && mkdir -p www/prototypes && cp index.html style.css www/ && cp -R js src www/ && cp -R prototypes/june-demo www/prototypes/",
     "sync": "npm run build && npx cap sync",
     "open:android": "npm run sync && npx cap open android",
     "record:concept": "node 概念片/shots/record.js",

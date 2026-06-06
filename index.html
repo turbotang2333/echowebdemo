@@ -2,147 +2,111 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#070811" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="mobile-web-app-capable" content="yes" />
-  <title>echo · 幕</title>
-  <link rel="preload" as="image" href="src/images/xiaohuli.png" />
-  <link rel="preload" as="image" href="src/images/cj1.jpg" />
-  <link rel="preload" as="image" href="src/images/cj2.jpg" />
-  <link rel="preload" as="image" href="src/images/cj3.jpg" />
-  <!-- 时空门 · 回响视频（场 6 段 4 后）：约 8MB，提前 prefetch 到达时已就绪 -->
-  <link rel="prefetch" href="src/videos/回响视频.mp4" />
-  <link rel="stylesheet" href="style.css" />
+  <title>Echo Web Demo</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 28px;
+      color: #f8ead5;
+      background: #070811;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .page {
+      width: min(100%, 760px);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 220px;
+      gap: 32px;
+      align-items: center;
+    }
+    h1 {
+      margin: 0 0 14px;
+      font-size: 34px;
+      line-height: 1.15;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+    p {
+      margin: 0 0 26px;
+      max-width: 420px;
+      color: rgba(248, 234, 213, 0.68);
+      font-size: 15px;
+      line-height: 1.8;
+    }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    a {
+      min-height: 42px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 18px;
+      border: 1px solid rgba(248, 234, 213, 0.22);
+      border-radius: 6px;
+      color: #f8ead5;
+      text-decoration: none;
+      font-size: 14px;
+      background: rgba(248, 234, 213, 0.08);
+    }
+    a.primary {
+      background: #f8ead5;
+      color: #10101a;
+      border-color: #f8ead5;
+    }
+    .figure {
+      width: 220px;
+      aspect-ratio: 1 / 1.32;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .figure img {
+      width: 142%;
+      max-width: none;
+      display: block;
+      transform: translateY(16px);
+      filter: drop-shadow(0 22px 36px rgba(0, 0, 0, 0.45));
+    }
+    @media (max-width: 720px) {
+      body { padding: 24px; }
+      .page {
+        grid-template-columns: 1fr;
+        gap: 22px;
+        text-align: left;
+      }
+      .figure {
+        width: min(62vw, 220px);
+        order: -1;
+      }
+      h1 { font-size: 28px; }
+      p { font-size: 14px; }
+      .actions { flex-direction: column; }
+      a { width: 100%; }
+    }
+  </style>
 </head>
 <body>
-  <div id="orientation-gate" hidden>
-    <p>请将设备竖置以体验</p>
-  </div>
-
-  <div id="stage" class="stage">
-    <!-- 屏堆栈·后景：当前屏在前，上滑时旧屏向上推走。每屏内放场景·后景（整图+遮罩 或 单体 PNG）。 -->
-    <div class="screen-host" id="screen-host"></div>
-
-    <!-- 氛围层 · env：在场景·后景之上、角色之下，仅染场景前景+后景。 -->
-    <div class="atmo-env" id="atmo-env" aria-hidden="true"></div>
-
-    <!-- 主导特效·后：角色之后的常驻粒子/光柱（鬼火/月光柱等） -->
-    <div class="fx-dominant-back" id="fx-dominant-back" aria-hidden="true"></div>
-
-    <!-- 全局立绘层（跨屏复用单一立绘，由场景控制 pose/位置） -->
-    <div class="character-layer" id="character-layer">
-      <div class="character" id="character" aria-hidden="true">
-        <div class="char-fig" id="char-fig">
-          <img class="char-img" src="src/images/xiaohuli.png" alt="" draggable="false" />
-        </div>
+  <main class="page">
+    <section>
+      <h1>Echo Web Demo</h1>
+      <p>当前主要开发页面是 6 月 Demo。根目录现在只作为入口，不再承载旧 demo 页面。</p>
+      <div class="actions">
+        <a class="primary" href="prototypes/june-demo/">进入 6 月 Demo</a>
+        <a href="plans/README.md">查看方案文档</a>
       </div>
+    </section>
+    <div class="figure" aria-hidden="true">
+      <img src="src/images/xiaohuli.png" alt="" />
     </div>
-
-    <!-- 屏堆栈·前景：与后景平行的镜像 host，承载场景·前景（角色之前的近景遮挡/装饰）。
-         当前所有素材均按后景使用，前景为预留扩展位。 -->
-    <div class="screen-host-front" id="screen-host-front"></div>
-
-    <!-- 主导特效·前：角色之前的常驻粒子（粒子飘过面前/训狗字符浮在身前）。
-         与"主导特效·后"二选一，任意时刻只允许一种主导特效在屏。 -->
-    <div class="fx-dominant-front" id="fx-dominant-front" aria-hidden="true"></div>
-
-    <!-- 氛围层 · emotion：在所有视觉层之上、文字之下，染整张画面（含前景/角色/主导特效）。 -->
-    <div class="atmo-emotion" id="atmo-emotion" aria-hidden="true"></div>
-
-    <!-- 旁白 / 内心 / 重旁白 / NPC 缺席旁白 / 对话气泡 — 跨屏全局，
-         scene 切换由 player 主动 clearAllText() 兜底。 -->
-    <div class="narration-zone" id="narration-zone"></div>
-    <div class="inner-zone" id="inner-zone"></div>
-    <div class="heavy-zone" id="heavy-zone"></div>
-    <div class="npc-zone" id="npc-zone"></div>
-    <div class="bubble-zone" id="bubble-zone"></div>
-
-    <!-- 特效·伴随层：屏震/白闪/雾/灯笼/纸扎人等瞬时或开关型覆盖。
-         覆盖至文字之上、交互 UI 之下——剧情冲击瞬间字也被吃掉，但圆弧仍可点。 -->
-    <div class="fx-burst-layer" id="fx-burst-layer" aria-hidden="true"></div>
-
-    <!-- 圆弧（屏内对话节点弹起） -->
-    <div class="edge-zone" id="edge-zone" hidden>
-      <div class="edge-veil" aria-hidden="true"></div>
-      <div class="edge-arc-host" id="edge-arc-host">
-        <svg class="edge-svg" viewBox="0 0 1000 220" preserveAspectRatio="none" aria-hidden="true">
-          <defs>
-            <linearGradient id="edge-fade-h" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%"   stop-color="white" stop-opacity="0"/>
-              <stop offset="20%"  stop-color="white" stop-opacity="1"/>
-              <stop offset="80%"  stop-color="white" stop-opacity="1"/>
-              <stop offset="100%" stop-color="white" stop-opacity="0"/>
-            </linearGradient>
-            <mask id="edge-mask-h">
-              <rect width="1000" height="220" fill="url(#edge-fade-h)"/>
-            </mask>
-          </defs>
-          <g mask="url(#edge-mask-h)">
-            <path class="edge-arc edge-arc-main"
-                  d="M 60 230 Q 500 30 940 230"
-                  fill="none" stroke="rgba(255,235,210,0.7)" stroke-width="2.5"
-                  stroke-linecap="round" vector-effect="non-scaling-stroke" />
-          </g>
-          <path class="edge-ripple ripple-1"
-                d="M 60 230 Q 500 30 940 230"
-                fill="none" stroke="rgba(255,235,210,0.85)" stroke-width="2.5"
-                stroke-linecap="round" vector-effect="non-scaling-stroke" />
-          <path class="edge-ripple ripple-2"
-                d="M 60 230 Q 500 30 940 230"
-                fill="none" stroke="rgba(255,235,210,0.85)" stroke-width="2.5"
-                stroke-linecap="round" vector-effect="non-scaling-stroke" />
-          <path class="edge-ripple ripple-3"
-                d="M 60 230 Q 500 30 940 230"
-                fill="none" stroke="rgba(255,235,210,0.85)" stroke-width="2.5"
-                stroke-linecap="round" vector-effect="non-scaling-stroke" />
-        </svg>
-      </div>
-
-      <!-- 弧下方居中操作提示（前 2 次出现，与手势教学同步消失） -->
-      <div class="arc-hint" id="arc-hint" aria-hidden="true">长按语音对话</div>
-
-      <!-- 引导文字（对话提示）— 弧上方 -->
-      <div class="edge-prompt" id="edge-prompt"></div>
-    </div>
-
-    <!-- 底部尖尖 — 上滑可推进剧情时显现。跟长按圆弧用完全相同的 viewBox
-         和 path（M 60 230 Q 500 30 940 230），元素整体下沉到屏外，只露
-         出顶端约 30px 的尖。弧线 + 弧下方实心半透填充，缓慢呼吸。
-         上滑手势中弧形会跟随手指拱起；上滑成功跟旧屏一起离场，
-         未达阈值则平滑回弹。 -->
-    <div class="swipe-tip" id="swipe-tip" aria-hidden="true">
-      <svg class="swipe-tip-svg" viewBox="0 0 1000 220" preserveAspectRatio="none">
-        <path class="swipe-tip-fill"
-              d="M 60 230 Q 500 30 940 230 Z" />
-      </svg>
-    </div>
-
-    <!-- 触点教学指示（前 2 次出现）— 一个圆点，由 .demo-swipe / .demo-press
-         切换成 上滑示范 / 长按示范 两种动画。元素始终在 DOM，靠 class 控制显隐。 -->
-    <div class="touch-hint" id="touch-hint"></div>
-
-    <!-- 左上角"剧情历史"锚点（点击展开） -->
-    <div class="anchor" id="journal-anchor" aria-label="剧情历史"></div>
-
-    <!-- 剧情历史抽屉：从顶部下展，纸面内可滚动，点击空白区域收回 -->
-    <div class="journal" id="journal" hidden>
-      <div class="journal-paper">
-        <button class="journal-close" id="journal-close" type="button" aria-label="返回">
-          <span class="journal-close-arrow"></span>
-        </button>
-        <div class="journal-scroll" id="journal-scroll"></div>
-      </div>
-      <div class="journal-blank-hint">点击空白处收回</div>
-    </div>
-
-    <!-- 启动遮罩 -->
-    <div class="boot-veil" id="boot-veil">
-      <div class="boot-tap">点击开始</div>
-    </div>
-  </div>
-
-  <script type="module" src="js/main.js"></script>
+  </main>
 </body>
 </html>

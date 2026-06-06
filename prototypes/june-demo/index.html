@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>回响 · 6月Demo</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<button class="menu-toggle" id="menu-toggle"><span></span><span></span><span></span></button>
+<div class="drawer-backdrop" id="drawer-backdrop"></div>
+<div class="drawer" id="drawer">
+  <div class="nav-panel" id="drawer-nav"></div>
+</div>
+
+<div class="desktop-wrap">
+  <div class="nav-panel" id="desktop-nav"></div>
+
+  <div class="phone-frame" id="phone">
+    <div class="phone-notch"></div>
+    <div class="phone-home"></div>
+    <div class="stage" id="stage">
+      <div class="scene-bg"></div>
+      <div class="character"><img src="../../src/images/xiaohuli.png" alt=""></div>
+      <div class="narration-zone" id="narration-zone"></div>
+      <div class="bubble-zone" id="bubble-zone"></div>
+      <canvas id="c-glow"></canvas>
+      <canvas id="c"></canvas>
+
+      <!-- 打字层：输入条 + 发送按钮；不带假键盘，靠真实系统键盘抬起 -->
+      <div class="typing-layer" id="typing-layer">
+        <input class="typing-input" id="typing-input" type="text"
+               autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        <button class="typing-send" id="typing-send" aria-label="发送">
+          <svg viewBox="0 0 24 24" width="100%" height="100%">
+            <polygon class="send-core" points="12,7.5 8,14.5 16,14.5"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- 左上角锚点：始终可见，点击切换历史面板 -->
+      <div class="history-anchor" id="history-anchor">
+        <svg viewBox="0 0 24 24">
+          <circle class="anchor-ring"                cx="12" cy="12" r="10" stroke-width="1.4"/>
+          <circle class="anchor-pulse anchor-pulse-1" cx="12" cy="12" r="2"  stroke-width="1"/>
+          <circle class="anchor-pulse anchor-pulse-2" cx="12" cy="12" r="2"  stroke-width="1"/>
+          <circle class="anchor-core"                cx="12" cy="12" r="1.8"/>
+        </svg>
+      </div>
+
+      <!-- 历史面板：dim 是底层暗幕（不受 mask 影响），panel 是浅纸（被 mask 弧形剪裁） -->
+      <div class="history-dim" id="history-dim"></div>
+      <div class="history-panel" id="history-panel">
+        <div class="history-scroll" id="history-scroll"></div>
+      </div>
+      <div class="history-hint" id="history-hint">点击空白处收回</div>
+    </div>
+  </div>
+</div>
+
+<script src="script.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

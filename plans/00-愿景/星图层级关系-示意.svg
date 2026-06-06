@@ -1,0 +1,179 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1100" width="1000" height="1100">
+  <defs>
+    <radialGradient id="bgGrad" cx="50%" cy="50%" r="65%">
+      <stop offset="0%" stop-color="#101a2e"/>
+      <stop offset="100%" stop-color="#04080f"/>
+    </radialGradient>
+    <radialGradient id="continentBg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#1a2847"/>
+      <stop offset="70%" stop-color="#0d1b2a"/>
+      <stop offset="100%" stop-color="#060d18"/>
+    </radialGradient>
+    <radialGradient id="personalityGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fff176" stop-opacity="0.6"/>
+      <stop offset="60%" stop-color="#fdd835" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#fdd835" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="darkGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#5c6bc0" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#5c6bc0" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="phoneBg" cx="50%" cy="55%" r="60%">
+      <stop offset="0%" stop-color="#1a2847"/>
+      <stop offset="100%" stop-color="#070d18"/>
+    </radialGradient>
+    <linearGradient id="arcGold" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#f57f17"/>
+      <stop offset="50%" stop-color="#ffd54f"/>
+      <stop offset="100%" stop-color="#f57f17"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 画布背景 -->
+  <rect width="1000" height="1100" fill="url(#bgGrad)"/>
+
+  <!-- ============= 上层 · 内容流(竖屏手机轮廓) ============= -->
+  <g transform="translate(450 250) skewX(-12)">
+    <!-- 落影 -->
+    <ellipse cx="0" cy="240" rx="135" ry="14" fill="#000" opacity="0.5"/>
+    <!-- 手机外壳 -->
+    <rect x="-110" y="-220" width="220" height="440" rx="26" fill="url(#phoneBg)" stroke="#ffffff" stroke-width="2.5" opacity="0.95"/>
+    <!-- 顶部刘海 -->
+    <rect x="-30" y="-216" width="60" height="6" rx="3" fill="#1a1a1a"/>
+    <!-- 内部画面区(略缩进) -->
+    <rect x="-100" y="-200" width="200" height="400" rx="18" fill="none" stroke="#ffffff" stroke-width="0.5" opacity="0.2"/>
+    <!-- 金色回响弧(底部) -->
+    <path d="M -75 150 Q 0 95, 75 150" stroke="url(#arcGold)" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+    <!-- 弧高光 -->
+    <path d="M -65 152 Q 0 110, 65 152" stroke="#fff7c4" stroke-width="1.2" fill="none" opacity="0.6" stroke-linecap="round"/>
+    <!-- 弧两端的小点 -->
+    <circle cx="-75" cy="150" r="3" fill="#fdd835"/>
+    <circle cx="75" cy="150" r="3" fill="#fdd835"/>
+  </g>
+
+  <!-- 上层标题 -->
+  <text x="630" y="100" fill="#fff8e1" font-size="18" font-family="sans-serif" font-weight="600">上层 · 内容流</text>
+  <text x="630" y="124" fill="#bbb" font-size="13" font-family="sans-serif">用户日常所在(刷剧情、回响弧发声)</text>
+  <line x1="555" y1="155" x2="620" y2="105" stroke="#fff8e1" stroke-width="1" opacity="0.5"/>
+
+  <!-- ============= 中间手势指示 ============= -->
+  <g transform="translate(500 560)">
+    <!-- 下沉箭头 -->
+    <line x1="-15" y1="-40" x2="-15" y2="10" stroke="#ff7043" stroke-width="2.5"/>
+    <path d="M -23 0 L -15 14 L -7 0" stroke="#ff7043" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="-35" y="-15" text-anchor="end" fill="#ff7043" font-size="14" font-family="sans-serif" font-weight="600">双指放大 ↓</text>
+    <text x="-35" y="2" text-anchor="end" fill="#ff7043" font-size="12" font-family="sans-serif" opacity="0.85">下沉到星图</text>
+
+    <!-- 上浮箭头 -->
+    <line x1="15" y1="10" x2="15" y2="-40" stroke="#ff7043" stroke-width="2.5"/>
+    <path d="M 7 -30 L 15 -44 L 23 -30" stroke="#ff7043" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="35" y="-15" fill="#ff7043" font-size="14" font-family="sans-serif" font-weight="600">双指缩小 ↑</text>
+    <text x="35" y="2" fill="#ff7043" font-size="12" font-family="sans-serif" opacity="0.85">返回内容流</text>
+  </g>
+
+  <!-- ============= 下层 · 星图画布 ============= -->
+  <!-- 整张星图缩放 + 同方向倾斜 -->
+  <g transform="translate(500 870) skewX(-12) scale(0.58)">
+    <g transform="translate(-600 -400)">
+      <!-- 大陆边界 + 内部底色 -->
+      <circle cx="600" cy="400" r="340" fill="url(#continentBg)" stroke="#ffffff" stroke-width="2.5" stroke-dasharray="10 12" opacity="0.95"/>
+
+      <!-- 星云团 A(已点亮,左上)中心 (490, 290) -->
+      <circle cx="490" cy="290" r="120" fill="url(#personalityGlow)"/>
+      <g stroke="#ffffff" stroke-width="1.4" opacity="0.55">
+        <line x1="490" y1="290" x2="410" y2="230"/>
+        <line x1="490" y1="290" x2="455" y2="355"/>
+        <line x1="490" y1="290" x2="570" y2="245"/>
+        <line x1="490" y1="290" x2="580" y2="335"/>
+        <line x1="490" y1="290" x2="400" y2="310"/>
+        <line x1="490" y1="290" x2="520" y2="200"/>
+        <line x1="490" y1="290" x2="605" y2="295"/>
+        <line x1="490" y1="290" x2="430" y2="375"/>
+        <line x1="490" y1="290" x2="375" y2="265"/>
+        <line x1="490" y1="290" x2="540" y2="385"/>
+      </g>
+      <circle cx="410" cy="230" r="6" fill="#ffffff" opacity="0.9"/>
+      <circle cx="455" cy="355" r="7.5" fill="#ffffff" opacity="0.95"/>
+      <circle cx="570" cy="245" r="6.5" fill="#ffffff" opacity="0.85"/>
+      <circle cx="580" cy="335" r="8" fill="#ffffff" opacity="0.95"/>
+      <circle cx="400" cy="310" r="6" fill="#ffffff" opacity="0.8"/>
+      <circle cx="520" cy="200" r="6.5" fill="#ffffff" opacity="0.9"/>
+      <circle cx="605" cy="295" r="5" fill="#ffffff" opacity="0.75"/>
+      <circle cx="430" cy="375" r="5" fill="#ffffff" opacity="0.7"/>
+      <circle cx="375" cy="265" r="5" fill="#ffffff" opacity="0.7"/>
+      <circle cx="540" cy="385" r="5" fill="#ffffff" opacity="0.75"/>
+      <!-- 人格星 A 已点亮 -->
+      <circle cx="490" cy="290" r="36" fill="#fdd835" stroke="#f57f17" stroke-width="3"/>
+
+      <!-- 星云团 B(未点亮,右)中心 (770, 470) -->
+      <circle cx="770" cy="470" r="105" fill="url(#darkGlow)"/>
+      <g stroke="#90a4ae" stroke-width="1.3" stroke-dasharray="5 6" opacity="0.5">
+        <line x1="770" y1="470" x2="685" y2="425"/>
+        <line x1="770" y1="470" x2="860" y2="405"/>
+        <line x1="770" y1="470" x2="855" y2="515"/>
+        <line x1="770" y1="470" x2="690" y2="520"/>
+        <line x1="770" y1="470" x2="810" y2="390"/>
+        <line x1="770" y1="470" x2="830" y2="555"/>
+        <line x1="770" y1="470" x2="670" y2="475"/>
+        <line x1="770" y1="470" x2="875" y2="465"/>
+      </g>
+      <circle cx="685" cy="425" r="6.5" fill="#ffffff" opacity="0.9"/>
+      <circle cx="860" cy="405" r="7" fill="#ffffff" opacity="0.95"/>
+      <circle cx="855" cy="515" r="6" fill="#ffffff" opacity="0.85"/>
+      <circle cx="690" cy="520" r="7" fill="#ffffff" opacity="0.95"/>
+      <circle cx="810" cy="390" r="5" fill="#ffffff" opacity="0.8"/>
+      <circle cx="830" cy="555" r="6" fill="#ffffff" opacity="0.85"/>
+      <circle cx="670" cy="475" r="5" fill="#ffffff" opacity="0.75"/>
+      <circle cx="875" cy="465" r="4.5" fill="#ffffff" opacity="0.7"/>
+      <!-- 人格星 B 未点亮 -->
+      <circle cx="770" cy="470" r="34" fill="#37474f" stroke="#78909c" stroke-width="2" stroke-dasharray="5 5"/>
+
+      <!-- 星云团 C(未点亮,下)中心 (500, 600) -->
+      <circle cx="500" cy="600" r="120" fill="url(#darkGlow)"/>
+      <g stroke="#90a4ae" stroke-width="1.3" stroke-dasharray="5 6" opacity="0.5">
+        <line x1="500" y1="600" x2="405" y2="555"/>
+        <line x1="500" y1="600" x2="580" y2="565"/>
+        <line x1="500" y1="600" x2="425" y2="660"/>
+        <line x1="500" y1="600" x2="575" y2="650"/>
+        <line x1="500" y1="600" x2="375" y2="615"/>
+        <line x1="500" y1="600" x2="520" y2="515"/>
+        <line x1="500" y1="600" x2="610" y2="610"/>
+        <line x1="500" y1="600" x2="440" y2="600"/>
+        <line x1="500" y1="600" x2="550" y2="605"/>
+        <line x1="500" y1="600" x2="480" y2="695"/>
+      </g>
+      <circle cx="405" cy="555" r="7" fill="#ffffff" opacity="0.95"/>
+      <circle cx="580" cy="565" r="6.5" fill="#ffffff" opacity="0.9"/>
+      <circle cx="425" cy="660" r="6" fill="#ffffff" opacity="0.85"/>
+      <circle cx="575" cy="650" r="8" fill="#ffffff" opacity="0.95"/>
+      <circle cx="375" cy="615" r="6" fill="#ffffff" opacity="0.85"/>
+      <circle cx="520" cy="515" r="6.5" fill="#ffffff" opacity="0.9"/>
+      <circle cx="610" cy="610" r="6" fill="#ffffff" opacity="0.85"/>
+      <circle cx="440" cy="600" r="5" fill="#ffffff" opacity="0.75"/>
+      <circle cx="550" cy="605" r="4.5" fill="#ffffff" opacity="0.7"/>
+      <circle cx="480" cy="695" r="5" fill="#ffffff" opacity="0.75"/>
+      <!-- 人格星 C 未点亮 -->
+      <circle cx="500" cy="600" r="34" fill="#37474f" stroke="#78909c" stroke-width="2" stroke-dasharray="5 5"/>
+
+      <!-- 零散微星 -->
+      <circle cx="320" cy="450" r="3" fill="#ffffff" opacity="0.5"/>
+      <circle cx="360" cy="380" r="3.5" fill="#ffffff" opacity="0.55"/>
+      <circle cx="895" cy="280" r="3" fill="#ffffff" opacity="0.5"/>
+      <circle cx="800" cy="170" r="3.5" fill="#ffffff" opacity="0.55"/>
+      <circle cx="290" cy="380" r="3" fill="#ffffff" opacity="0.5"/>
+      <circle cx="880" cy="640" r="3.5" fill="#ffffff" opacity="0.55"/>
+      <circle cx="330" cy="660" r="3" fill="#ffffff" opacity="0.5"/>
+      <circle cx="640" cy="170" r="3" fill="#ffffff" opacity="0.5"/>
+      <circle cx="700" cy="610" r="3" fill="#ffffff" opacity="0.5"/>
+      <circle cx="900" cy="370" r="3" fill="#ffffff" opacity="0.5"/>
+    </g>
+  </g>
+
+  <!-- 下层标题(画板坐标系,不跟着倾斜) -->
+  <text x="40" y="780" fill="#fff8e1" font-size="18" font-family="sans-serif" font-weight="600">下层 · 星图画布</text>
+  <text x="40" y="804" fill="#bbb" font-size="13" font-family="sans-serif">角色的人格大陆(沉到内容流之下)</text>
+  <line x1="170" y1="820" x2="220" y2="870" stroke="#fff8e1" stroke-width="1" opacity="0.5"/>
+
+  <!-- 底部小注 -->
+  <text x="500" y="1070" text-anchor="middle" fill="#666" font-size="12" font-family="sans-serif" font-style="italic">弧在表层 · 圆在中层</text>
+</svg>

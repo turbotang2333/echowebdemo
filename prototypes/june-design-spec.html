@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>6月版本 交互/表现方案</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; background: #f5f5f5; font-family: -apple-system, 'PingFang SC', sans-serif; overflow: hidden; }
+
+/* ============================================================
+   桌面端
+   ============================================================ */
+.desktop-wrapper {
+  display: none; width: 100%; height: 100%;
+  flex-direction: column;
+}
+@media (min-width: 769px) {
+  .desktop-wrapper { display: flex; }
+  .mobile-layout { display: none !important; }
+}
+.desktop-layout {
+  flex: 1; width: 100%;
+  display: flex; flex-direction: row;
+  overflow: hidden;
+}
+
+/* 左侧文档 50% */
+.doc-panel {
+  width: 50%; height: 100%;
+  overflow-y: auto; overflow-x: hidden;
+  padding: 24px 36px 48px 36px;
+  background: #fff;
+  border-right: 1px solid #e5e5e5;
+  scrollbar-width: thin;
+  scrollbar-color: #ccc transparent;
+}
+.doc-panel::-webkit-scrollbar { width: 5px; }
+.doc-panel::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+
+/* 竖向导航条 */
+.nav-bar {
+  width: 168px; min-width: 168px; height: 100%;
+  display: flex; flex-direction: column;
+  padding: 14px 10px; gap: 0;
+  background: #eae6e0;
+  border-left: 1px solid #d5d0c8;
+  border-right: 1px solid #d5d0c8;
+  overflow-y: auto;
+}
+.nav-l1 {
+  font-size: 13px; font-weight: 700; color: #222;
+  padding: 14px 8px 6px 8px;
+  letter-spacing: 0.06em;
+  border-top: 1px solid #ccc;
+}
+.nav-l1:first-child { border-top: none; padding-top: 4px; }
+.nav-l2 {
+  font-size: 10px; font-weight: 500; color: #888;
+  padding: 8px 8px 3px 14px;
+  letter-spacing: 0.08em;
+}
+.nav-btn {
+  padding: 8px 10px 8px 22px;
+  border: none; border-radius: 6px;
+  background: transparent;
+  color: #555; font-size: 13px;
+  text-align: left; cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  position: relative;
+}
+.nav-btn:hover { background: rgba(0,0,0,0.05); color: #222; }
+.nav-btn.active {
+  background: #333; color: #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+}
+.nav-btn.disabled { color: #c0b8ad; cursor: default; }
+.nav-btn.disabled:hover { background: transparent; color: #c0b8ad; }
+.badge-done {
+  display: inline-block; font-size: 9px; padding: 1px 5px;
+  border-radius: 3px; margin-left: 4px; vertical-align: middle;
+  background: #2a7d4f; color: #fff;
+}
+.badge-pending {
+  display: inline-block; font-size: 9px; padding: 1px 5px;
+  border-radius: 3px; margin-left: 4px; vertical-align: middle;
+  background: #d5d0c8; color: #888;
+}
+
+/* 原型区 */
+.proto-area {
+  flex: 1; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  background: #1a1a2e;
+  position: relative;
+}
+.proto-container {
+  width: 390px; height: 844px;
+  position: relative; overflow: hidden;
+  background: #070811;
+}
+.reset-guide-btn {
+  position: absolute;
+  bottom: 20px; left: 50%; transform: translateX(-50%);
+  padding: 8px 18px;
+  border: 1px solid rgba(255,235,210,0.25);
+  border-radius: 8px;
+  background: rgba(255,235,210,0.08);
+  color: rgba(255,235,210,0.7);
+  font-size: 12px; cursor: pointer;
+  z-index: 10;
+}
+.reset-guide-btn:hover { background: rgba(255,235,210,0.15); }
+
+/* ============================================================
+   手机端
+   ============================================================ */
+.mobile-layout {
+  display: none; width: 100%; height: 100%;
+  position: relative; background: #070811;
+}
+@media (max-width: 768px) {
+  .mobile-layout { display: block; }
+}
+.mobile-nav {
+  position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
+  z-index: 500;
+  display: flex; gap: 0;
+  border: 1px solid rgba(255,235,210,0.2);
+  border-radius: 8px; overflow: hidden;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.mobile-nav-btn {
+  padding: 8px 18px; border: none;
+  background: rgba(7,8,17,0.6);
+  color: rgba(255,235,210,0.5);
+  font-size: 13px; cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.mobile-nav-btn.active {
+  background: rgba(255,200,130,0.2);
+  color: rgba(255,235,210,0.9);
+}
+
+/* ============================================================
+   原型内部样式（内嵌，不引用外部文件）
+   ============================================================ */
+.proto-stage { position: absolute; inset: 0; overflow: hidden; }
+.proto-stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.proto-stage .c-glow { z-index: 0; }
+.proto-stage .c-main { z-index: 1; }
+.proto-stage .tutorial-text-el {
+  position: absolute; left: 0; right: 0;
+  bottom: 16%; text-align: center;
+  font-size: 14px; letter-spacing: 0.18em;
+  color: rgba(255,235,210,0.45);
+  pointer-events: none; z-index: 16; opacity: 0;
+  font-family: -apple-system, 'PingFang SC', sans-serif;
+}
+.proto-stage .tutorial-text-fill { bottom: 25%; }
+
+/* ============================================================
+   Markdown 样式
+   ============================================================ */
+.md { color: #333; }
+.md h1 { font-size: 20px; font-weight: 600; color: #111; margin: 0 0 8px 0; }
+.md h2 { font-size: 16px; font-weight: 600; color: #1a1a1a; margin: 28px 0 10px 0; padding-top: 16px; border-top: 1px solid #eee; }
+.md h3 { font-size: 14px; font-weight: 600; color: #222; margin: 20px 0 8px 0; }
+.md p, .md li { font-size: 13px; line-height: 1.8; color: #444; margin: 6px 0; }
+.md strong { color: #111; }
+.md ul, .md ol { padding-left: 1.4em; }
+.md blockquote {
+  border-left: 3px solid #d4a76a; padding: 4px 0 4px 14px; margin: 10px 0;
+  color: #666; font-size: 12px; background: #faf8f5;
+}
+.md code {
+  font-family: 'SF Mono','Menlo','Consolas',monospace;
+  font-size: 12px; background: #f3f0ec;
+  padding: 1px 5px; border-radius: 3px; color: #8a6530;
+}
+.md pre {
+  background: #f8f6f3; border: 1px solid #e8e4de;
+  border-radius: 6px; padding: 12px 14px;
+  overflow-x: auto; margin: 10px 0;
+}
+.md pre code { background: none; padding: 0; font-size: 11.5px; line-height: 1.6; color: #555; }
+.md table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 12px; }
+.md th { text-align: left; color: #8a6530; font-weight: 500; padding: 6px 8px; border-bottom: 1px solid #ddd; }
+.md td { padding: 5px 8px; color: #555; border-bottom: 1px solid #f0f0f0; }
+.md hr { border: none; border-top: 1px solid #eee; margin: 20px 0; }
+</style>
+</head>
+<body>
+
+<!-- 桌面端 -->
+<div class="desktop-wrapper">
+<div class="desktop-layout">
+  <div class="doc-panel" id="doc-panel"><div class="md" id="doc-desktop"></div></div>
+  <div class="nav-bar">
+    <div class="nav-l1">内容流</div>
+    <div class="nav-l2">交互</div>
+    <button class="nav-btn active" data-page="common">共用原则 <span class="badge-done">已交付</span></button>
+    <button class="nav-btn" data-page="arc">用户输入 <span class="badge-done">已交付</span></button>
+    <button class="nav-btn" data-page="fill">推动剧情 <span class="badge-done">已交付</span></button>
+    <button class="nav-btn disabled">历史剧情 <span class="badge-pending">待交付</span></button>
+    <div class="nav-l2">剧情表现</div>
+    <button class="nav-btn disabled">文字层 <span class="badge-pending">待交付</span></button>
+    <button class="nav-btn disabled">角色层 <span class="badge-pending">待交付</span></button>
+    <button class="nav-btn disabled">场景层 <span class="badge-pending">待交付</span></button>
+    <button class="nav-btn disabled">特效层 <span class="badge-pending">待交付</span></button>
+    <div class="nav-l1">记忆星图</div>
+    <button class="nav-btn disabled">记忆星图 <span class="badge-pending">待交付</span></button>
+  </div>
+  <div class="proto-area" id="proto-area">
+    <div class="proto-container" id="proto-desktop">
+      <div class="proto-stage" id="stage-desktop">
+        <canvas class="c-glow" id="cg-d"></canvas>
+        <canvas class="c-main" id="cm-d"></canvas>
+        <div class="tutorial-text-el" id="tt-arc-d">长按说话</div>
+        <div class="tutorial-text-el tutorial-text-fill" id="tt-fill-d">上滑推进</div>
+      </div>
+    </div>
+    <button class="reset-guide-btn" id="reset-guide-btn" style="display:none">重置引导（2次）</button>
+  </div>
+</div>
+</div>
+
+<!-- 手机端 -->
+<div class="mobile-layout" id="mobile-layout">
+  <div class="proto-stage" id="stage-mobile">
+    <canvas class="c-glow" id="cg-m"></canvas>
+    <canvas class="c-main" id="cm-m"></canvas>
+    <div class="tutorial-text-el" id="tt-arc-m">长按说话</div>
+    <div class="tutorial-text-el tutorial-text-fill" id="tt-fill-m">上滑推进</div>
+  </div>
+  <div class="mobile-nav">
+    <button class="mobile-nav-btn active" data-page="arc">用户输入</button>
+    <button class="mobile-nav-btn" data-page="fill">推动剧情</button>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// 原型引擎（从 june-design-test.html 完整复制，适配多实例）
+// ============================================================
+function createProtoEngine(container, cMainEl, cGlowEl, arcTextEl, fillTextEl) {
+  const P = {
+    radiusVW: 120,
+    arcPeekVH: 16, strokeWidth: 3, arcBreathAmp: 2.75, arcBreathPeriod: 4.2,
+    glowBlur: 14,
+    fillPeekVH: 5.5, fillAlpha: 0.15, fillBreathAmp: 1.5, fillBreathPeriod: 4.0,
+  };
+
+  const ctxM = cMainEl.getContext('2d');
+  const ctxG = cGlowEl.getContext('2d');
+  let W, H, dpr;
+
+  function resize() {
+    dpr = window.devicePixelRatio || 1;
+    W = container.clientWidth; H = container.clientHeight;
+    for (const cv of [cMainEl, cGlowEl]) {
+      cv.width = W * dpr; cv.height = H * dpr;
+      cv.style.width = W + 'px'; cv.style.height = H + 'px';
+    }
+  }
+  window.addEventListener('resize', resize); resize();
+  function vw(n) { return n * W / 100; }
+  function vh(n) { return n * H / 100; }
+
+  let mode = 'fill';
+  let state = 'fill-idle', stateT = 0;
+  let arcTutorialCount = 0, fillTutorialCount = 0;
+  let down = null, swipeProgress = 0, commitFromProgress = 0;
+  let longPressTimer = null, pressing = false;
+  let arcEnterAccel = false, arcEnterAccelStart = 0;
+  let arcInviteTimer = null;
+  const ripples = [];
+  let rippleTimer = 0;
+
+  function go(s) {
+    state = s; stateT = performance.now(); rippleTimer = 0;
+    const arcHints = { 'arc-enter':'长按说话','arc-invite':'长按说话','arc-record':'松手发送' };
+    if (arcHints[s] && arcTutorialCount < 2) arcTextEl.textContent = arcHints[s];
+    if (s === 'arc-record' && arcTutorialCount < 2) { arcTextEl.style.opacity = '0.85'; }
+    else if (s !== 'arc-enter' && s !== 'arc-invite') { arcTextEl.style.opacity = '0'; }
+    if (s !== 'fill-enter' && s !== 'fill-idle') { fillTextEl.style.opacity = '0'; }
+    if (s === 'arc-record') arcTutorialCount++;
+    if (s === 'fill-commit') fillTutorialCount++;
+  }
+
+  function arcAngles(cx, cy, r) {
+    const m = vw(20);
+    const a0 = Math.asin(Math.max(-1, Math.min(1, (cx-(W+m))/r)));
+    const a1 = Math.asin(Math.max(-1, Math.min(1, (cx-(-m))/r)));
+    return { s: -Math.PI/2+a0, e: -Math.PI/2+a1 };
+  }
+
+  function drawStroke(cx, cy, r, sw, alpha, glowAlpha) {
+    const { s, e } = arcAngles(cx, cy, r);
+    if (alpha > 0.005) {
+      ctxM.save(); ctxM.scale(dpr, dpr);
+      ctxM.beginPath(); ctxM.arc(cx, cy, r, s, e);
+      ctxM.strokeStyle = `rgba(255,235,210,${alpha})`;
+      ctxM.lineWidth = sw; ctxM.lineCap = 'round'; ctxM.stroke();
+      ctxM.restore();
+    }
+    if (glowAlpha > 0.005) {
+      ctxG.save(); ctxG.scale(dpr, dpr);
+      ctxG.beginPath(); ctxG.arc(cx, cy, r, s, e);
+      ctxG.strokeStyle = `rgba(255,235,210,${glowAlpha})`;
+      ctxG.lineWidth = sw + 6; ctxG.lineCap = 'round'; ctxG.stroke();
+      ctxG.restore();
+    }
+  }
+
+  function drawFill(cx, cy, r, alpha) {
+    if (alpha < 0.005) return;
+    ctxM.save(); ctxM.scale(dpr, dpr);
+    const { s, e } = arcAngles(cx, cy, r);
+    ctxM.beginPath(); ctxM.arc(cx, cy, r, s, e);
+    ctxM.lineTo(cx + r*Math.cos(e), H+40);
+    ctxM.lineTo(cx + r*Math.cos(s), H+40);
+    ctxM.closePath();
+    const grad = ctxM.createLinearGradient(0, cy-r, 0, H+20);
+    grad.addColorStop(0, `rgba(255,235,210,${alpha})`);
+    grad.addColorStop(0.5, `rgba(255,235,210,${alpha*0.35})`);
+    grad.addColorStop(1, `rgba(255,235,210,0)`);
+    ctxM.fillStyle = grad; ctxM.fill();
+    ctxM.beginPath(); ctxM.arc(cx, cy, r, s, e);
+    ctxM.strokeStyle = `rgba(255,235,210,${Math.min(0.3,alpha*1.2)})`;
+    ctxM.lineWidth = 1; ctxM.stroke();
+    ctxM.restore();
+  }
+
+  function drawArcTutorial(arcAlpha) {
+    if (arcTutorialCount >= 2) return;
+    if (arcAlpha < 0.005) return;
+    const a = arcAlpha * 0.15;
+    ctxM.save(); ctxM.scale(dpr, dpr);
+    const top = H * 2 / 3;
+    const grad = ctxM.createLinearGradient(0, top, 0, top + vh(5));
+    grad.addColorStop(0, `rgba(255,235,210,0)`);
+    grad.addColorStop(1, `rgba(255,235,210,${a})`);
+    ctxM.fillStyle = grad;
+    ctxM.fillRect(0, top, W, vh(5));
+    ctxM.fillStyle = `rgba(255,235,210,${a})`;
+    ctxM.fillRect(0, top + vh(5), W, H - top - vh(5));
+    ctxM.restore();
+    arcTextEl.style.opacity = arcAlpha > 0.005 ? Math.min(0.9, arcAlpha * 0.55 + 0.45) : 0;
+  }
+
+  function drawFillTutorial(fillAlpha, now) {
+    if (fillTutorialCount >= 2) return;
+    if (fillAlpha < 0.005) { fillTextEl.style.opacity = '0'; return; }
+    const r = vw(P.radiusVW);
+    const cycleDur = 3.0;
+    const raw = ((now / 1000) % cycleDur) / cycleDur;
+    const t = 1 - Math.pow(1 - raw, 2);
+    const startY = H + vh(5), endY = H * 1 / 3;
+    const arcTopY = startY + (endY - startY) * t;
+    const bandCy = arcTopY + r;
+    const fadeA = fillAlpha * 1.0 * (1 - t);
+    if (fadeA < 0.005) return;
+    ctxM.save(); ctxM.scale(dpr, dpr);
+    const { s, e } = arcAngles(W/2, bandCy, r);
+    ctxM.beginPath(); ctxM.arc(W/2, bandCy, r, s, e);
+    ctxM.lineTo(W/2 + r * Math.cos(e), H + 40);
+    ctxM.lineTo(W/2 + r * Math.cos(s), H + 40);
+    ctxM.closePath();
+    const feather = vh(5);
+    const gradTop = arcTopY - feather, gradBot = H + 20, gradH = gradBot - gradTop;
+    const peakStop = Math.min(0.4, feather / gradH);
+    const grad = ctxM.createLinearGradient(0, gradTop, 0, gradBot);
+    grad.addColorStop(0, `rgba(255,235,210,0)`);
+    grad.addColorStop(peakStop, `rgba(255,235,210,${fadeA})`);
+    grad.addColorStop(Math.min(0.6, peakStop + 0.2), `rgba(255,235,210,${fadeA * 0.3})`);
+    grad.addColorStop(1, `rgba(255,235,210,0)`);
+    ctxM.fillStyle = grad; ctxM.fill();
+    ctxM.restore();
+    fillTextEl.style.opacity = fillAlpha > 0.005 ? Math.min(0.9, fillAlpha * 2.5 + 0.45) : 0;
+  }
+
+  function spawnRipple(cx, cy, r) { ripples.push({ cx, cy, r, t: 0 }); }
+
+  function tickRipples(dt) {
+    if (!ripples.length) return;
+    ctxM.save(); ctxM.scale(dpr, dpr);
+    for (let i = ripples.length-1; i >= 0; i--) {
+      const rp = ripples[i]; rp.t += dt;
+      if (rp.t > 1800) { ripples.splice(i,1); continue; }
+      const p = rp.t/1800, a = (1-p)*0.55;
+      const { s, e } = arcAngles(rp.cx, rp.cy - p*vh(22), rp.r + p*vh(4));
+      ctxM.beginPath(); ctxM.arc(rp.cx, rp.cy - p*vh(22), rp.r + p*vh(4), s, e);
+      ctxM.strokeStyle = `rgba(255,235,210,${a})`; ctxM.lineWidth = 1.5; ctxM.stroke();
+    }
+    ctxM.restore();
+  }
+
+  // 手势
+  container.addEventListener('contextmenu', (e) => e.preventDefault());
+  container.addEventListener('pointerdown', (e) => {
+    const rect = container.getBoundingClientRect();
+    const lx = e.clientX - rect.left, ly = e.clientY - rect.top;
+    down = { x: e.clientX, y: e.clientY, t: performance.now(), ly };
+    if (state === 'arc-invite' || state === 'arc-enter') {
+      if (ly < H * 2 / 3) return;
+      pressing = true;
+      if (state === 'arc-enter') {
+        if (arcInviteTimer) { clearTimeout(arcInviteTimer); arcInviteTimer = null; }
+        arcEnterAccel = true;
+        arcEnterAccelStart = Math.min(1, (performance.now() - stateT) / 1000);
+      }
+      longPressTimer = setTimeout(() => {
+        if (pressing) { arcEnterAccel = false; go('arc-record'); rippleTimer = 400; }
+      }, 250);
+    }
+  });
+  container.addEventListener('pointermove', (e) => {
+    if (!down) return;
+    if (state === 'fill-idle' || state === 'fill-swipe') {
+      swipeProgress = Math.max(0, Math.min(1.3, -(e.clientY - down.y) / 40));
+      if (swipeProgress > 0.05 && state === 'fill-idle') state = 'fill-swipe';
+    }
+  });
+  container.addEventListener('pointerup', (e) => {
+    if (!down) return;
+    const dy = e.clientY - down.y, dt = performance.now() - down.t;
+    const vy = dy / Math.max(1, dt);
+    if (state === 'fill-swipe' || state === 'fill-idle') {
+      if (dy <= -40 || vy <= -0.25) {
+        commitFromProgress = Math.min(1, swipeProgress);
+        go('fill-commit');
+        setTimeout(() => go('fill-enter'), 500);
+        setTimeout(() => go('fill-idle'), 2100);
+      } else { swipeProgress = 0; go('fill-idle'); }
+    } else if (state === 'arc-record') {
+      go('arc-close');
+      setTimeout(() => go('arc-enter'), 550);
+      arcInviteTimer = setTimeout(() => { go('arc-invite'); arcInviteTimer = null; }, 1550);
+    }
+    if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+    pressing = false; down = null;
+  });
+  container.addEventListener('pointercancel', () => {
+    if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+    pressing = false; down = null; swipeProgress = 0;
+    if (state === 'fill-swipe') go('fill-idle');
+  });
+
+  let lastT = 0;
+  function tick(now) {
+    const dt = lastT ? Math.min(50, now-lastT) : 16;
+    lastT = now;
+    ctxM.clearRect(0, 0, cMainEl.width, cMainEl.height);
+    ctxG.clearRect(0, 0, cGlowEl.width, cGlowEl.height);
+    cGlowEl.style.filter = `blur(${P.glowBlur}px)`;
+    const r = vw(P.radiusVW), cx = W/2;
+    const elapsed = (now - stateT) / 1000;
+
+    if (state === 'fill-enter') {
+      const preDur = 1.0;
+      if (elapsed < preDur) {
+        const p = elapsed / preDur;
+        const pulse = Math.pow(Math.max(0, Math.sin(p * Math.PI)), 1.6);
+        ctxM.save(); ctxM.scale(dpr, dpr);
+        ctxM.translate(W/2, H); ctxM.scale(1, 0.25); ctxM.translate(-W/2, -H);
+        const grad = ctxM.createRadialGradient(W/2, H, 0, W/2, H, W*0.5);
+        grad.addColorStop(0, `rgba(255,235,210,${pulse*0.6})`);
+        grad.addColorStop(0.15, `rgba(255,235,210,${pulse*0.35})`);
+        grad.addColorStop(0.4, `rgba(255,235,210,${pulse*0.12})`);
+        grad.addColorStop(1, `rgba(255,235,210,0)`);
+        ctxM.fillStyle = grad; ctxM.fillRect(0, H - W*0.5, W, W*0.5);
+        ctxM.restore();
+      }
+      if (elapsed > 0.6) {
+        const toCy = H + r - vh(P.fillPeekVH);
+        const fromCy = toCy + vh(P.fillPeekVH + 3);
+        const t = Math.min(1, (elapsed - 0.6) / 1.0);
+        const e = 1 - Math.pow(1-t, 2.5);
+        const fillA = P.fillAlpha * e;
+        drawFillTutorial(fillA, now);
+        drawFill(cx, fromCy + (toCy-fromCy)*e, r, fillA);
+      }
+    }
+    else if (state === 'fill-idle') {
+      const baseCy = H + r - vh(P.fillPeekVH);
+      const b = Math.sin(elapsed / P.fillBreathPeriod * Math.PI*2);
+      const fillA = P.fillAlpha * (1+0.2*b);
+      drawFillTutorial(fillA, now);
+      drawFill(cx, baseCy - vh(P.fillBreathAmp)*b*0.5, r, fillA);
+    }
+    else if (state === 'fill-swipe') {
+      const baseCy = H + r - vh(P.fillPeekVH);
+      const p = Math.min(1, swipeProgress);
+      drawFill(cx, baseCy - vh(8)*p, r, P.fillAlpha + 0.1*p);
+    }
+    else if (state === 'fill-commit') {
+      const baseCy = H + r - vh(P.fillPeekVH);
+      const startOff = vh(8) * commitFromProgress;
+      const t = Math.min(1, elapsed / 0.5);
+      const e = 1 - Math.pow(1-t, 3);
+      drawFill(cx, baseCy - (startOff + (vh(14)-startOff)*e), r, (P.fillAlpha+0.1*commitFromProgress)*(1-e));
+    }
+    else if (state === 'arc-enter') {
+      const toCy = H + r - vh(P.arcPeekVH), fromCy = toCy + vh(5);
+      let t;
+      if (arcEnterAccel) {
+        const ae = elapsed - arcEnterAccelStart;
+        t = Math.min(1, arcEnterAccelStart + (1-arcEnterAccelStart)*Math.min(1, ae/0.15));
+      } else { t = Math.min(1, elapsed / 1.0); }
+      const e = 1 - Math.pow(1-t, 2.5);
+      const arcA = 0.7 * e;
+      drawArcTutorial(arcA);
+      drawStroke(cx, fromCy + (toCy-fromCy)*e, r, P.strokeWidth, arcA, 0.15*e);
+    }
+    else if (state === 'arc-invite') {
+      const baseCy = H + r - vh(P.arcPeekVH);
+      const b = Math.sin(elapsed / P.arcBreathPeriod * Math.PI*2);
+      const arcA = 0.7 + 0.2*b;
+      drawArcTutorial(arcA);
+      drawStroke(cx, baseCy - vh(P.arcBreathAmp)*b*0.5, r, P.strokeWidth, arcA, 0.15+0.1*b);
+    }
+    else if (state === 'arc-record') {
+      const baseCy = H + r - vh(P.arcPeekVH);
+      const t = Math.min(1, elapsed / 0.4), e = 1 - Math.pow(1-t, 3);
+      const cy = baseCy - vh(6)*e;
+      drawStroke(cx, cy, r, P.strokeWidth*1.4, 0.95, 0.15+0.85*e);
+      rippleTimer += dt;
+      if (rippleTimer > 600) { rippleTimer = 0; spawnRipple(cx, cy, r); }
+    }
+    else if (state === 'arc-close') {
+      const raisedCy = H + r - vh(P.arcPeekVH) - vh(6);
+      const restCy = H + r - vh(P.fillPeekVH);
+      const t = Math.min(1, elapsed / 0.45), e = 1 - Math.pow(1-t, 2);
+      const a = 0.8*(1-e);
+      let ga = 0;
+      if (elapsed < 0.35) ga = 0.6 * Math.sin(elapsed/0.35*Math.PI);
+      drawStroke(cx, raisedCy + (restCy-raisedCy)*e, r, P.strokeWidth, a, ga);
+    }
+    tickRipples(dt);
+    requestAnimationFrame(tick);
+  }
+
+  go('fill-idle');
+  requestAnimationFrame(tick);
+
+  return {
+    switchToArc() {
+      mode = 'arc'; arcTutorialCount = 0; fillTutorialCount = 0;
+      go('arc-enter');
+      arcInviteTimer = setTimeout(() => { go('arc-invite'); arcInviteTimer = null; }, 1000);
+    },
+    switchToFill() {
+      mode = 'fill'; arcTutorialCount = 0; fillTutorialCount = 0;
+      go('fill-enter');
+      setTimeout(() => go('fill-idle'), 1600);
+    },
+    resetTutorial() {
+      arcTutorialCount = 0; fillTutorialCount = 0;
+    }
+  };
+}
+
+// ============================================================
+// 初始化原型实例
+// ============================================================
+const isMobile = window.innerWidth < 769;
+
+let desktopEngine = null, mobileEngine = null;
+
+if (!isMobile) {
+  desktopEngine = createProtoEngine(
+    document.getElementById('proto-desktop'),
+    document.getElementById('cm-d'), document.getElementById('cg-d'),
+    document.getElementById('tt-arc-d'), document.getElementById('tt-fill-d')
+  );
+}
+if (isMobile) {
+  mobileEngine = createProtoEngine(
+    document.getElementById('mobile-layout'),
+    document.getElementById('cm-m'), document.getElementById('cg-m'),
+    document.getElementById('tt-arc-m'), document.getElementById('tt-fill-m')
+  );
+}
+
+function getEngine() { return isMobile ? mobileEngine : desktopEngine; }
+
+// ============================================================
+// 文档章节分组
+// ============================================================
+const PAGE_SECTIONS = {
+  common: ['一、坐标体系与适配', '二、共享圆', '八、色值'],
+  arc:    ['三、回响弧（描边', '5.1 回响弧引导', '六、手势检测', '七、状态转移'],
+  fill:   ['四、上滑色块（填充', '5.2 上滑色块引导', '六、手势检测', '七、状态转移'],
+};
+const PAGE_TITLES = { common: '共用原则', arc: '回响弧（输入用）', fill: '上滑色块（推进用）' };
+
+let docSections = {}, currentPage = 'common';
+
+function splitByH2(src) {
+  const sections = {}; const lines = src.split('\n');
+  let currentKey = '__header__', buf = [];
+  for (const line of lines) {
+    if (line.startsWith('## ')) { if (buf.length) sections[currentKey] = buf.join('\n'); currentKey = line.slice(3).trim(); buf = [line]; }
+    else if (line.startsWith('### ') && (line.includes('5.1') || line.includes('5.2'))) { if (buf.length) sections[currentKey] = buf.join('\n'); currentKey = line.slice(4).trim(); buf = [line]; }
+    else buf.push(line);
+  }
+  if (buf.length) sections[currentKey] = buf.join('\n');
+  return sections;
+}
+
+function getPageMarkdown(page) {
+  const keys = PAGE_SECTIONS[page] || [], parts = ['# ' + PAGE_TITLES[page]];
+  for (const prefix of keys) { for (const [key, content] of Object.entries(docSections)) { if (key.includes(prefix)) parts.push('\n' + content); } }
+  return parts.join('\n');
+}
+
+function renderPage(page) {
+  currentPage = page;
+  const desktop = document.getElementById('doc-desktop');
+  if (desktop) { desktop.innerHTML = md2html(getPageMarkdown(page)); document.getElementById('doc-panel').scrollTop = 0; }
+  document.querySelectorAll('.nav-btn').forEach(b => { if (!b.classList.contains('disabled')) b.classList.toggle('active', b.dataset.page === page); });
+  const protoContainer = document.getElementById('proto-desktop');
+  const resetBtn = document.getElementById('reset-guide-btn');
+  if (page === 'common') {
+    if (protoContainer) protoContainer.style.visibility = 'hidden';
+    if (resetBtn) resetBtn.style.display = 'none';
+  } else {
+    if (protoContainer) protoContainer.style.visibility = '';
+    if (resetBtn) resetBtn.style.display = '';
+    const eng = getEngine();
+    if (eng) { eng.resetTutorial(); if (page === 'arc') eng.switchToArc(); else eng.switchToFill(); }
+  }
+}
+
+// 导航
+document.querySelectorAll('.nav-btn').forEach(btn => {
+  btn.addEventListener('click', () => { if (!btn.classList.contains('disabled') && btn.dataset.page) renderPage(btn.dataset.page); });
+});
+document.getElementById('reset-guide-btn')?.addEventListener('click', () => {
+  const eng = getEngine();
+  if (eng) { eng.resetTutorial(); if (currentPage === 'arc') eng.switchToArc(); else eng.switchToFill(); }
+});
+
+// 手机端导航
+document.querySelectorAll('.mobile-nav-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (!btn.dataset.page) return;
+    document.querySelectorAll('.mobile-nav-btn').forEach(b => b.classList.toggle('active', b === btn));
+    const eng = getEngine();
+    if (eng) { eng.resetTutorial(); if (btn.dataset.page === 'arc') eng.switchToArc(); else eng.switchToFill(); }
+  });
+});
+
+// Markdown
+function md2html(src) {
+  let html = '', inCode = false, inTable = false, inList = false, inBlockquote = false;
+  for (const line of src.split('\n')) {
+    if (line.startsWith('```')) { if (inCode) { html += '</code></pre>'; inCode = false; } else { html += '<pre><code>'; inCode = true; } continue; }
+    if (inCode) { html += escHtml(line) + '\n'; continue; }
+    if (!line.trim()) { if (inList) { html += '</ul>'; inList = false; } if (inTable) { html += '</table>'; inTable = false; } if (inBlockquote) { html += '</blockquote>'; inBlockquote = false; } continue; }
+    if (line.includes('|') && line.trim().startsWith('|')) { if (line.replace(/[|\-\s]/g, '') === '') continue; const cells = line.split('|').filter(Boolean).map(c => c.trim()); if (!inTable) { html += '<table>'; inTable = true; } const tag = !html.includes('<td>') && inTable && html.endsWith('<table>') ? 'th' : 'td'; html += '<tr>' + cells.map(c => `<${tag}>${inline(c)}</${tag}>`).join('') + '</tr>'; continue; }
+    if (inTable) { html += '</table>'; inTable = false; }
+    if (line.startsWith('> ')) { if (!inBlockquote) { html += '<blockquote>'; inBlockquote = true; } html += '<p>' + inline(line.slice(2)) + '</p>'; continue; }
+    if (inBlockquote) { html += '</blockquote>'; inBlockquote = false; }
+    if (line.startsWith('# ')) { html += '<h1>' + inline(line.slice(2)) + '</h1>'; continue; }
+    if (line.startsWith('## ')) { html += '<h2>' + inline(line.slice(3)) + '</h2>'; continue; }
+    if (line.startsWith('### ')) { html += '<h3>' + inline(line.slice(4)) + '</h3>'; continue; }
+    if (/^---+$/.test(line.trim())) { html += '<hr>'; continue; }
+    if (line.match(/^[\-\*] /)) { if (!inList) { html += '<ul>'; inList = true; } html += '<li>' + inline(line.replace(/^[\-\*] /, '')) + '</li>'; continue; }
+    if (inList) { html += '</ul>'; inList = false; }
+    html += '<p>' + inline(line) + '</p>';
+  }
+  if (inCode) html += '</code></pre>'; if (inList) html += '</ul>'; if (inTable) html += '</table>'; if (inBlockquote) html += '</blockquote>';
+  return html;
+}
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function inline(s) { return escHtml(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/`([^`]+)`/g, '<code>$1</code>'); }
+
+// 加载文档
+fetch('../plans/01-通用设计规范/内容流交互-弧形交互规格.md')
+  .then(r => r.text())
+  .then(src => { docSections = splitByH2(src); renderPage('common'); })
+  .catch(() => { const d = document.getElementById('doc-desktop'); if (d) d.innerHTML = '<p>文档加载失败</p>'; });
+</script>
+</body>
+</html>

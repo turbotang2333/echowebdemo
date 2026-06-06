@@ -1,0 +1,196 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" width="1200" height="800">
+  <defs>
+    <radialGradient id="continentBg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#1a2847"/>
+      <stop offset="70%" stop-color="#0d1b2a"/>
+      <stop offset="100%" stop-color="#060d18"/>
+    </radialGradient>
+    <radialGradient id="personalityGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fff176" stop-opacity="0.6"/>
+      <stop offset="60%" stop-color="#fdd835" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#fdd835" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="darkGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#5c6bc0" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#5c6bc0" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- ============= 大陆边界 + 内部底色 ============= -->
+  <circle cx="600" cy="400" r="340" fill="url(#continentBg)" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="6 8" opacity="0.95"/>
+
+  <!-- 顶部标注 -->
+  <text x="600" y="60" text-anchor="middle" fill="#666" font-size="14" font-family="sans-serif">人格大陆 · 隐性圆边界</text>
+
+  <!-- ============= 星云团 A(已点亮,左上)中心 (490, 290) ============= -->
+  <circle cx="490" cy="290" r="120" fill="url(#personalityGlow)"/>
+  <!-- 实线(已点亮) -->
+  <g stroke="#ffffff" stroke-width="0.9" opacity="0.5">
+    <line x1="490" y1="290" x2="410" y2="230"/>
+    <line x1="490" y1="290" x2="455" y2="355"/>
+    <line x1="490" y1="290" x2="570" y2="245"/>
+    <line x1="490" y1="290" x2="580" y2="335"/>
+    <line x1="490" y1="290" x2="400" y2="310"/>
+    <line x1="490" y1="290" x2="520" y2="200"/>
+    <line x1="490" y1="290" x2="605" y2="295"/>
+    <line x1="490" y1="290" x2="430" y2="375"/>
+    <line x1="490" y1="290" x2="375" y2="265"/>
+    <line x1="490" y1="290" x2="540" y2="385"/>
+  </g>
+  <!-- 记忆星 -->
+  <circle cx="410" cy="230" r="4" fill="#ffffff" opacity="0.9"/>
+  <circle cx="455" cy="355" r="5" fill="#ffffff" opacity="0.95"/>
+  <circle cx="570" cy="245" r="4.5" fill="#ffffff" opacity="0.85"/>
+  <circle cx="580" cy="335" r="5.5" fill="#ffffff" opacity="0.95"/>
+  <circle cx="400" cy="310" r="4" fill="#ffffff" opacity="0.8"/>
+  <circle cx="520" cy="200" r="4.5" fill="#ffffff" opacity="0.9"/>
+  <circle cx="605" cy="295" r="3.5" fill="#ffffff" opacity="0.75"/>
+  <circle cx="430" cy="375" r="3" fill="#ffffff" opacity="0.7"/>
+  <circle cx="375" cy="265" r="3" fill="#ffffff" opacity="0.7"/>
+  <circle cx="540" cy="385" r="3.5" fill="#ffffff" opacity="0.75"/>
+  <!-- 人格星(已点亮) -->
+  <circle cx="490" cy="290" r="28" fill="#fdd835" stroke="#f57f17" stroke-width="2"/>
+  <text x="490" y="296" text-anchor="middle" fill="#000" font-size="13" font-family="sans-serif" font-weight="600">人格星 A</text>
+
+  <!-- ============= 星云团 B(未点亮,右)中心 (770, 470) ============= -->
+  <circle cx="770" cy="470" r="105" fill="url(#darkGlow)"/>
+  <!-- 虚线(未点亮) -->
+  <g stroke="#90a4ae" stroke-width="0.8" stroke-dasharray="3 4" opacity="0.45">
+    <line x1="770" y1="470" x2="685" y2="425"/>
+    <line x1="770" y1="470" x2="860" y2="405"/>
+    <line x1="770" y1="470" x2="855" y2="515"/>
+    <line x1="770" y1="470" x2="690" y2="520"/>
+    <line x1="770" y1="470" x2="810" y2="390"/>
+    <line x1="770" y1="470" x2="830" y2="555"/>
+    <line x1="770" y1="470" x2="670" y2="475"/>
+    <line x1="770" y1="470" x2="875" y2="465"/>
+  </g>
+  <!-- 记忆星 -->
+  <circle cx="685" cy="425" r="4.5" fill="#ffffff" opacity="0.9"/>
+  <circle cx="860" cy="405" r="5" fill="#ffffff" opacity="0.95"/>
+  <circle cx="855" cy="515" r="4" fill="#ffffff" opacity="0.85"/>
+  <circle cx="690" cy="520" r="5" fill="#ffffff" opacity="0.95"/>
+  <circle cx="810" cy="390" r="3.5" fill="#ffffff" opacity="0.8"/>
+  <circle cx="830" cy="555" r="4" fill="#ffffff" opacity="0.85"/>
+  <circle cx="670" cy="475" r="3.5" fill="#ffffff" opacity="0.75"/>
+  <circle cx="875" cy="465" r="3" fill="#ffffff" opacity="0.7"/>
+  <!-- 人格星(未点亮) -->
+  <circle cx="770" cy="470" r="26" fill="#37474f" stroke="#78909c" stroke-width="1.5" stroke-dasharray="3 3"/>
+  <text x="770" y="478" text-anchor="middle" fill="#90a4ae" font-size="20" font-family="sans-serif" font-weight="600">?</text>
+
+  <!-- ============= 星云团 C(未点亮,下)中心 (500, 600) ============= -->
+  <circle cx="500" cy="600" r="120" fill="url(#darkGlow)"/>
+  <!-- 虚线 -->
+  <g stroke="#90a4ae" stroke-width="0.8" stroke-dasharray="3 4" opacity="0.45">
+    <line x1="500" y1="600" x2="405" y2="555"/>
+    <line x1="500" y1="600" x2="580" y2="565"/>
+    <line x1="500" y1="600" x2="425" y2="660"/>
+    <line x1="500" y1="600" x2="575" y2="650"/>
+    <line x1="500" y1="600" x2="375" y2="615"/>
+    <line x1="500" y1="600" x2="520" y2="515"/>
+    <line x1="500" y1="600" x2="610" y2="610"/>
+    <line x1="500" y1="600" x2="440" y2="600"/>
+    <line x1="500" y1="600" x2="550" y2="605"/>
+    <line x1="500" y1="600" x2="480" y2="695"/>
+  </g>
+  <!-- 记忆星 -->
+  <circle cx="405" cy="555" r="5" fill="#ffffff" opacity="0.95"/>
+  <circle cx="580" cy="565" r="4.5" fill="#ffffff" opacity="0.9"/>
+  <circle cx="425" cy="660" r="4" fill="#ffffff" opacity="0.85"/>
+  <circle cx="575" cy="650" r="5.5" fill="#ffffff" opacity="0.95"/>
+  <circle cx="375" cy="615" r="4" fill="#ffffff" opacity="0.85"/>
+  <circle cx="520" cy="515" r="4.5" fill="#ffffff" opacity="0.9"/>
+  <circle cx="610" cy="610" r="4" fill="#ffffff" opacity="0.85"/>
+  <circle cx="440" cy="600" r="3.5" fill="#ffffff" opacity="0.75"/>
+  <circle cx="550" cy="605" r="3" fill="#ffffff" opacity="0.7"/>
+  <circle cx="480" cy="695" r="3.5" fill="#ffffff" opacity="0.75"/>
+  <!-- 人格星(未点亮) -->
+  <circle cx="500" cy="600" r="26" fill="#37474f" stroke="#78909c" stroke-width="1.5" stroke-dasharray="3 3"/>
+  <text x="500" y="608" text-anchor="middle" fill="#90a4ae" font-size="20" font-family="sans-serif" font-weight="600">?</text>
+
+  <!-- ============= 零散微星 ============= -->
+  <circle cx="320" cy="450" r="2" fill="#ffffff" opacity="0.5"/>
+  <circle cx="360" cy="380" r="2.5" fill="#ffffff" opacity="0.55"/>
+  <circle cx="895" cy="280" r="2" fill="#ffffff" opacity="0.5"/>
+  <circle cx="800" cy="170" r="2.5" fill="#ffffff" opacity="0.55"/>
+  <circle cx="290" cy="380" r="2" fill="#ffffff" opacity="0.5"/>
+  <circle cx="880" cy="640" r="2.5" fill="#ffffff" opacity="0.55"/>
+  <circle cx="330" cy="660" r="2" fill="#ffffff" opacity="0.5"/>
+  <circle cx="640" cy="170" r="2" fill="#ffffff" opacity="0.5"/>
+  <circle cx="700" cy="610" r="2" fill="#ffffff" opacity="0.5"/>
+  <circle cx="900" cy="370" r="2" fill="#ffffff" opacity="0.5"/>
+
+  <!-- ============= 点击记忆星指示环(在 cluster A 的 (455,355)) ============= -->
+  <circle cx="455" cy="355" r="11" fill="none" stroke="#ff7043" stroke-width="2" opacity="0.9"/>
+  <circle cx="455" cy="355" r="16" fill="none" stroke="#ff7043" stroke-width="1" opacity="0.45"/>
+
+  <!-- 指引线:被点的记忆星 → 文字框 -->
+  <path d="M 444 358 Q 340 390 250 380" fill="none" stroke="#ff7043" stroke-width="1.5" stroke-dasharray="5 4" opacity="0.8"/>
+
+  <!-- ============= 文字框(左侧 panel)记忆内容 ============= -->
+  <g transform="translate(40, 230)">
+    <rect x="0" y="0" width="210" height="240" rx="10" fill="#ffffff" stroke="#ff7043" stroke-width="1.5"/>
+    <rect x="0" y="0" width="210" height="34" rx="10" fill="#ff7043"/>
+    <rect x="0" y="24" width="210" height="10" fill="#ff7043"/>
+    <text x="16" y="23" fill="#fff" font-size="13" font-family="sans-serif" font-weight="600">记忆 · 文字记录</text>
+    <text x="16" y="60" fill="#333" font-size="11" font-family="sans-serif">
+      <tspan x="16" dy="0">「今晚他主动跟我说了</tspan>
+      <tspan x="16" dy="17">一件他一直没敢提的事——</tspan>
+      <tspan x="16" dy="17"> </tspan>
+      <tspan x="16" dy="17">他在等一个</tspan>
+      <tspan x="16" dy="17">迟到三年的回信。</tspan>
+      <tspan x="16" dy="17"> </tspan>
+      <tspan x="16" dy="17">我突然懂了他</tspan>
+      <tspan x="16" dy="17">眼神里那点暗。」</tspan>
+    </text>
+    <text x="16" y="222" fill="#888" font-size="10" font-family="sans-serif" font-style="italic">— 第 7 场景 · 雨后阳台</text>
+  </g>
+
+  <!-- ============= 点击人格星指示环(cluster A 的 (490, 290),已点亮) ============= -->
+  <circle cx="490" cy="290" r="40" fill="none" stroke="#ff7043" stroke-width="2" opacity="0.9"/>
+  <circle cx="490" cy="290" r="48" fill="none" stroke="#ff7043" stroke-width="1" opacity="0.45"/>
+
+  <!-- 指引线:被点的人格星 → 视频 panel -->
+  <path d="M 530 290 Q 720 200 950 230" fill="none" stroke="#ff7043" stroke-width="1.5" stroke-dasharray="5 4" opacity="0.8"/>
+
+  <!-- ============= 视频 panel(右侧)竖屏 ============= -->
+  <g transform="translate(950, 180)">
+    <!-- 外框(手机/竖屏边框) -->
+    <rect x="0" y="0" width="200" height="360" rx="14" fill="#1a1a1a" stroke="#ff7043" stroke-width="1.5"/>
+    <!-- 视频画面区 -->
+    <rect x="12" y="14" width="176" height="296" rx="6" fill="#0d0d0d"/>
+    <!-- 渐变模拟视频底色 -->
+    <rect x="12" y="14" width="176" height="296" rx="6" fill="url(#personalityGlow)" opacity="0.4"/>
+    <!-- 播放按钮 -->
+    <circle cx="100" cy="160" r="34" fill="none" stroke="#ff7043" stroke-width="2.5" opacity="0.85"/>
+    <polygon points="90,144 90,176 118,160" fill="#ff7043" opacity="0.95"/>
+    <!-- 进度条 -->
+    <rect x="24" y="282" width="152" height="3" rx="1.5" fill="#444"/>
+    <rect x="24" y="282" width="56" height="3" rx="1.5" fill="#ff7043"/>
+    <text x="24" y="300" fill="#aaa" font-size="9" font-family="sans-serif">00:32 / 02:15</text>
+    <!-- 底部标注 -->
+    <text x="100" y="332" text-anchor="middle" fill="#fff" font-size="11" font-family="sans-serif" font-weight="600">人格 · 视频片段</text>
+    <text x="100" y="348" text-anchor="middle" fill="#aaa" font-size="9" font-family="sans-serif">来自内容流的解锁瞬间</text>
+  </g>
+
+  <!-- ============= 图例 ============= -->
+  <g transform="translate(40, 750)">
+    <circle cx="12" cy="0" r="10" fill="#fdd835" stroke="#f57f17" stroke-width="1.5"/>
+    <text x="30" y="4" fill="#333" font-size="12" font-family="sans-serif">已点亮人格星</text>
+
+    <circle cx="160" cy="0" r="10" fill="#37474f" stroke="#78909c" stroke-width="1.5" stroke-dasharray="3 3"/>
+    <text x="178" y="4" fill="#333" font-size="12" font-family="sans-serif">未点亮人格星</text>
+
+    <circle cx="310" cy="0" r="4" fill="#fff" stroke="#999" stroke-width="0.5"/>
+    <text x="322" y="4" fill="#333" font-size="12" font-family="sans-serif">记忆星</text>
+
+    <line x1="380" y1="0" x2="412" y2="0" stroke="#999" stroke-width="1.2"/>
+    <text x="420" y="4" fill="#333" font-size="12" font-family="sans-serif">实线 = 已点亮</text>
+
+    <line x1="520" y1="0" x2="552" y2="0" stroke="#90a4ae" stroke-width="1.2" stroke-dasharray="3 4"/>
+    <text x="560" y="4" fill="#333" font-size="12" font-family="sans-serif">虚线 = 未点亮</text>
+
+    <circle cx="675" cy="0" r="7" fill="none" stroke="#ff7043" stroke-width="2"/>
+    <text x="688" y="4" fill="#333" font-size="12" font-family="sans-serif">用户点击</text>
+  </g>
+</svg>

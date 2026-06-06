@@ -5,9 +5,11 @@ node_modules/
 .env.local
 .vscode/
 .idea/
+.claude/
 *.log
 .share-logs/
 others/
+dist/
 
 # Capacitor build output
 www/

@@ -1,0 +1,442 @@
+:root {
+  --bg: #1a1a2e; --phone-bg: #070811; --nav-w: 200px; --sat: env(safe-area-inset-top, 0px);
+  /* 字体策略：宋体管"故事内容"（旁白/对话/历史），黑体管"系统语言"（UI 标签/操作提示）。*/
+  --serif: 'Source Han Serif SC VF', 'Source Han Serif SC', 'Songti SC', 'STSong', serif;
+  --sans:  'Source Han Sans CN', 'Source Han Sans SC', 'PingFang SC', 'HarmonyOS Sans SC', sans-serif;
+}
+/* 让自定义属性可被 transition / animation 插值（气泡压栈、入场、呼吸各管各的） */
+@property --stack-shift { syntax: '<length>'; initial-value: 0px; inherits: false; }
+@property --enter-y     { syntax: '<length>'; initial-value: 0px; inherits: false; }
+@property --breath-y    { syntax: '<length>'; initial-value: 0px; inherits: false; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  width: 100%; height: 100%;
+  background: var(--bg);
+  overflow: hidden;
+  user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+  font-family: var(--sans);
+  color: rgba(255,235,210,0.9);
+}
+
+/* ============ 桌面布局 ============ */
+.desktop-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%; height: 100%;
+  gap: 32px;
+}
+
+/* ---- 控制菜单面板（左侧，未来填控制项） ---- */
+.nav-panel {
+  width: var(--nav-w);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.nav-l1 {
+  font-size: 12px; font-weight: 600;
+  letter-spacing: 0.1em;
+  color: rgba(255,235,210,0.45);
+  padding: 0 10px 4px; margin-top: 16px;
+}
+.nav-l1:first-child { margin-top: 0; }
+.nav-l2 {
+  font-size: 10px; font-weight: 500;
+  letter-spacing: 0.08em;
+  color: rgba(255,235,210,0.25);
+  padding: 6px 10px 3px 18px;
+}
+.nav-hint {
+  font-size: 11px; font-style: italic;
+  color: rgba(255,235,210,0.25);
+  padding: 2px 10px 6px 18px;
+  letter-spacing: 0.04em;
+}
+.nav-item {
+  padding: 7px 10px 7px 26px; border-radius: 6px;
+  font-size: 13px; color: rgba(255,235,210,0.5);
+  cursor: pointer; transition: background 0.2s, color 0.2s;
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+}
+.nav-item:hover { background: rgba(255,235,210,0.06); color: rgba(255,235,210,0.7); }
+.nav-item.active { background: rgba(255,200,130,0.12); color: rgba(255,235,210,0.9); }
+.nav-item.disabled { color: rgba(255,235,210,0.2); cursor: default; pointer-events: none; }
+.nav-divider { height:1px; background:rgba(255,235,210,0.08); margin:10px 10px; }
+.nav-action { padding:7px 10px; margin-top:4px; border-radius:6px; font-size:12px; color:rgba(255,235,210,0.35); cursor:pointer; transition:background 0.2s,color 0.2s; }
+.nav-action:hover { background:rgba(255,235,210,0.06); color:rgba(255,235,210,0.5); }
+.nav-toggle {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 10px 7px 26px; border-radius: 6px;
+  font-size: 13px; color: rgba(255,235,210,0.5);
+  cursor: pointer; transition: background 0.2s, color 0.2s;
+}
+.nav-toggle:hover { background: rgba(255,235,210,0.06); color: rgba(255,235,210,0.7); }
+.nav-toggle.on { color: rgba(255,235,210,0.9); }
+.nav-toggle .toggle-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: rgba(255,235,210,0.15);
+  border: 1px solid rgba(255,235,210,0.3);
+  transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+  flex-shrink: 0;
+}
+.nav-toggle.on .toggle-dot {
+  background: rgba(255,200,130,0.85);
+  border-color: rgba(255,200,130,1);
+  box-shadow: 0 0 8px rgba(255,200,130,0.5);
+}
+
+/* ---- 手机框 ---- */
+.phone-frame {
+  height: 95vh; aspect-ratio: 1260 / 2800; border-radius: 0;
+  background: var(--phone-bg); position: relative; overflow: hidden;
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.08), 0 20px 60px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.04);
+  flex-shrink: 0;
+}
+.phone-notch { display: none; }
+.phone-home { display: none; }
+
+/* ---- 舞台 ---- */
+.stage { position:absolute; inset:0; overflow:hidden; touch-action:none; }
+
+/* 场景 & 角色（canvas 之下） */
+.scene-bg {
+  position:absolute; inset:0; z-index:0;
+  background: url('../../src/images/cj5.jpg') center/cover no-repeat;
+  opacity: 0; transition: opacity 0.8s ease;
+}
+.scene-bg.visible { opacity: 1; }
+.character {
+  position:absolute; z-index:1;
+  left:calc(50% - 50vh); top:5%;
+  width:100vh; height:100vh;
+  transform: translateY(15vh) scale(0.7);
+  transform-origin: 50% 20%;
+  pointer-events:none;
+  opacity: 0; transition: opacity 0.8s ease;
+}
+.character.visible { opacity: 1; }
+.character img {
+  width:100%; height:100%;
+  object-fit:contain; object-position:center bottom;
+}
+
+canvas { position:absolute; inset:0; width:100%; height:100%; }
+/* 层级：历史(1000+) > 用户输入层(弧/光晕, 4-16) > 文字层(气泡 2 / 旁白 2) > 角色立绘 / 场景图 */
+#c-glow { z-index:4; }
+#c { z-index:5; }
+
+/* ---- 打字层：输入条 + 发送按钮，靠真实系统键盘抬高（移动端 visualViewport.height 变化写到 --kb-inset） ---- */
+/* 注意：input 不能用 display:none 切显隐，否则 iOS Safari 首次 focus() 不弹键盘——
+   始终保持 input 在 layout 树里，靠 opacity + pointer-events 控显隐。 */
+.typing-layer { position:absolute; inset:0; z-index:20; pointer-events:none; }
+/* 输入条 = 拉长版用户气泡：沿用 .bubble-user 同款墨纸介质（暖棕底 + 白字 + 外阴影 + 文字阴影），
+   做成横向胶囊形（border-radius = height/2），让"敲字"和"成气泡"是同一容器在变形 */
+.typing-input {
+  position:absolute; left:calc(24 * var(--u)); right:calc(64 * var(--u));
+  bottom:calc(14 * var(--u) + var(--kb-inset, 0px));
+  height:calc(38 * var(--u)); padding:0 calc(18 * var(--u));
+  background:rgba(40,30,22,0.85);
+  border:none; outline:none;
+  border-radius:calc(19 * var(--u));
+  color:rgba(255,255,255,1);
+  caret-color:rgba(255,255,255,1);
+  text-shadow:0 1px 2px rgba(0,0,0,0.7);
+  box-shadow:0 0 18px rgba(0,0,0,0.42);
+  text-align:center;
+  font-family: var(--serif);
+  font-size:calc(16 * var(--u)); letter-spacing:0.05em;
+  pointer-events:none;
+  opacity:0; transition:opacity 0.22s ease;
+}
+.typing-input::placeholder { color:rgba(255,255,255,0.35); font-style:italic; }
+.typing-input::-webkit-input-placeholder { color:rgba(255,255,255,0.35); font-style:italic; }
+.typing-send {
+  position:absolute; right:calc(14 * var(--u));
+  bottom:calc(14 * var(--u) + var(--kb-inset, 0px));
+  width:calc(38 * var(--u)); height:calc(38 * var(--u)); padding:0;
+  display:flex; align-items:center; justify-content:center;
+  border:none;
+  background:rgba(20,15,8,0.85);
+  border-radius:50%;
+  box-shadow:0 0 18px rgba(0,0,0,0.42);
+  cursor:default;
+  pointer-events:none;
+  opacity:0; transition:opacity 0.22s ease, background-color 0.22s ease;
+}
+.typing-send svg { display:block; overflow:visible; }
+.typing-send .send-core {
+  fill:rgba(255,235,210,0.5);
+  transition:fill 0.22s ease;
+}
+.typing-layer.entered .typing-input { opacity:1; pointer-events:auto; }
+.typing-layer.entered .typing-send { opacity:1; }
+.typing-layer.entered .typing-send.active {
+  background:rgba(255,235,210,1);
+  cursor:pointer;
+  pointer-events:auto;
+}
+.typing-layer.entered .typing-send.active .send-core {
+  fill:rgba(20,15,8,1);
+}
+
+/* ---- 左上角锚点（始终可见）：外圈 + 中心点 + 双圈慢脉冲，4 秒一波 + 错相 2 秒。
+       面板打开后脉冲停、中心点淡掉、::after 画三角 ▽ 表示"可收回"。 ---- */
+.history-anchor {
+  position: absolute;
+  top: calc(18 * var(--u) + var(--sat)); left: calc(18 * var(--u));
+  width: calc(28 * var(--u)); height: calc(28 * var(--u));
+  z-index: 1010;
+  cursor: pointer;
+  color: rgba(255, 225, 200, 0.85);
+}
+.history-anchor svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.history-anchor .anchor-ring  { stroke: currentColor; fill: none; }
+.history-anchor .anchor-core  { fill: currentColor; transition: opacity 0.3s; }
+.history-anchor .anchor-pulse { stroke: currentColor; fill: none; opacity: 0; }
+.history-anchor .anchor-pulse-1 { animation: anchorPulseWave 4s ease-out infinite; }
+.history-anchor .anchor-pulse-2 { animation: anchorPulseWave 4s ease-out infinite; animation-delay: 2s; }
+@keyframes anchorPulseWave {
+  0%   { r: 2;  opacity: 0.75; }
+  100% { r: 10; opacity: 0; }
+}
+.history-anchor.panel-open .anchor-pulse { animation: none; opacity: 0; }
+.history-anchor.panel-open .anchor-core  { opacity: 0; }
+.history-anchor.panel-open::after {
+  content: '';
+  position: absolute;
+  top: calc(9 * var(--u)); left: calc(9 * var(--u));
+  width: calc(10 * var(--u)); height: calc(10 * var(--u));
+  background: #6e5b3a;
+  clip-path: polygon(50% 0%, 0% 86.6%, 100% 86.6%);
+}
+/* 文字层：用户每完成一次交互（语音/打字）触发一次的"放大→缩回"提示；
+   首次点过锚点后不再触发（由 JS 控制添加/移除）。 */
+.history-anchor.hint-pulse {
+  animation: anchorHintPulse 0.9s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform-origin: center;
+}
+@keyframes anchorHintPulse {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.55); }
+  100% { transform: scale(1); }
+}
+
+/* ---- 历史面板（浅纸版）
+   结构：
+     .history-dim   底层暗幕，整屏覆盖，盖住舞台/人物 —— 不受 setMask 影响。
+     .history-panel 浅纸层，整屏 + 纯色纸面背景，由 JS 的 setMask 剪成弧形。 */
+.history-dim {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 999;
+  background: rgba(7, 8, 17, 0.85);
+  pointer-events: none;
+  opacity: 0;
+  display: none;
+  transition: opacity 0.4s ease;
+}
+.history-panel {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 1000;
+  background: rgb(238, 228, 210);
+  pointer-events: none;
+  opacity: 0;
+  display: none;
+}
+.history-scroll {
+  position: absolute;
+  top: calc(52 * var(--u) + var(--sat)); left: 0; right: 0; bottom: 26%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  padding: calc(16 * var(--u)) calc(32 * var(--u)) calc(32 * var(--u));
+  font-family: var(--serif);
+  color: #2a2218;
+  line-height: 1.8;
+  letter-spacing: 0.06em;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 85%, transparent 100%);
+          mask-image: linear-gradient(to bottom, #000 0%, #000 85%, transparent 100%);
+}
+.history-scroll::-webkit-scrollbar { width: 3px; }
+.history-scroll::-webkit-scrollbar-thumb { background: rgba(110,91,58,0.3); border-radius: 2px; }
+
+.history-hint {
+  position: absolute;
+  left: 0; right: 0; bottom: calc(40 * var(--u));
+  z-index: 1001;
+  text-align: center;
+  font-family: var(--sans);
+  font-size: calc(11 * var(--u));
+  color: rgba(255, 235, 210, 0.55);
+  letter-spacing: 0.3em;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.history-hint.visible {
+  opacity: 1;
+  transition: opacity 0.4s ease 0.25s;
+}
+/* 块间距：所有条目（对话块 / 旁白块）之间统一用这个大间距 */
+.history-entry { margin: calc(26 * var(--u)) 0; }
+.history-entry:first-child { margin-top: 0; }
+.history-entry:last-child { margin-bottom: 0; }
+
+/* Weight 二档体系：
+     旁白 400 (Regular)      — 跟"对话/说话人"靠颜色拉开
+     对话正文 + 说话人 700 (Bold) — 真粗体 */
+.h-narration {
+  color: #a08c66;
+  font-style: italic;
+  font-weight: 400;
+  font-size: calc(14 * var(--u));
+  padding-left: 1.5em;
+}
+
+.h-dialogue .h-speaker {
+  display: block;
+  font-size: calc(14 * var(--u));
+  font-weight: 700;
+  line-height: 1.3;
+  margin-bottom: 0;
+  letter-spacing: 0.04em;
+}
+.h-dialogue.h-speaker-you .h-speaker { color: #6e5b3a; }
+.h-dialogue.h-speaker-him .h-speaker { color: #8a7245; }
+.h-dialogue-text {
+  font-size: calc(15 * var(--u));
+  font-weight: 700;
+  padding-left: 1.5em;
+  color: #2a2218;
+}
+
+/* ---- 移动端 ---- */
+.menu-toggle {
+  display:none; position:fixed; top:calc(12px + var(--sat)); left:50%; transform:translateX(-50%);
+  z-index:500; width:40px; height:40px; border-radius:10px; border:none;
+  background:rgba(255,235,210,0.08); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+  cursor:pointer; flex-direction:column; align-items:center; justify-content:center; gap:5px; padding:0;
+}
+.menu-toggle span { display:block; width:18px; height:1.5px; background:rgba(255,235,210,0.6); border-radius:1px; transition:transform 0.3s,opacity 0.3s; }
+.menu-toggle.open span:nth-child(1) { transform:translateY(6.5px) rotate(45deg); }
+.menu-toggle.open span:nth-child(2) { opacity:0; }
+.menu-toggle.open span:nth-child(3) { transform:translateY(-6.5px) rotate(-45deg); }
+.drawer-backdrop { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:300; opacity:0; pointer-events:none; transition:opacity 0.3s; }
+.drawer-backdrop.visible { opacity:1; pointer-events:auto; }
+.drawer { display:none; position:fixed; top:0; left:0; bottom:0; width:240px; background:rgba(20,20,40,0.95); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); z-index:400; padding:68px 16px 24px; overflow-y:auto; transform:translateX(-100%); transition:transform 0.3s cubic-bezier(0.4,0,0.2,1); }
+.drawer.open { transform:translateX(0); }
+
+/* ---- 历史面板打开期间：主屏所有"会冒新内容"的层临时藏起来，避免穿帮 ---- */
+.stage.main-stage-frozen .narration-zone,
+.stage.main-stage-frozen .bubble-zone {
+  opacity: 0 !important;
+  transition: opacity 0.25s ease !important;
+}
+
+/* ---- 文字层 ⑨：旁白 / 角色动作（narration-zone）+ 对话气泡（bubble-zone） ---- */
+/* ④ 固定中心线：容器中心永远锚在屏幕从上 70% 处，内容以此为中心向上下两边对称展开 */
+.narration-zone {
+  position:absolute; left:50%; top:70%; width:88%;
+  transform:translate(-50%, -50%);
+  text-align:center; z-index:2; pointer-events:none;
+}
+.narration {
+  display:inline-block; position:relative; max-width:100%; margin:0;
+  font-family: var(--serif); font-style:italic; font-weight:300;
+  font-size:calc(14 * var(--u)); line-height:1.8; letter-spacing:0.06em;
+  color:rgba(255,240,215,0.92);
+  text-shadow:0 0 6px rgba(0,0,0,0.85), 0 1px 0 rgba(0,0,0,0.6);
+  opacity:0; transition:opacity 0.7s ease, filter 0.25s ease; z-index:0;
+}
+.narration.visible { opacity:1; }
+/* 角色动作：偏蓝紫的白（他的主题色），跟旁白的香槟金和用户气泡的纯白区分 */
+.narration.narration-action { color:rgba(195,210,255,0.96); }
+/* ⑤ 暗带：本体加厚到 0.78，上下用渐变羽化融入画面 */
+.narration.line-banner:not(:empty)::before {
+  content:''; position:absolute; left:-50vw; right:-50vw;
+  top:calc(-20 * var(--u)); bottom:auto; height:var(--banner-h, 0);
+  background:linear-gradient(to bottom,
+    rgba(6,6,12,0) 0,
+    rgba(6,6,12,0.78) calc(14 * var(--u)),
+    rgba(6,6,12,0.78) calc(100% - 14 * var(--u)),
+    rgba(6,6,12,0) 100%);
+  z-index:-1; pointer-events:none;
+  transition:height 0.55s cubic-bezier(0.22,0.61,0.36,1);
+}
+.gen-chunk { display:inline; }
+.gen-chunk.pending { opacity:0; }
+.gen-chunk.reveal {
+  opacity:1; animation:chunkRise 0.7s ease forwards;
+}
+@keyframes chunkRise {
+  from { opacity:0; transform:translateY(calc(4 * var(--u))); filter:blur(2px); }
+  to   { opacity:1; transform:translateY(0);   filter:blur(0); }
+}
+.narration.drifting { animation:narrDrift 1s ease forwards; }
+@keyframes narrDrift {
+  from { opacity:1; transform:translateY(0); }
+  to   { opacity:0; transform:translateY(calc(-14 * var(--u))); }
+}
+
+/* ① 气泡 · 暖灰墨纸：跟历史面板共用一种介质；底色明显，靠文字色区分说话人 */
+.bubble-zone { position:absolute; inset:0; z-index:2; pointer-events:none; overflow:hidden; }
+.bubble {
+  /* 宽度跟随内容（max-content），上限 286 → 触顶换 2 行，内容区 254 → 15 字/行 → 2 行 30 字容量。 */
+  position:absolute; width:max-content; max-width:calc(286 * var(--u)); min-width:calc(80 * var(--u));
+  --stack-shift: 0px;
+  --enter-y: 0px;
+  --breath-y: 0px;
+  transform: translate(-50%, calc(var(--stack-shift) + var(--enter-y) + var(--breath-y)));
+  padding:calc(10 * var(--u)) calc(16 * var(--u)); border-radius:calc(18 * var(--u));
+  font-family: var(--serif); font-size:calc(16 * var(--u)); line-height:1.5; font-weight:400;
+  letter-spacing:0.05em; text-align:center; white-space:normal;
+  opacity:0; transition: --stack-shift 0.45s ease, --enter-y 0.45s ease, opacity 0.45s ease, filter 0.25s ease;
+}
+.bubble.visible { opacity:1; }
+.bubble.bubble-char { --enter-y: calc(28 * var(--u)); }
+.bubble.bubble-char.settled { --enter-y: 0px; }
+/* 呼吸：上下浮动 ±0/-3，周期 4.2s（和底部弧 arcBreathPeriod 同源） */
+.bubble.bubble-char.settled:not(.drifting) { animation: bubbleBreath 4.2s ease-in-out infinite; }
+@keyframes bubbleBreath {
+  0%, 100% { --breath-y: 0px; }
+  50%      { --breath-y: calc(-3 * var(--u)); }
+}
+/* 用户气泡走 inline transform（slide-in），保留 transform transition */
+.bubble.bubble-user { transition: opacity 0.45s ease, transform 0.5s ease; }
+/* 用户输入暂态把旁白 + 角色气泡压暗一档 */
+.bubble.dimmed-for-recording,
+.narration.dimmed-for-recording {
+  filter: opacity(0.5);
+}
+.bubble-char {
+  color:rgba(195,210,255,0.96);
+  background:rgba(30,28,38,0.85);
+  box-shadow:0 0 18px rgba(0,0,0,0.42);
+  text-shadow:0 1px 2px rgba(0,0,0,0.7);
+}
+.bubble-user {
+  color:rgba(255,255,255,1);
+  background:rgba(40,30,22,0.85);
+  box-shadow:0 0 18px rgba(0,0,0,0.42);
+  text-shadow:0 1px 2px rgba(0,0,0,0.7);
+}
+.bubble.drifting { animation:bubbleDrift 1s ease forwards; }
+@keyframes bubbleDrift {
+  from { opacity:0.85; transform:translate(-50%, var(--stack-shift, 0px)); filter:blur(0); }
+  to   { opacity:0;    transform:translate(-50%, calc(var(--stack-shift, 0px) - 14 * var(--u))); filter:blur(0.8px); }
+}
+
+@media (max-width: 768px) {
+  :root { --bg: #070811; }
+  .desktop-wrap { display:block; width:100%; height:100%; }
+  .desktop-wrap > .nav-panel { display:none; }
+  .phone-frame { width:100%; height:100%; border-radius:0; box-shadow:none; }
+  .phone-notch, .phone-home { display:none; }
+  .menu-toggle { display:flex; }
+  .drawer-backdrop { display:block; }
+  .drawer { display:block; }
+  .drawer .nav-panel { width:100%; }
+  .drawer .nav-item { padding:10px 10px 10px 26px; }
+}

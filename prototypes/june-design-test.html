@@ -1,0 +1,2427 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>回响弧 · 交互测试</title>
+<style>
+:root {
+  --bg: #1a1a2e; --phone-bg: #070811; --nav-w: 200px; --sat: env(safe-area-inset-top, 0px);
+  /* 字体策略：宋体管"故事内容"（旁白/对话/历史），黑体管"系统语言"（UI 标签/操作提示）。*/
+  --serif: 'Source Han Serif SC VF', 'Source Han Serif SC', 'Songti SC', 'STSong', serif;
+  --sans:  'Source Han Sans CN', 'Source Han Sans SC', 'PingFang SC', 'HarmonyOS Sans SC', sans-serif;
+}
+/* 让自定义属性可被 transition / animation 插值（气泡压栈、入场、呼吸各管各的） */
+@property --stack-shift { syntax: '<length>'; initial-value: 0px; inherits: false; }
+@property --enter-y     { syntax: '<length>'; initial-value: 0px; inherits: false; }
+@property --breath-y    { syntax: '<length>'; initial-value: 0px; inherits: false; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  width: 100%; height: 100%;
+  background: var(--bg);
+  overflow: hidden;
+  user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+  font-family: var(--sans);
+  color: rgba(255,235,210,0.9);
+}
+
+/* ============ 桌面布局 ============ */
+.desktop-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%; height: 100%;
+  gap: 32px;
+}
+
+/* ---- 导航面板 ---- */
+.nav-panel {
+  width: var(--nav-w);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.nav-l1 {
+  font-size: 12px; font-weight: 600;
+  letter-spacing: 0.1em;
+  color: rgba(255,235,210,0.45);
+  padding: 0 10px 4px; margin-top: 16px;
+}
+.nav-l1:first-child { margin-top: 0; }
+.nav-l2 {
+  font-size: 10px; font-weight: 500;
+  letter-spacing: 0.08em;
+  color: rgba(255,235,210,0.25);
+  padding: 6px 10px 3px 18px;
+}
+.nav-item {
+  padding: 7px 10px 7px 26px; border-radius: 6px;
+  font-size: 13px; color: rgba(255,235,210,0.5);
+  cursor: pointer; transition: background 0.2s, color 0.2s;
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+}
+.nav-item:hover { background: rgba(255,235,210,0.06); color: rgba(255,235,210,0.7); }
+.nav-item.active { background: rgba(255,200,130,0.12); color: rgba(255,235,210,0.9); }
+.nav-item.disabled { color: rgba(255,235,210,0.2); cursor: default; pointer-events: none; }
+.badge-done { font-size:10px; padding:1px 6px; border-radius:4px; background:rgba(80,200,120,0.15); color:rgba(80,200,120,0.7); flex-shrink:0; }
+.badge-pending { font-size:10px; padding:1px 6px; border-radius:4px; background:rgba(255,235,210,0.06); color:rgba(255,235,210,0.2); flex-shrink:0; }
+.nav-divider { height:1px; background:rgba(255,235,210,0.08); margin:10px 10px; }
+.nav-action { padding:7px 10px; margin-top:4px; border-radius:6px; font-size:12px; color:rgba(255,235,210,0.35); cursor:pointer; transition:background 0.2s,color 0.2s; }
+.nav-action:hover { background:rgba(255,235,210,0.06); color:rgba(255,235,210,0.5); }
+
+/* ---- 手机框 ---- */
+.phone-frame {
+  height: 95vh; aspect-ratio: 1260 / 2800; border-radius: 0;
+  background: var(--phone-bg); position: relative; overflow: hidden;
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.08), 0 20px 60px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.04);
+  flex-shrink: 0;
+}
+.phone-notch { display: none; }
+.phone-home { display: none; }
+
+/* ---- 舞台 ---- */
+.stage { position:absolute; inset:0; overflow:hidden; touch-action:none; }
+
+/* 场景 & 角色（canvas 之下） */
+.scene-bg {
+  position:absolute; inset:0; z-index:0;
+  background: url('../src/images/cj5.jpg') center/cover no-repeat;
+  opacity: 0; transition: opacity 0.8s ease;
+}
+.scene-bg.visible { opacity: 1; }
+.character {
+  position:absolute; z-index:1;
+  left:calc(50% - 50vh); top:5%;
+  width:100vh; height:100vh;
+  transform: translateY(15vh) scale(0.7);
+  transform-origin: 50% 20%;
+  pointer-events:none;
+  opacity: 0; transition: opacity 0.8s ease;
+}
+.character.visible { opacity: 1; }
+.character img {
+  width:100%; height:100%;
+  object-fit:contain; object-position:center bottom;
+}
+
+/* 用户输入引导期间：全屏均匀压暗，让场景+角色统一退到暗背景，弧形/光晕浮在前景。
+   引导完成后随场景图/角色一起淡出。 */
+.arc-tutorial-bg-mask {
+  position: absolute; inset: 0;
+  z-index: 3; pointer-events: none;
+  background: rgba(0, 0, 0, 0.85);
+  opacity: 0; transition: opacity 0.8s ease;
+}
+.arc-tutorial-bg-mask.visible { opacity: 1; }
+
+canvas { position:absolute; inset:0; width:100%; height:100%; }
+/* 层级：历史(1000+) > 用户输入层(弧/光晕/提示, 4-16) > 引导暗罩(3) > 文字层(气泡 2 / 旁白 2) > 角色立绘 / 场景图
+   气泡和旁白都在暗罩(z 3)之下：引导启动时整组内容跟场景+角色一起被压暗，弧/光晕浮在前景。 */
+#c-glow { z-index:4; }
+#c { z-index:5; }
+
+/* ---- 引导文字 ---- */
+.tutorial-text-el { position:absolute; left:0; right:0; bottom:8%; text-align:center; font-size:calc(14 * var(--u)); letter-spacing:0.18em; color:rgba(255,235,210,0.45); pointer-events:none; z-index:16; opacity:0; }
+.tutorial-text-fill { bottom:25%; }
+/* arc tab 的引导文字：加粗 + 微凉纯白 + 紧贴笔画的暗色软阴影描边。字本体已结实，靠两层短半径暗晕勾出轮廓，
+   把字从暖金雾里"描"出来，不糊、不带方向、不引入任何形状。 */
+.tutorial-text-arc {
+  color: rgba(250,252,255,1);   /* 微凉纯白 */
+  font-weight: 700;             /* 中文小字最高杠杆的可读性手段——笔画结实 */
+  text-shadow:
+    0 0 1.5px rgba(0,0,0,0.9),  /* 内圈：紧贴笔画的深色衣领，定义清晰轮廓 */
+    0 0 3px   rgba(0,0,0,0.5);  /* 外圈：稍远一档的散晕，让暗色和背景平滑过渡，不显贴纸感 */
+}
+
+/* ---- 打字层：输入条 + 发送按钮，靠真实系统键盘抬高（移动端 visualViewport.height 变化写到 --kb-inset） ---- */
+/* 注意：input 不能用 display:none 切显隐，否则 iOS Safari 首次 focus() 不弹键盘——
+   始终保持 input 在 layout 树里，靠 opacity + pointer-events 控显隐。 */
+.typing-layer { position:absolute; inset:0; z-index:20; pointer-events:none; }
+/* 输入条 = 拉长版用户气泡：沿用 .bubble-user 同款墨纸介质（暖棕底 + 白字 + 外阴影 + 文字阴影），
+   做成横向胶囊形（border-radius = height/2），让"敲字"和"成气泡"是同一容器在变形 */
+.typing-input {
+  position:absolute; left:calc(24 * var(--u)); right:calc(64 * var(--u));  /* 给右侧 36 宽 + 14 边距的发送按钮留位 */
+  bottom:calc(14 * var(--u) + var(--kb-inset, 0px));
+  height:calc(38 * var(--u)); padding:0 calc(18 * var(--u));
+  background:rgba(40,30,22,0.85);                        /* 同 .bubble-user：暖墨棕（深一档，输入态字更立） */
+  border:none; outline:none;
+  border-radius:calc(19 * var(--u));                     /* height/2 → 胶囊圆头 */
+  color:rgba(255,255,255,1);
+  caret-color:rgba(255,255,255,1);                       /* 显式锁死白色光标，避开系统主题色 */
+  text-shadow:0 1px 2px rgba(0,0,0,0.7);                 /* 同 .bubble-user：文字阴影 */
+  box-shadow:0 0 18px rgba(0,0,0,0.42);                  /* 同 .bubble-user：外发光，在暗背景上自托立体 */
+  text-align:center;                                     /* 光标在中心起跳，输入时文字向两边对称扩展 */
+  font-family: var(--serif);
+  font-size:calc(16 * var(--u)); letter-spacing:0.05em;  /* 跟气泡同字号，发送瞬间无视觉跳变 */
+  pointer-events:none;                                  /* 默认不接 tap，避免抢误触 */
+  opacity:0; transition:opacity 0.22s ease;             /* bottom 不做过渡：让 OS 键盘动画唯一驱动视觉连续 */
+}
+.typing-input::placeholder { color:rgba(255,255,255,0.35); font-style:italic; }
+.typing-input::-webkit-input-placeholder { color:rgba(255,255,255,0.35); font-style:italic; }
+/* 发送按钮：墨纸 disc 包 ▲，激活时图底反转——
+   非激活：深 disc + 半亮 ▲（▲ 是亮焦点，等待你给它点亮）
+   激活：disc 整个亮起到 100%，▲ 反转成深色剪影（颜色翻转，光从▲扩散到整个 disc，▲ 反过来成暗剪影）。
+   去掉了圆环和水波脉冲——disc 本身即圆、点亮本身即反馈，简洁两态足矣。 */
+.typing-send {
+  position:absolute; right:calc(14 * var(--u));
+  bottom:calc(14 * var(--u) + var(--kb-inset, 0px));
+  width:calc(38 * var(--u)); height:calc(38 * var(--u)); padding:0; /* 正圆 disc，对齐胶囊高度 */
+  display:flex; align-items:center; justify-content:center;
+  border:none;
+  background:rgba(20,15,8,0.85);                          /* 非激活：深一档暖墨棕（比胶囊深，等被点亮） */
+  border-radius:50%;
+  box-shadow:0 0 18px rgba(0,0,0,0.42);                   /* 同款外发光 */
+  cursor:default;
+  pointer-events:none;
+  opacity:0; transition:opacity 0.22s ease, background-color 0.22s ease;
+}
+.typing-send svg { display:block; overflow:visible; }
+.typing-send .send-core {
+  fill:rgba(255,235,210,0.5);                             /* 非激活：暖白半亮 ▲，深 disc 上的"亮焦点" */
+  transition:fill 0.22s ease;
+}
+.typing-layer.entered .typing-input { opacity:1; pointer-events:auto; }
+.typing-layer.entered .typing-send { opacity:1; }
+.typing-layer.entered .typing-send.active {
+  background:rgba(255,235,210,1);                         /* 激活：disc 点亮到 100% 暖白 */
+  cursor:pointer;
+  pointer-events:auto;
+}
+.typing-layer.entered .typing-send.active .send-core {
+  fill:rgba(20,15,8,1);                                   /* 激活：▲ 反转成深色剪影（颜色翻转） */
+}
+
+/* ---- 左上角锚点（始终可见）：跟打字发送按钮同款视觉 —— 外圈 + 中心点 + 双圈慢脉冲
+       4 秒一波 + 错相 2 秒，节奏接近原呼吸但形式换成水波。
+       面板打开后脉冲停、中心点淡掉、::after 画三角 ▽ 表示"可收回"。 ---- */
+.history-anchor {
+  position: absolute;
+  top: calc(18 * var(--u) + var(--sat)); left: calc(18 * var(--u));
+  width: calc(28 * var(--u)); height: calc(28 * var(--u));
+  z-index: 1010;
+  cursor: pointer;
+  color: rgba(255, 225, 200, 0.85);                /* SVG 子元素靠 currentColor 取色 */
+}
+.history-anchor svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.history-anchor .anchor-ring  { stroke: currentColor; fill: none; }
+.history-anchor .anchor-core  { fill: currentColor; transition: opacity 0.3s; }
+.history-anchor .anchor-pulse { stroke: currentColor; fill: none; opacity: 0; }
+.history-anchor .anchor-pulse-1 { animation: anchorPulseWave 4s ease-out infinite; }
+.history-anchor .anchor-pulse-2 { animation: anchorPulseWave 4s ease-out infinite; animation-delay: 2s; }
+@keyframes anchorPulseWave {
+  0%   { r: 2;  opacity: 0.75; }
+  100% { r: 10; opacity: 0; }
+}
+.history-anchor.panel-open .anchor-pulse { animation: none; opacity: 0; }
+.history-anchor.panel-open .anchor-core  { opacity: 0; }
+.history-anchor.panel-open::after {
+  content: '';
+  position: absolute;
+  top: calc(9 * var(--u)); left: calc(9 * var(--u));
+  width: calc(10 * var(--u)); height: calc(10 * var(--u));
+  background: #6e5b3a;
+  clip-path: polygon(50% 0%, 0% 86.6%, 100% 86.6%);
+}
+/* 文字层：用户每完成一次交互（语音/打字/上滑）触发一次的"放大→缩回"提示；
+   首次点过锚点后不再触发（由 JS 控制添加/移除）。
+   作用在容器上，整体连同里面的 SVG 一起弹一下。 */
+.history-anchor.hint-pulse {
+  animation: anchorHintPulse 0.9s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform-origin: center;
+}
+@keyframes anchorHintPulse {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.55); }
+  100% { transform: scale(1); }
+}
+
+/* ---- 历史面板（浅纸版）
+   结构：
+     .history-dim   底层暗幕，整屏覆盖，盖住舞台/人物 —— 不受 setMask 影响。
+     .history-panel 浅纸层，整屏 + 纯色纸面背景，由 JS 的 setMask 剪成弧形。
+                    mask 圆外的区域透明 → 露出下面的 dim。
+   注意：padding 用 px，不要 vw/vh —— 手机框是固定 390x844，vw/vh 跟浏览器窗口走会失真。 */
+.history-dim {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 999;
+  background: rgba(7, 8, 17, 0.85);
+  pointer-events: none;
+  opacity: 0;
+  display: none;
+  transition: opacity 0.4s ease;
+}
+.history-panel {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 1000;
+  background: rgb(238, 228, 210);
+  pointer-events: none;
+  opacity: 0;
+  display: none;
+}
+.history-scroll {
+  position: absolute;
+  top: calc(52 * var(--u) + var(--sat)); left: 0; right: 0; bottom: 26%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  padding: calc(16 * var(--u)) calc(32 * var(--u)) calc(32 * var(--u));
+  font-family: var(--serif);
+  color: #2a2218;
+  line-height: 1.8;
+  letter-spacing: 0.06em;
+  /* 底部渐隐进暗区，避免最后一行被硬切 */
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 85%, transparent 100%);
+          mask-image: linear-gradient(to bottom, #000 0%, #000 85%, transparent 100%);
+}
+.history-scroll::-webkit-scrollbar { width: 3px; }
+.history-scroll::-webkit-scrollbar-thumb { background: rgba(110,91,58,0.3); border-radius: 2px; }
+
+/* 底部"点击空白处收回"提示：跟 demo 完全一致的样式（黑体细字、字距大、暖白半透明）。
+   z-index 高于 panel，落在底部暗区上；pointer-events:none 让点击穿透到 stage 触发关闭。
+   入场延迟 0.25s 出现（等弧形先展开），出场立即淡出。 */
+.history-hint {
+  position: absolute;
+  left: 0; right: 0; bottom: calc(40 * var(--u));
+  z-index: 1001;
+  text-align: center;
+  font-family: var(--sans);
+  font-size: calc(11 * var(--u));
+  color: rgba(255, 235, 210, 0.55);
+  letter-spacing: 0.3em;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.history-hint.visible {
+  opacity: 1;
+  transition: opacity 0.4s ease 0.25s;
+}
+/* 块间距：所有条目（对话块 / 旁白块）之间统一用这个大间距，每一块都是独立单位 */
+.history-entry { margin: calc(26 * var(--u)) 0; }
+.history-entry:first-child { margin-top: 0; }
+.history-entry:last-child { margin-bottom: 0; }
+
+/* Weight 二档体系（避开变体字体依赖，几乎所有中文字体都有 400/700 这两档实体字模）：
+     旁白 400 (Regular)      — 跟"对话/说话人"靠颜色拉开
+     对话正文 + 说话人 700 (Bold) — 真粗体，所有设备都看得到
+   节奏靠颜色（旁白淡棕 / 对话深墨棕）+ 粗细（旁白 400 / 对话 700）双轨拉对比。 */
+
+/* 旁白 + 动作旁白合并 */
+.h-narration {
+  color: #a08c66;
+  font-style: italic;
+  font-weight: 400;
+  font-size: calc(14 * var(--u));
+  padding-left: 1.5em;
+}
+
+/* 对话两行结构：
+     第一行 .h-speaker  说话人 + 冒号（块小标题）
+     第二行 .h-dialogue-text  正文（视觉焦点）
+   关键：说话人 line-height 1.3，跟正文紧贴；块间距 26px → 块内:块间 ≈ 1:3 */
+.h-dialogue .h-speaker {
+  display: block;
+  font-size: calc(14 * var(--u));
+  font-weight: 700;
+  line-height: 1.3;
+  margin-bottom: 0;
+  letter-spacing: 0.04em;
+}
+.h-dialogue.h-speaker-you .h-speaker { color: #6e5b3a; }
+.h-dialogue.h-speaker-him .h-speaker { color: #8a7245; }
+.h-dialogue-text {
+  font-size: calc(15 * var(--u));
+  font-weight: 700;
+  padding-left: 1.5em;
+  color: #2a2218;
+}
+
+/* ---- 移动端 ---- */
+.menu-toggle {
+  display:none; position:fixed; top:calc(12px + var(--sat)); left:50%; transform:translateX(-50%);
+  z-index:500; width:40px; height:40px; border-radius:10px; border:none;
+  background:rgba(255,235,210,0.08); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+  cursor:pointer; flex-direction:column; align-items:center; justify-content:center; gap:5px; padding:0;
+}
+.menu-toggle span { display:block; width:18px; height:1.5px; background:rgba(255,235,210,0.6); border-radius:1px; transition:transform 0.3s,opacity 0.3s; }
+.menu-toggle.open span:nth-child(1) { transform:translateY(6.5px) rotate(45deg); }
+.menu-toggle.open span:nth-child(2) { opacity:0; }
+.menu-toggle.open span:nth-child(3) { transform:translateY(-6.5px) rotate(-45deg); }
+.drawer-backdrop { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:300; opacity:0; pointer-events:none; transition:opacity 0.3s; }
+.drawer-backdrop.visible { opacity:1; pointer-events:auto; }
+.drawer { display:none; position:fixed; top:0; left:0; bottom:0; width:240px; background:rgba(20,20,40,0.95); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); z-index:400; padding:68px 16px 24px; overflow-y:auto; transform:translateX(-100%); transition:transform 0.3s cubic-bezier(0.4,0,0.2,1); }
+.drawer.open { transform:translateX(0); }
+
+/* ---- 历史面板打开期间：主屏所有"会冒新内容"的层临时藏起来，避免穿帮 ---- */
+.stage.main-stage-frozen .narration-zone,
+.stage.main-stage-frozen .bubble-zone,
+.stage.main-stage-frozen #tutorial-text-arc,
+.stage.main-stage-frozen #tutorial-text-fill {
+  opacity: 0 !important;
+  transition: opacity 0.25s ease !important;
+}
+
+/* ---- 文字层 ⑨：旁白 / 角色动作（narration-zone）+ 对话气泡（bubble-zone） ---- */
+/* ④ 固定中心线：容器中心永远锚在屏幕从上 70% 处，内容以此为中心向上下两边对称展开 */
+.narration-zone {
+  position:absolute; left:50%; top:70%; width:88%;
+  transform:translate(-50%, -50%);
+  text-align:center; z-index:2; pointer-events:none;
+}
+.narration {
+  display:inline-block; position:relative; max-width:100%; margin:0;
+  font-family: var(--serif); font-style:italic; font-weight:300;
+  font-size:calc(14 * var(--u)); line-height:1.8; letter-spacing:0.06em;
+  color:rgba(255,240,215,0.92);
+  text-shadow:0 0 6px rgba(0,0,0,0.85), 0 1px 0 rgba(0,0,0,0.6);
+  opacity:0; transition:opacity 0.7s ease, filter 0.25s ease; z-index:0;
+}
+.narration.visible { opacity:1; }
+/* 角色动作：偏蓝紫的白（他的主题色），跟旁白的香槟金和用户气泡的纯白区分 */
+.narration.narration-action { color:rgba(195,210,255,0.96); }
+/* ⑤ 暗带：本体加厚到 0.78，上下用渐变羽化融入画面 */
+.narration.line-banner:not(:empty)::before {
+  content:''; position:absolute; left:-50vw; right:-50vw;
+  top:calc(-20 * var(--u)); bottom:auto; height:var(--banner-h, 0);
+  background:linear-gradient(to bottom,
+    rgba(6,6,12,0) 0,
+    rgba(6,6,12,0.78) calc(14 * var(--u)),
+    rgba(6,6,12,0.78) calc(100% - 14 * var(--u)),
+    rgba(6,6,12,0) 100%);
+  z-index:-1; pointer-events:none;
+  transition:height 0.55s cubic-bezier(0.22,0.61,0.36,1);
+}
+.gen-chunk { display:inline; }
+.gen-chunk.pending { opacity:0; }
+.gen-chunk.reveal {
+  opacity:1; animation:chunkRise 0.7s ease forwards;
+}
+@keyframes chunkRise {
+  from { opacity:0; transform:translateY(calc(4 * var(--u))); filter:blur(2px); }
+  to   { opacity:1; transform:translateY(0);   filter:blur(0); }
+}
+.narration.drifting { animation:narrDrift 1s ease forwards; }
+@keyframes narrDrift {
+  from { opacity:1; transform:translateY(0); }
+  to   { opacity:0; transform:translateY(calc(-14 * var(--u))); }
+}
+
+/* ① 气泡 · 暖灰墨纸：跟历史面板共用一种介质；底色明显，靠文字色区分说话人 */
+.bubble-zone { position:absolute; inset:0; z-index:2; pointer-events:none; overflow:hidden; }
+.bubble {
+  /* 设计规范：宽度跟随内容（max-content），上限 286 → 触顶换 2 行，内容区 254 → 15 字/行 → 2 行 30 字容量。
+     后端单句硬上限 30 字，刚好触顶填满 2 行。min-width 80 兜底极短文本。基准 844pt 设计稿，随 --u 等比缩放。 */
+  position:absolute; width:max-content; max-width:calc(286 * var(--u)); min-width:calc(80 * var(--u));
+  --stack-shift: 0px;
+  --enter-y: 0px;
+  --breath-y: 0px;
+  transform: translate(-50%, calc(var(--stack-shift) + var(--enter-y) + var(--breath-y)));
+  padding:calc(10 * var(--u)) calc(16 * var(--u)); border-radius:calc(18 * var(--u));
+  font-family: var(--serif); font-size:calc(16 * var(--u)); line-height:1.5; font-weight:400;
+  letter-spacing:0.05em; text-align:center; white-space:normal;
+  /* 三个变量各自插值，互不打架；transform 由 calc 实时合成 */
+  opacity:0; transition: --stack-shift 0.45s ease, --enter-y 0.45s ease, opacity 0.45s ease, filter 0.25s ease;
+}
+.bubble.visible { opacity:1; }
+.bubble.bubble-char { --enter-y: calc(28 * var(--u)); }
+.bubble.bubble-char.settled { --enter-y: 0px; }
+/* 呼吸：上下浮动 ±0/-3，周期 4.2s（和底部弧 arcBreathPeriod 同源），相位错开靠各气泡 .settled 加 class 的时差自然形成 */
+.bubble.bubble-char.settled:not(.drifting) { animation: bubbleBreath 4.2s ease-in-out infinite; }
+@keyframes bubbleBreath {
+  0%, 100% { --breath-y: 0px; }
+  50%      { --breath-y: calc(-3 * var(--u)); }
+}
+/* 用户气泡走 inline transform（slide-in），保留 transform transition */
+.bubble.bubble-user { transition: opacity 0.45s ease, transform 0.5s ease; }
+/* 用户输入暂态（点击打字 / 长按语音）把旁白 + 角色气泡压暗一档：
+   filter 与 inline opacity 相乘，保留栈衰减层级；摘掉本类后 filter 经 base 的 transition 自然回到 none，无需 save/restore */
+.bubble.dimmed-for-recording,
+.narration.dimmed-for-recording {
+  filter: opacity(0.5);
+}
+.bubble-char {
+  color:rgba(195,210,255,0.96);
+  background:rgba(30,28,38,0.85);
+  box-shadow:0 0 18px rgba(0,0,0,0.42);
+  text-shadow:0 1px 2px rgba(0,0,0,0.7);
+}
+.bubble-user {
+  color:rgba(255,255,255,1);
+  background:rgba(40,30,22,0.85);
+  box-shadow:0 0 18px rgba(0,0,0,0.42);
+  text-shadow:0 1px 2px rgba(0,0,0,0.7);
+}
+.bubble.drifting { animation:bubbleDrift 1s ease forwards; }
+@keyframes bubbleDrift {
+  from { opacity:0.85; transform:translate(-50%, var(--stack-shift, 0px)); filter:blur(0); }
+  to   { opacity:0;    transform:translate(-50%, calc(var(--stack-shift, 0px) - 14 * var(--u))); filter:blur(0.8px); }
+}
+
+/* ============ 登录板块 · 方案 Y：暖灰墨纸承载 ============
+   一张暖灰墨纸（沿用历史面板那张纸的色 rgb(238,228,210)）从黑底上浮出。
+   纸边缘四向羽化、消融到黑里——不是矩形，是有机形状。
+   纸上一切元素都用宋体 + 深墨色（#2a2218 / #6e5b3a / #8a7245，跟历史面板说话人色同源）。
+   背景黑底底部仍画一条真回响弧（暖白、呼吸），跟纸面形成"光 与 纸"的对比。 */
+.login-layer {
+  position: absolute; inset: 0;
+  z-index: 50;
+  display: none;
+  background: transparent;
+  pointer-events: auto;
+}
+.login-layer.visible { display: block; }
+/* 登录模式下藏掉左上角的历史锚点 + 打字层（保留 canvas 让 tick 画底部弧） */
+.login-layer.visible ~ .history-anchor,
+.login-layer.visible ~ .history-dim,
+.login-layer.visible ~ .history-panel,
+.login-layer.visible ~ .history-hint,
+.login-layer.visible ~ .typing-layer { display: none !important; }
+
+/* 纸面：暖灰墨纸 + 椭圆 mask 边缘羽化 + drop-shadow 给一点重量
+   不在 ::before 里做，独立一层以便 filter 不波及内容文字 */
+.login-paper {
+  position: absolute;
+  top: 47%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 92%;
+  max-width: calc(380 * var(--u));
+  height: calc(460 * var(--u));
+  background: rgb(238, 228, 210);
+  /* 椭圆 mask 把四边羽化掉——视觉上纸是一团从黑底里"晕"出来的形状，不是矩形 */
+  -webkit-mask-image: radial-gradient(ellipse 70% 64% at 50% 50%,
+    rgba(0,0,0,1)   28%,
+    rgba(0,0,0,0.88) 52%,
+    rgba(0,0,0,0.42) 78%,
+    rgba(0,0,0,0)   100%);
+          mask-image: radial-gradient(ellipse 70% 64% at 50% 50%,
+    rgba(0,0,0,1)   28%,
+    rgba(0,0,0,0.88) 52%,
+    rgba(0,0,0,0.42) 78%,
+    rgba(0,0,0,0)   100%);
+  /* drop-shadow 跟随 mask 的 alpha 形状，给纸一点漂浮的"重量" */
+  filter: drop-shadow(0 calc(8 * var(--u)) calc(36 * var(--u)) rgba(0, 0, 0, 0.55));
+  pointer-events: none;
+  animation: paperFloatIn 0.85s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+@keyframes paperFloatIn {
+  from { opacity: 0; transform: translate(-50%, -45%) scale(0.97); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+/* 内容容器：跟纸面同心，宽度小一圈（让文字坐在纸的"安全区"里） */
+.login-card {
+  position: absolute;
+  top: 47%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 70%;
+  max-width: calc(280 * var(--u));
+}
+
+/* 三个子页：同区域叠放；display 控显隐，opacity 控淡入淡出 */
+.login-page {
+  display: none;
+  flex-direction: column;
+  align-items: stretch;
+  gap: calc(20 * var(--u));
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.login-page.active { display: flex; }
+.login-page.entered { opacity: 1; }
+
+/* 标题：宋体 + 深墨色，像翻开一本旧书的扉页 */
+.login-title {
+  font-family: var(--serif);
+  font-size: calc(26 * var(--u));
+  font-weight: 400;
+  letter-spacing: 0.2em;
+  text-indent: 0.2em;
+  text-align: center;
+  color: #2a2218;
+  margin-bottom: calc(4 * var(--u));
+}
+/* 引导小字：宋体斜体 + 浅墨棕（沿用历史面板 h-narration 色） */
+.login-hint {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: calc(13 * var(--u));
+  letter-spacing: 0.04em;
+  text-align: center;
+  color: #a08c66;
+  margin-bottom: calc(6 * var(--u));
+}
+
+/* 输入框：纸上一条深墨色细线（左右两端淡出消融到纸里）
+   字色深墨 #2a2218、宋体；下划线初始用 #6e5b3a 半透，聚焦时换 #2a2218 全墨 */
+.login-input {
+  display: block;
+  width: 100%;
+  height: calc(40 * var(--u));
+  padding: 0 calc(6 * var(--u));
+  background-color: transparent;
+  background-image: linear-gradient(to right,
+    rgba(110, 91, 58, 0)    0%,
+    rgba(110, 91, 58, 0.5)  22%,
+    rgba(110, 91, 58, 0.5)  78%,
+    rgba(110, 91, 58, 0)   100%);
+  background-repeat: no-repeat;
+  background-size: 100% 1px;
+  background-position: 50% 100%;
+  border: none;
+  outline: none;
+  color: #2a2218;
+  caret-color: #2a2218;
+  font-family: var(--serif);
+  font-size: calc(16 * var(--u));
+  letter-spacing: 0.05em;
+  text-align: center;
+  transition: background-image 0.25s, transform 0.05s;
+}
+.login-input::placeholder { color: rgba(110, 91, 58, 0.45); font-style: italic; letter-spacing: 0.06em; }
+.login-input:focus {
+  background-image: linear-gradient(to right,
+    rgba(42, 34, 24, 0)    0%,
+    rgba(42, 34, 24, 0.85) 22%,
+    rgba(42, 34, 24, 0.85) 78%,
+    rgba(42, 34, 24, 0)   100%);
+}
+.login-input.shake { animation: loginShake 0.32s ease-in-out; }
+@keyframes loginShake {
+  0%, 100% { transform: translateX(0); }
+  20%      { transform: translateX(calc(-5 * var(--u))); }
+  40%      { transform: translateX(calc(5 * var(--u))); }
+  60%      { transform: translateX(calc(-4 * var(--u))); }
+  80%      { transform: translateX(calc(3 * var(--u))); }
+}
+
+/* 输入框 + 右贴"获取验证码"小按钮 */
+.login-input-row { display: flex; gap: calc(6 * var(--u)); align-items: flex-end; }
+.login-input-row .login-input { flex: 1; }
+.login-mini-btn {
+  flex-shrink: 0;
+  height: calc(40 * var(--u));
+  padding: 0 calc(6 * var(--u));
+  background: transparent;
+  border: none;
+  outline: none;
+  color: rgba(110, 91, 58, 0.7);
+  font-family: var(--serif);
+  font-size: calc(13 * var(--u));
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: color 0.2s;
+  white-space: nowrap;
+}
+.login-mini-btn:hover:not(:disabled) { color: #2a2218; }
+.login-mini-btn:disabled { color: rgba(110, 91, 58, 0.3); cursor: default; }
+
+/* 主按钮：纸上一段宋体墨字 + 下方一条短墨线；激活时墨色变深、墨线变实 */
+.login-btn {
+  position: relative;
+  align-self: center;
+  margin-top: calc(20 * var(--u));
+  padding: calc(8 * var(--u)) calc(36 * var(--u));
+  background-color: transparent;
+  background-image: linear-gradient(to right,
+    rgba(110, 91, 58, 0)    0%,
+    rgba(110, 91, 58, 0.4) 30%,
+    rgba(110, 91, 58, 0.4) 70%,
+    rgba(110, 91, 58, 0)   100%);
+  background-repeat: no-repeat;
+  background-size: 60% 1px;
+  background-position: 50% 100%;
+  border: none;
+  outline: none;
+  color: rgba(110, 91, 58, 0.7);
+  font-family: var(--serif);
+  font-size: calc(17 * var(--u));
+  font-weight: 400;
+  letter-spacing: 0.35em;
+  text-indent: 0.35em;
+  cursor: pointer;
+  transition: color 0.3s, background-image 0.3s, transform 0.1s;
+}
+.login-btn.active {
+  color: #2a2218;
+  background-image: linear-gradient(to right,
+    rgba(42, 34, 24, 0)    0%,
+    rgba(42, 34, 24, 0.85) 30%,
+    rgba(42, 34, 24, 0.85) 70%,
+    rgba(42, 34, 24, 0)   100%);
+  background-size: 70% 1px;
+}
+.login-btn:active.active { transform: translateY(1px); }
+
+/* 点击瞬间：从中心向外发散一圈墨色光涟漪 */
+.login-btn .btn-flare {
+  position: absolute; left: 50%; top: 50%;
+  width: 0; height: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle,
+    rgba(110, 91, 58, 0.35) 0%,
+    rgba(110, 91, 58, 0.12) 40%,
+    rgba(110, 91, 58, 0)    78%);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  opacity: 0;
+}
+.login-btn .btn-label { position: relative; z-index: 1; }
+.login-btn.flaring .btn-flare { animation: loginBtnFlare 0.7s ease-out; }
+@keyframes loginBtnFlare {
+  0%   { width: calc(20 * var(--u));  height: calc(20 * var(--u));  opacity: 0.85; }
+  100% { width: calc(220 * var(--u)); height: calc(90 * var(--u));  opacity: 0; }
+}
+
+.login-link {
+  margin-top: calc(8 * var(--u));
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: calc(13 * var(--u));
+  letter-spacing: 0.04em;
+  text-align: center;
+  color: rgba(110, 91, 58, 0.65);
+  cursor: pointer;
+  transition: color 0.2s;
+}
+.login-link:hover { color: #2a2218; }
+
+.login-error {
+  min-height: calc(16 * var(--u));
+  margin-top: calc(-12 * var(--u));
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: calc(12 * var(--u));
+  letter-spacing: 0.04em;
+  text-align: center;
+  color: #8a4a3a;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.login-error.visible { opacity: 1; }
+
+@media (max-width: 768px) {
+  :root { --bg: #070811; }
+  .desktop-wrap { display:block; width:100%; height:100%; }
+  .desktop-wrap > .nav-panel { display:none; }
+  .phone-frame { width:100%; height:100%; border-radius:0; box-shadow:none; }
+  .phone-notch, .phone-home { display:none; }
+  .menu-toggle { display:flex; }
+  .drawer-backdrop { display:block; }
+  .drawer { display:block; }
+  .drawer .nav-panel { width:100%; }
+  .drawer .nav-item { padding:10px 10px 10px 26px; }
+}
+</style>
+</head>
+<body>
+
+<button class="menu-toggle" id="menu-toggle"><span></span><span></span><span></span></button>
+<div class="drawer-backdrop" id="drawer-backdrop"></div>
+<div class="drawer" id="drawer">
+  <div class="nav-panel" id="drawer-nav"></div>
+</div>
+
+<div class="desktop-wrap">
+  <div class="nav-panel" id="desktop-nav"></div>
+
+  <div class="phone-frame" id="phone">
+    <div class="phone-notch"></div>
+    <div class="phone-home"></div>
+    <div class="stage" id="stage">
+      <div class="scene-bg"></div>
+      <div class="character"><img src="../src/images/xiaohuli.png" alt=""></div>
+      <div class="arc-tutorial-bg-mask" id="arc-tutorial-bg-mask"></div>
+      <div class="narration-zone" id="narration-zone"></div>
+      <div class="bubble-zone" id="bubble-zone"></div>
+      <canvas id="c-glow"></canvas>
+      <canvas id="c"></canvas>
+      <div class="tutorial-text-el tutorial-text-arc" id="tutorial-text-arc">长按区域，语音输入</div>
+      <div class="tutorial-text-el tutorial-text-fill" id="tutorial-text-fill">上滑推进</div>
+
+      <!-- 登录板块：方案 Y · 暖灰墨纸承载（纸面是独立背景层，文字在 card 里） -->
+      <div class="login-layer" id="login-layer">
+        <div class="login-paper"></div>
+        <div class="login-card">
+          <!-- 邀请码页 -->
+          <div class="login-page login-page-invite active entered" data-page="login-invite">
+            <div class="login-title">回 响</div>
+            <div class="login-hint">输入你的邀请码</div>
+            <input class="login-input" id="login-invite-input" type="text"
+                   placeholder="邀请码"
+                   autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            <div class="login-error" id="login-invite-error">邀请码无效，再试一次</div>
+            <button class="login-btn" id="login-invite-btn">
+              <span class="btn-flare"></span>
+              <span class="btn-label">进 入</span>
+            </button>
+          </div>
+
+          <!-- 手机号验证码页 -->
+          <div class="login-page login-page-phone" data-page="login-phone">
+            <div class="login-title">手机登录</div>
+            <div class="login-hint">未注册的手机号将自动创建账号</div>
+            <input class="login-input" id="login-phone-input" type="tel"
+                   placeholder="手机号"
+                   autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            <div class="login-input-row">
+              <input class="login-input" id="login-code-input" type="text"
+                     placeholder="验证码"
+                     autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+              <button class="login-mini-btn" id="login-code-btn">获取验证码</button>
+            </div>
+            <button class="login-btn" id="login-phone-btn">
+              <span class="btn-flare"></span>
+              <span class="btn-label">登 录</span>
+            </button>
+            <div class="login-link" data-switch="login-password">使用账号密码登录</div>
+          </div>
+
+          <!-- 账号密码页 -->
+          <div class="login-page login-page-password" data-page="login-password">
+            <div class="login-title">账号登录</div>
+            <div class="login-hint">使用已绑定的账号</div>
+            <input class="login-input" id="login-account-input" type="text"
+                   placeholder="账号"
+                   autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            <input class="login-input" id="login-pwd-input" type="password"
+                   placeholder="密码"
+                   autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            <button class="login-btn" id="login-password-btn">
+              <span class="btn-flare"></span>
+              <span class="btn-label">登 录</span>
+            </button>
+            <div class="login-link" data-switch="login-phone">使用手机验证码登录</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 打字层：输入条 + 发送按钮；不再带假键盘，靠真实系统键盘抬起 -->
+      <div class="typing-layer" id="typing-layer">
+        <input class="typing-input" id="typing-input" type="text"
+               autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        <button class="typing-send" id="typing-send" aria-label="发送">
+          <svg viewBox="0 0 24 24" width="100%" height="100%">
+            <polygon class="send-core" points="12,7.5 8,14.5 16,14.5"/>
+          </svg>
+        </button>
+      </div>
+      <!-- 左上角锚点：始终可见，点击切换历史面板 -->
+      <div class="history-anchor" id="history-anchor">
+        <svg viewBox="0 0 24 24">
+          <circle class="anchor-ring"                cx="12" cy="12" r="10" stroke-width="1.4"/>
+          <circle class="anchor-pulse anchor-pulse-1" cx="12" cy="12" r="2"  stroke-width="1"/>
+          <circle class="anchor-pulse anchor-pulse-2" cx="12" cy="12" r="2"  stroke-width="1"/>
+          <circle class="anchor-core"                cx="12" cy="12" r="1.8"/>
+        </svg>
+      </div>
+
+      <!-- 历史面板：dim 是底层暗幕（不受 mask 影响），panel 是浅纸（被 mask 弧形剪裁） -->
+      <div class="history-dim" id="history-dim"></div>
+      <div class="history-panel" id="history-panel">
+        <div class="history-scroll" id="history-scroll"></div>
+      </div>
+      <div class="history-hint" id="history-hint">点击空白处收回</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// 数据 + 渲染（导航 / 历史剧情）
+// ============================================================
+// 改 nav：只动这个数组。type=l1/l2 是分组标题，item 是可点项，
+// disabled 不可点；status=done|pending 决定徽章；page 用于高亮，mode 触发 switchMode。
+const NAV_ITEMS = [
+  { type: 'l1', label: '登录' },
+  { type: 'item', page: 'login-invite',   mode: 'login-invite',   label: '邀请码',       status: 'done', active: true },
+  { type: 'item', page: 'login-phone',    mode: 'login-phone',    label: '手机号验证码', status: 'done' },
+  { type: 'item', page: 'login-password', mode: 'login-password', label: '账号密码',     status: 'done' },
+  { type: 'l1', label: '内容流' },
+  { type: 'l2', label: '交互' },
+  { type: 'item', page: 'common', label: '共用原则', status: 'done', disabled: true },
+  { type: 'item', page: 'arc',     mode: 'arc',     label: '用户输入', status: 'done' },
+  { type: 'item', page: 'fill',    mode: 'fill',    label: '推动剧情', status: 'done' },
+  { type: 'item', page: 'history', mode: 'history', label: '历史剧情', status: 'done' },
+  { type: 'l2', label: '剧情表现' },
+  { type: 'item', page: 'text',    mode: 'text',    label: '文字层',   status: 'done' },
+  { type: 'item', label: '角色层', status: 'pending', disabled: true },
+  { type: 'item', label: '场景层', status: 'pending', disabled: true },
+  { type: 'item', label: '特效层', status: 'pending', disabled: true },
+  { type: 'l1', label: '记忆星图' },
+  { type: 'item', label: '记忆星图', status: 'pending', disabled: true },
+  { type: 'divider' },
+  { type: 'action', action: 'reset', label: '重置引导计数' },
+];
+
+function renderNav(container) {
+  container.innerHTML = NAV_ITEMS.map(it => {
+    if (it.type === 'l1')      return `<div class="nav-l1">${it.label}</div>`;
+    if (it.type === 'l2')      return `<div class="nav-l2">${it.label}</div>`;
+    if (it.type === 'divider') return `<div class="nav-divider"></div>`;
+    if (it.type === 'action')  return `<div class="nav-action" data-action="${it.action}">${it.label}</div>`;
+    const cls = ['nav-item'];
+    if (it.disabled) cls.push('disabled');
+    if (it.active)   cls.push('active');
+    const attrs = [];
+    if (it.page) attrs.push(`data-page="${it.page}"`);
+    if (it.mode) attrs.push(`data-mode="${it.mode}"`);
+    const badge = it.status === 'done'    ? '<span class="badge-done">已交付</span>'
+                : it.status === 'pending' ? '<span class="badge-pending">待交付</span>'
+                : '';
+    return `<div class="${cls.join(' ')}" ${attrs.join(' ')}>${it.label} ${badge}</div>`;
+  }).join('');
+}
+renderNav(document.getElementById('drawer-nav'));
+renderNav(document.getElementById('desktop-nav'));
+
+// 改剧情：只动这个数组。narration 是旁白；以「（」开头的会自动判定为动作旁白（蓝调）。
+// dialogue 是对话，speaker 用 'you' / 'him'。
+const HISTORY_SCRIPT = [
+  { type: 'narration', text: '风从城市的边缘吹来，带着远处海面的咸味。他靠在栏杆上，望着渐渐暗下来的天际线。你推开天台的门，铰链发出一声干涩的响。' },
+  { type: 'dialogue',  speaker: 'you', text: '等很久了？' },
+  { type: 'narration', text: '（他听到门响，转过头，嘴角微微扬了一下。）' },
+  { type: 'dialogue',  speaker: 'him', text: '你来了。还好，看了会儿日落。不知道值不值得看，但有人一起看的话，大概更值得。' },
+  { type: 'dialogue',  speaker: 'you', text: '那我算来对了。' },
+  { type: 'narration', text: '（他往旁边让了半步，腾出栏杆的位置，下巴朝天际线的方向抬了抬。）' },
+  { type: 'dialogue',  speaker: 'him', text: '你有没有想过，有些事情只有在黄昏才能说出口？白天太亮，什么都看得见。晚上又太暗，什么都看不到。只有这一会儿，刚好。' },
+  { type: 'dialogue',  speaker: 'you', text: '什么意思？' },
+  { type: 'narration', text: '（他转过身，靠在栏杆上，双手插进口袋，目光落在远处海面上。）' },
+  { type: 'dialogue',  speaker: 'him', text: '……没什么。就是想让你也看看这个。你看那边，最后一点橘色快散了。' },
+  { type: 'dialogue',  speaker: 'you', text: '我看到了。' },
+  { type: 'narration', text: '（他伸出手，指向天际线尽头。风把他的衣角吹起来，他没有收回手。）' },
+  { type: 'dialogue',  speaker: 'him', text: '小时候觉得日落很慢。现在觉得太快了，快到来不及跟人说一句"你看"。所以今天叫你来。' },
+  { type: 'dialogue',  speaker: 'you', text: '……就为了这个？' },
+  { type: 'narration', text: '（他收回手，低头笑了一下，像是被说中了什么。）' },
+  { type: 'dialogue',  speaker: 'him', text: '嗯。就为了这个。你觉得不够吗？有些事情不需要理由的，想让你看到，就够了。' },
+  { type: 'narration', text: '你们就这样安静地站了很久。城市的灯光一盏一盏亮起来，像是接替了落日的工作。天台上的风大了些，带着夜晚独有的凉意。' },
+  { type: 'narration', text: '远处有几只海鸥掠过水面，留下短暂的影子。有那么一瞬间，你觉得时间在这座天台上走得格外慢，慢到足够把每一秒都记住。' },
+  { type: 'dialogue',  speaker: 'you', text: '还好。' },
+  { type: 'narration', text: '（他偏过头看了你一眼，没说话，但往你这边靠了半步，刚好够挡住一点风。）' },
+  { type: 'dialogue',  speaker: 'him', text: '你每次说"还好"的时候，其实都在逞强。我知道，因为我也会这样。' },
+  { type: 'dialogue',  speaker: 'you', text: '你怎么知道？' },
+  { type: 'narration', text: '（他没有看你，但嘴角弯了一下。手从口袋里抽出来，搭在栏杆上，离你的手很近。）' },
+  { type: 'dialogue',  speaker: 'him', text: '因为说"还好"的人，其实是在等对方多问一句。我有时候觉得，人和人之间的距离，其实就是一句没说出口的话。' },
+  { type: 'dialogue',  speaker: 'you', text: '那你现在说出口了。' },
+  { type: 'narration', text: '（他终于转过头看你，眼睛里映着远处的万家灯火，视线没有躲。）' },
+  { type: 'dialogue',  speaker: 'him', text: '是啊。所以近了一点。走吧，带你去个地方。' },
+  { type: 'dialogue',  speaker: 'you', text: '去哪儿？' },
+  { type: 'narration', text: '（他从栏杆上直起身，拍了拍手上的锈，朝楼梯的方向偏了偏头。）' },
+  { type: 'dialogue',  speaker: 'him', text: '一个只有我知道的地方。不远，走几步就到。小时候我经常来，那时候觉得只要走到那盏灯下面，所有不开心的事情就会消失。' },
+  { type: 'dialogue',  speaker: 'you', text: '现在呢？' },
+  { type: 'narration', text: '（他停下脚步，回头看你，走廊里的灯光刚好落在他半边脸上。）' },
+  { type: 'dialogue',  speaker: 'him', text: '现在不需要走到灯下了。谢谢你今天来。不是客气，是真的觉得——有些时刻，如果没有人分享，就像从来没发生过一样。' },
+  { type: 'dialogue',  speaker: 'you', text: '你不用谢我。' },
+  { type: 'narration', text: '（他推开一扇半掩的铁门，侧身让你先过。门外是一条窄巷，巷子尽头有一盏暖黄色的灯。）' },
+  { type: 'dialogue',  speaker: 'him', text: '你先走，我跟着。这条路有点暗，不过很快就到了。到了你就知道为什么我喜欢这里。' },
+  { type: 'narration', text: '暖黄色的灯光越来越近，照亮了他侧脸柔和的轮廓。巷子里很窄，你们肩并肩地走着，偶尔手背会不经意地碰到一起。' },
+  { type: 'narration', text: '你忽然很想记住这一刻——风声、灯光、和他说话时嘴角微微上扬的弧度。' },
+];
+
+function renderHistory(container) {
+  container.innerHTML = HISTORY_SCRIPT.map(e => {
+    if (e.type === 'narration') {
+      const isAction = e.text.trim().startsWith('（');
+      const cls = 'history-entry h-narration' + (isAction ? ' h-narration-action' : '');
+      return `<div class="${cls}">${e.text}</div>`;
+    }
+    const speakerCls = e.speaker === 'you' ? 'h-speaker-you' : 'h-speaker-him';
+    const speakerLabel = e.speaker === 'you' ? '你' : '他';
+    return `<div class="history-entry h-dialogue ${speakerCls}"><div class="h-speaker">${speakerLabel}：</div><div class="h-dialogue-text">${e.text}</div></div>`;
+  }).join('');
+}
+renderHistory(document.getElementById('history-scroll'));
+
+// ============================================================
+// 抽屉菜单
+// ============================================================
+const menuToggle = document.getElementById('menu-toggle');
+const drawer = document.getElementById('drawer');
+const backdrop = document.getElementById('drawer-backdrop');
+function openDrawer() { drawer.classList.add('open'); backdrop.classList.add('visible'); menuToggle.classList.add('open'); }
+function closeDrawer() { drawer.classList.remove('open'); backdrop.classList.remove('visible'); menuToggle.classList.remove('open'); }
+menuToggle.addEventListener('click', () => { drawer.classList.contains('open') ? closeDrawer() : openDrawer(); });
+backdrop.addEventListener('click', closeDrawer);
+
+// ============================================================
+// 参数
+// ============================================================
+const P = {
+  radiusVW: 120,
+  arcPeekVH: 16, strokeWidth: 3, arcBreathAmp: 2.75, arcBreathPeriod: 4.2,
+  glowBlur: 14,
+  fillPeekVH: 5.5, fillAlpha: 0.15, fillBreathAmp: 1.5, fillBreathPeriod: 4.0,
+};
+
+const phone = document.getElementById('phone');
+const cMain = document.getElementById('c');
+const cGlow = document.getElementById('c-glow');
+const ctxM = cMain.getContext('2d');
+const ctxG = cGlow.getContext('2d');
+const historyPanel = document.getElementById('history-panel');
+const historyDim = document.getElementById('history-dim');
+const historyHint = document.getElementById('history-hint');
+const historyScroll = document.getElementById('history-scroll');
+const historyAnchor = document.getElementById('history-anchor');
+let W, H, dpr;
+
+// 等比缩放基准：iPhone 14 标准设计稿高度。所有 CSS/JS 里的 px 都按 (H/BASE_H) 缩放。
+const BASE_H = 844;
+function resize() {
+  dpr = window.devicePixelRatio || 1;
+  W = phone.clientWidth; H = phone.clientHeight;
+  for (const cv of [cMain, cGlow]) {
+    cv.width = W * dpr; cv.height = H * dpr;
+    cv.style.width = W + 'px'; cv.style.height = H + 'px';
+  }
+  // --u：CSS 里 calc(N * var(--u)) 的单位缩放因子。
+  // 桌面 95vh ≈ 1026px → u ≈ 1.215；iPhone 14 真机 844px → u = 1。
+  phone.style.setProperty('--u', (H / BASE_H) + 'px');
+}
+window.addEventListener('resize', resize); resize();
+function vw(n) { return n * W / 100; }
+function vh(n) { return n * H / 100; }
+function u(n)  { return n * H / BASE_H; }
+
+// ---- 真实系统键盘适配：把当前键盘抢走的高度写入 --kb-inset，输入框 bottom 自动抬起 ----
+// 桌面无键盘：inset = 0，输入框停在 phone-frame 底边上方 14px；
+// 移动端键盘弹起：visualViewport.height 缩小，inset = 抢走的像素数，输入框正好停在键盘上方。
+function updateKbInset() {
+  const vv = window.visualViewport;
+  let inset = 0;
+  if (vv) {
+    // 只算 innerHeight - vv.height：键盘弹起时 offsetTop 在 Android 上会因 scroll-into-view
+    // 临时跳值，加进来会让 inset 中途过冲。去掉 offsetTop 后失真很小但平稳。
+    inset = Math.max(0, window.innerHeight - vv.height);
+  }
+  document.documentElement.style.setProperty('--kb-inset', inset + 'px');
+}
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', updateKbInset);
+  window.visualViewport.addEventListener('scroll', updateKbInset);
+}
+window.addEventListener('resize', updateKbInset);
+updateKbInset();
+
+// ============================================================
+// 导航切换
+// ============================================================
+let mode = 'login-invite';   // 当前 tab：'login-invite' | 'login-phone' | 'login-password' | 'arc' | 'fill' | 'history' | 'text'
+let historyOverlay = false;   // true = 锚点从 arc/fill 上叠加的覆盖层
+let prevArcFillMode = 'arc';  // 进入历史前的 arc/fill 模式，锚点关闭后恢复
+const sceneBg = document.querySelector('.scene-bg');
+const characterEl = document.querySelector('.character');
+const arcBgMask = document.getElementById('arc-tutorial-bg-mask');
+let fillCommitCount = 0;
+
+function updateStage() {
+  if (mode.startsWith('login')) {
+    sceneBg.classList.remove('visible');
+    characterEl.classList.remove('visible');
+    arcBgMask.classList.remove('visible');
+    return;
+  }
+  if (mode === 'arc') {
+    sceneBg.classList.add('visible');
+    characterEl.classList.add('visible');
+    arcBgMask.classList.remove('visible');
+  } else if (mode === 'fill') {
+    const tutorialDone = fillTutorialCount >= 2;
+    sceneBg.classList.add('visible');
+    characterEl.classList.add('visible');
+    if (tutorialDone) arcBgMask.classList.remove('visible');
+    else              arcBgMask.classList.add('visible');
+  } else if (mode === 'text') {
+    sceneBg.classList.add('visible');
+    characterEl.classList.add('visible');
+    arcBgMask.classList.remove('visible');
+  } else {
+    sceneBg.classList.add('visible');
+    characterEl.classList.add('visible');
+    arcBgMask.classList.remove('visible');
+  }
+}
+
+// ---- 统一 timer 管理 ----
+let pendingTimers = [];
+function scheduleGo(s, delay) {
+  const id = setTimeout(() => {
+    pendingTimers = pendingTimers.filter(t => t !== id);
+    go(s);
+  }, delay);
+  pendingTimers.push(id);
+}
+function clearAllTimers() {
+  pendingTimers.forEach(id => clearTimeout(id));
+  pendingTimers = [];
+}
+
+// ---- 手势状态清理 ----
+function resetGesture() {
+  if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+  pressing = false; down = null; swipeProgress = 0; arcEnterAccel = false;
+}
+
+// ---- 历史面板 DOM ----
+// 圆形剪裁：用 clip-path 而非 mask。
+//   (1) clip-path 是几何切，边缘硬切，没有 mask 渐变带产生的"半透明浅色环"。
+//   (2) clip-path 会影响 hit-testing —— 圆外区域不接收点击，点击穿透到下面的 dim/stage，
+//       这样"点面板外区域关闭"才能恢复（mask 不影响点击，圆外的整块面板还是会拦截点击）。
+//   fade 参数保留是为了不动调用点，clip-path 没有渐变，实际不用。
+function setMask(el, r, cx, cy, fade) {
+  const clip = r <= 0 ? 'circle(0)' : `circle(${r}px at ${cx}px ${cy}px)`;
+  el.style.clipPath = clip;
+  el.style.webkitClipPath = clip;
+}
+function clearMask(el) {
+  el.style.clipPath = '';
+  el.style.webkitClipPath = '';
+}
+
+function showHistoryPanel() {
+  historyDim.style.display = 'block';
+  // 强制 reflow 让 opacity 从 0 起步，下一行设 1 才会触发 transition
+  void historyDim.offsetWidth;
+  historyDim.style.opacity = '1';
+  historyPanel.style.display = 'block';
+  historyPanel.style.opacity = '1';
+  historyPanel.style.pointerEvents = 'none';
+  setMask(historyPanel, 0, 0, 0, 0);
+  historyScroll.scrollTop = historyScroll.scrollHeight;
+  historyAnchor.classList.add('panel-open');
+  historyHint.classList.add('visible');
+}
+function hideHistoryPanel() {
+  historyPanel.style.opacity = '0';
+  historyPanel.style.pointerEvents = 'none';
+  clearMask(historyPanel);
+  historyPanel.style.display = 'none';
+  historyDim.style.opacity = '0';
+  historyDim.style.display = 'none';
+  historyHint.classList.remove('visible');
+  historyAnchor.classList.remove('panel-open');
+  thawMainStage();
+}
+
+// 历史面板打开时：不打断当前正在播的内容，但藏掉视觉层避免漏进面板下方的开口；
+// 同时设 _pauseAfterCurrent，让"下一步"被 maybeRunOrPause 暂存而非执行
+let _pauseAfterCurrent = false;
+let _pendingNextStep = null;
+let _frozenState = null;     // 冻住时主屏的 state/stateT，关掉面板时还原（防止 history 状态把主屏 state 覆盖丢）
+
+function maybeRunOrPause(fn) {
+  if (_pauseAfterCurrent) { _pendingNextStep = fn; }
+  else { fn(); }
+}
+
+function freezeMainStage() {
+  if (!state.startsWith('history')) _frozenState = { s: state, t: stateT };
+  // 杀状态机的待办（避免遗留 scheduleGo 在面板打开后覆盖 history 状态）；
+  // 但**不杀**文字层 tSet 计时器——让当前正在打字/淡入的动画自然播完
+  clearAllTimers();
+  resetGesture();
+  if (state === 'arc-record' && mode === 'text') restoreDimmedText();
+  _pauseAfterCurrent = true;
+  document.getElementById('stage').classList.add('main-stage-frozen');
+}
+
+function thawMainStage() {
+  document.getElementById('stage').classList.remove('main-stage-frozen');
+  _pauseAfterCurrent = false;
+  if (_frozenState) {
+    state = _frozenState.s; stateT = _frozenState.t; _frozenState = null;
+  }
+  if (_pendingNextStep) {
+    const fn = _pendingNextStep; _pendingNextStep = null;
+    fn();
+  } else {
+    // 没有暂存的"下一步"——按 state 做一次最小恢复
+    if (state === 'arc-enter') scheduleGo('arc-invite', 1000);
+    else if (state === 'fill-enter') scheduleGo('fill-idle', 1600);
+  }
+}
+
+// ---- 高亮 nav ----
+function highlightNav(page) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll(`.nav-item[data-page="${page}"]`).forEach(n => n.classList.add('active'));
+}
+
+// ---- 进入历史面板（入场动画） ----
+function enterHistory() {
+  clearAllTimers();
+  resetGesture();
+  showHistoryPanel();
+  go('history-enter');
+  scheduleGo('history-idle', 550);
+}
+
+// ---- 进入 arc/fill 基础模式 ----
+function enterArcFill() {
+  clearAllTimers();
+  resetGesture();
+  if (mode === 'fill') {
+    arcTutorialCount = 0;
+    go('fill-enter');
+    scheduleGo('fill-idle', 1600);
+  } else if (mode === 'text') {
+    clearAllText();
+    charTurnIdx = 0;
+    runCharTurn();   // 进入文字层：角色先发起 Round 1，之后两轮无限循环
+  } else {
+    // arc tab：在引导出现前先放一组动作旁白 + 角色气泡（叠加视觉对照用），
+    // 气泡打完一拍后才触发弧浮起 / 暗罩 / 高亮区
+    clearAllText();
+    runArcOverlayDemo();
+  }
+}
+
+// arc tab 叠加视觉测试：一组动作旁白 + 3 条角色气泡（每条 2 行，堆叠总视觉 ~6 行）
+const ARC_OVERLAY_ACTION = '他靠在栏杆上，听见门响才转过头来。风从城市的边缘吹来，带着海面的咸味。落日的最后一点橘色压在天际线上，慢慢沉下去。他没有立刻说话，只是看了你一眼，又把目光移回远处。城市的灯光一盏一盏亮起来，像是接替了白天的工作。';
+const ARC_OVERLAY_BUBBLES = [
+  '你来了。还好，你最后还是赶上了。',
+  '我等了一会儿。海风把衣角吹得有点凉。',
+  '刚才橘色快散完那一瞬，我以为你今天不会来了。',
+];
+
+async function runArcOverlayDemo() {
+  // 进 prep 态：canvas 主循环没有这个分支 → 弧不画，给旁白+气泡留干净屏面
+  state = 'arc-overlay-prep';
+  // 旁白逐块浮现耗时长（~12s），不 await：让它与气泡并行展开
+  showAction(ARC_OVERLAY_ACTION);
+  await waitP(800);
+  for (let i = 0; i < ARC_OVERLAY_BUBBLES.length; i++) {
+    if (mode !== 'arc') return;
+    if (i > 0) await waitP(BUBBLE_HOLD);
+    await showCharBubble(ARC_OVERLAY_BUBBLES[i], 26);
+  }
+  if (mode !== 'arc') return;
+  await waitP(400);
+  if (mode !== 'arc') return;
+  // 气泡播完 → 弧浮起 + 高亮区出来（暗罩已拿掉）
+  go('arc-enter');
+  scheduleGo('arc-invite', 1000);
+}
+
+// ============================================================
+// Nav tab 切换：三个独立 tab
+// ============================================================
+function switchMode(m) {
+  if (m === mode && !historyOverlay) return;
+  clearAllTimers();
+  resetGesture();
+  // arc tab 也带了一组叠加旁白+气泡，切走时跟 text 一样清场
+  if ((mode === 'text' || mode === 'arc') && m !== 'text' && m !== 'arc') clearAllText();
+  // 切走 arc tab：立即收起打字层(若仍开着)；draft 保留，回来仍可见光点
+  if (mode === 'arc' && m !== 'arc') {
+    if (typingLayer.classList.contains('entered')) hideTypingUI();
+  }
+
+  if (historyOverlay) { historyOverlay = false; hideHistoryPanel(); }
+  if (mode === 'history' && m !== 'history') hideHistoryPanel();
+
+  // 切到登录模式：藏掉舞台所有交互，只显示登录卡片
+  if (m.startsWith('login')) {
+    mode = m;
+    highlightNav(m);
+    updateStage();
+    showLoginMode(m);
+    return;
+  }
+  // 从登录切回 arc/fill/text：藏登录层
+  if (mode.startsWith('login')) {
+    hideLoginLayer();
+  }
+
+  // 记住最后的 arc/fill 模式
+  if (m === 'history' && (mode === 'arc' || mode === 'fill')) prevArcFillMode = mode;
+
+  mode = m;
+  if (m === 'fill') fillCommitCount = 0;
+  highlightNav(m);
+  updateStage();
+
+  if (m === 'history') {
+    enterHistory();
+  } else {
+    enterArcFill();
+  }
+}
+
+// ============================================================
+// 锚点：在 arc/fill 上叠加覆盖层（不改 tab）
+// ============================================================
+function openOverlay() {
+  freezeMainStage();
+  prevArcFillMode = mode;
+  historyOverlay = true;
+  showHistoryPanel();
+  go('history-enter');
+  scheduleGo('history-idle', 550);
+}
+
+// 统一关闭：不管从 tab 还是覆盖层打开的，都走同一条关闭路径
+function closeHistoryWithAnim() {
+  clearAllTimers();
+  resetGesture();
+  historyOverlay = false;
+  historyPanel.style.pointerEvents = 'none';
+  historyAnchor.classList.remove('panel-open');
+  historyHint.classList.remove('visible');
+  historyDim.style.opacity = '0';
+  // 视觉解冻提前到点关闭瞬间：text/bubble 的 0.25s 淡入跟弧形收回(400ms)平行跑，
+  // 等弧形消失时 UI 已经到位。逻辑解冻（状态机/待办剧情）仍留到 hideHistoryPanel。
+  document.getElementById('stage').classList.remove('main-stage-frozen');
+  go('history-exit');
+  scheduleGo('_exit-done', 400);
+}
+
+function _onExitDone() {
+  hideHistoryPanel();
+  // 覆盖层关闭（mode !== 'history'）：主屏在 openOverlay 时已经被冻住，
+  // hideHistoryPanel 已经 thaw 视觉层，这里不再重启主屏流程——画面停留在冻住的那一刻。
+  if (mode === 'history') state = 'history-closed';
+}
+
+// ---- 动画打断：从当前进度平滑反转 ----
+function getHistoryVisualProgress() {
+  const elapsed = (performance.now() - stateT) / 1000;
+  if (state === 'history-enter') return 1 - Math.pow(1 - Math.min(1, elapsed / 0.5), 2.5);
+  if (state === 'history-exit')  return Math.pow(1 - Math.min(1, elapsed / 0.35), 2);
+  return state === 'history-idle' ? 1 : 0;
+}
+
+function interruptToClose() {
+  const vp = getHistoryVisualProgress();
+  clearAllTimers();
+  resetGesture();
+  historyOverlay = false;
+  historyPanel.style.pointerEvents = 'none';
+  historyAnchor.classList.remove('panel-open');
+  historyHint.classList.remove('visible');
+  historyDim.style.opacity = '0';
+  document.getElementById('stage').classList.remove('main-stage-frozen');
+
+  const exitDur = 0.35;
+  const t_exit = 1 - Math.sqrt(Math.max(0.001, vp));
+  state = 'history-exit';
+  stateT = performance.now() - t_exit * exitDur * 1000;
+  rippleTimer = 0;
+  scheduleGo('_exit-done', Math.max(50, (1 - t_exit) * exitDur * 1000 + 50));
+}
+
+function interruptToOpen() {
+  const vp = getHistoryVisualProgress();
+  clearAllTimers();
+  resetGesture();
+  if (mode !== 'history') historyOverlay = true;
+  showHistoryPanel();
+
+  const enterDur = 0.5;
+  const t_enter = 1 - Math.pow(Math.max(0.001, 1 - vp), 0.4);
+  state = 'history-enter';
+  stateT = performance.now() - t_enter * enterDur * 1000;
+  rippleTimer = 0;
+  scheduleGo('history-idle', Math.max(50, (1 - t_enter) * enterDur * 1000 + 50));
+}
+
+document.querySelectorAll('.nav-item[data-mode]').forEach(item => {
+  item.addEventListener('click', () => { switchMode(item.dataset.mode); closeDrawer(); });
+});
+
+document.querySelectorAll('[data-action="reset"]').forEach(el => {
+  el.addEventListener('click', () => {
+    arcTutorialCount = 0; fillTutorialCount = 0; typingTutorialCount = 0;
+    draftText = ''; hasDraft = false;
+    anchorEverClicked = false;
+    if (typingLayer.classList.contains('entered')) hideTypingUI();
+    updateStage();
+  });
+});
+
+// ---- 文字层锚点提示 ----
+// anchorEverClicked: 用户是否点过左上角锚点；点过一次后整局不再触发提示动画
+let anchorEverClicked = false;
+function pulseHistoryAnchor() {
+  if (anchorEverClicked) return;
+  if (mode !== 'text') return;
+  // 移除再加，强制重置 animation；中间用 reflow 确保浏览器重新拾起
+  historyAnchor.classList.remove('hint-pulse');
+  void historyAnchor.offsetWidth;
+  historyAnchor.classList.add('hint-pulse');
+}
+historyAnchor.addEventListener('animationend', (e) => {
+  if (e.animationName === 'anchorHintPulse') historyAnchor.classList.remove('hint-pulse');
+});
+
+// 左上角锚点：切换历史面板
+historyAnchor.addEventListener('click', (e) => {
+  e.stopPropagation();
+  anchorEverClicked = true;
+  historyAnchor.classList.remove('hint-pulse');
+  if (state === 'history-enter') { interruptToClose(); return; }
+  if (state === 'history-exit')  { interruptToOpen(); return; }
+  const panelVisible = state === 'history-idle';
+  if (panelVisible) {
+    closeHistoryWithAnim();
+  } else if (mode === 'history') {
+    enterHistory();
+  } else {
+    openOverlay();
+  }
+});
+
+// 点击面板外区域收起
+document.getElementById('stage').addEventListener('click', (e) => {
+  if (mode.startsWith('login')) return;
+  // Android Chrome 兜底：短按弧底后 pointerup 阶段 focus() 没弹起键盘的情况下，
+  // click 事件比 pointerup 在 Android 上更"重"，再补一次 focus() 通常能把键盘叫出来。
+  if ((state === 'arc-typing-enter' || state === 'arc-typing')
+      && !e.target.closest('.typing-input') && !e.target.closest('.typing-send')) {
+    if (document.activeElement !== typingInput) {
+      try { typingInput.focus(); } catch (_) {}
+    }
+    return;
+  }
+  if (e.target.closest('.history-anchor')) return;
+  if (state === 'history-enter') {
+    if (e.target.closest('.history-panel')) return;
+    interruptToClose(); return;
+  }
+  if (state === 'history-exit') return;
+  const historyShowing = mode === 'history' || historyOverlay;
+  if (!historyShowing) return;
+  if (e.target.closest('.history-panel')) return;
+  closeHistoryWithAnim();
+});
+
+// ============================================================
+// 文字层 ⑨ — 机制移植自根目录 js/paragraph.js（暖白语言 + 去控件化）
+// ============================================================
+const narrationZone = document.getElementById('narration-zone');
+const bubbleZone = document.getElementById('bubble-zone');
+
+const TYPING_DIALOGUE = 55;     // 气泡逐字 ms/字
+const TOKEN_CHUNK_GAP = 240;    // 旁白相邻 chunk 启动间隔
+const TOKEN_CHUNK_JITTER = 0.2;
+const TOKEN_LINE_PAUSE = 180;
+const TOKEN_FADE_MS = 700;
+
+const TRAILING_PUNCT = new Set(["。","，","、","；","：","？","！","…","“","”","‘","’",")","）","」","』","】","—","—",".",",","?","!",";",":"]);
+
+let _textTimers = [];           // 文字层独立 timer（区别于状态机 pendingTimers）
+function tSet(fn, delay) { const id = setTimeout(() => { _textTimers = _textTimers.filter(t => t !== id); fn(); }, delay); _textTimers.push(id); return id; }
+function clearTextTimers() { _textTimers.forEach(id => clearTimeout(id)); _textTimers = []; }
+function rafP() { return new Promise(r => requestAnimationFrame(() => r())); }
+function waitP(ms) { return new Promise(r => tSet(r, ms)); }
+
+let _activeNarration = null;    // 当前停留的旁白节点（不自动消失，等上滑）
+let _narrCtrl = null;           // 两段旁白控制器：revealRest()
+
+// 气泡逐字打字机
+function startTyper(node, text, perChar) {
+  return new Promise((resolve) => {
+    const chars = Array.from(text); let i = 0;
+    const step = () => {
+      if (i < chars.length) { node.textContent = chars.slice(0, i + 1).join(''); i++; tSet(step, perChar); }
+      else resolve();
+    };
+    tSet(step, 30);
+  });
+}
+
+// 旁白：2-3 字逐块浮现 + 动态暗带；支持多段（phases），段间用 <br>
+function sliceForReveal(text) {
+  const chars = Array.from(text); const total = chars.length; const slices = []; let i = 0;
+  while (i < total) {
+    const want = Math.random() < 0.45 ? 2 : 3;
+    let end = Math.min(total, i + want);
+    while (end < total && TRAILING_PUNCT.has(chars[end])) end++;
+    slices.push(chars.slice(i, end).join('')); i = end;
+  }
+  return slices;
+}
+
+async function startTokenReveal(node, phasesInput) {
+  const phases = Array.isArray(phasesInput) ? phasesInput : [phasesInput];
+  node.classList.add('line-banner');
+  node.style.setProperty('--banner-h', '0px');
+  node.textContent = '';
+
+  // 每段切片预先算好，但 chunk 不预放——一段一段动态 append，让容器随内容长大
+  const phasePlans = phases.map((text) => sliceForReveal(text));
+
+  const revealPhase = (pi) => new Promise((resolve) => {
+    const slices = phasePlans[pi];
+    if (!slices || !slices.length) { resolve(); return; }
+    let k = 0, prevTop = null;
+    const step = () => {
+      if (k >= slices.length) { tSet(resolve, TOKEN_FADE_MS); return; }
+      const slice = slices[k++];
+      const span = document.createElement('span');
+      span.className = 'gen-chunk reveal';
+      span.textContent = slice;
+      node.appendChild(span);
+      const top = span.offsetTop;
+      let delay = TOKEN_CHUNK_GAP * (1 + (Math.random() * 2 - 1) * TOKEN_CHUNK_JITTER);
+      if (prevTop !== null && Math.abs(top - prevTop) > 2) delay += TOKEN_LINE_PAUSE;
+      prevTop = top;
+      // banner 跟着当前内容高度同步
+      node.style.setProperty('--banner-h', `${node.offsetHeight + u(40)}px`);
+      tSet(step, delay);
+    };
+    step();
+  });
+
+  await revealPhase(0);
+  if (phases.length === 1) return null;
+  return { revealRest: async () => {
+    if (node.childNodes.length) node.appendChild(document.createElement('br'));
+    for (let p = 1; p < phases.length; p++) await revealPhase(p);
+  } };
+}
+
+function driftAway(node, dur = 1000) {
+  return new Promise((resolve) => {
+    if (dur !== 1000) node.style.animationDuration = dur + 'ms';
+    node.classList.add('drifting');
+    tSet(() => { if (node.parentNode) node.parentNode.removeChild(node); resolve(); }, dur);
+  });
+}
+
+// 旁白：暖白；块位置由 narration-zone 居中锚住，打字机一段段浮现
+async function showNarration(text, opts = {}) {
+  if (_activeNarration && _activeNarration.parentNode) {
+    const prev = _activeNarration; _activeNarration = null; driftAway(prev);
+  }
+  const node = document.createElement('div');
+  node.className = 'narration' + (opts.cls ? ' ' + opts.cls : '');
+  narrationZone.appendChild(node); _activeNarration = node;
+  await rafP(); node.classList.add('visible');
+  _narrCtrl = await startTokenReveal(node, [text]);
+}
+
+// 角色动作：月白色 + 全角括号包裹，跟角色气泡呼应
+async function showAction(text) {
+  return showNarration('（' + text + '）', { cls: 'narration-action' });
+}
+
+// 上滑推进：把当前旁白的下一段揭出；没有下一段则把旁白漂走
+async function advanceNarration() {
+  if (_narrCtrl) { const c = _narrCtrl; _narrCtrl = null; await c.revealRest(); return 'revealed'; }
+  if (_activeNarration && _activeNarration.parentNode) {
+    const node = _activeNarration; _activeNarration = null; await driftAway(node); return 'drifted';
+  }
+  return 'none';
+}
+
+// ② 一句一气泡：打完字 hold 后 drift 走；同区任意时刻最多一条气泡
+const BUBBLE_HOLD = 1200;
+
+// 用户气泡：从底部回响弧位置升起到驻留位，打完字即返回节点；
+// 退场时机由 runTextDialogue 的清场编排统一调度（先描述+角色气泡涟漪退场，用户气泡最后收尾）
+async function showUserBubble(text) {
+  const node = document.createElement('div'); node.className = 'bubble bubble-user';
+  node.style.left = '50%';
+  node.style.bottom = '28%';                       // 高于"长按录音"时弧顶顶起到的 22%（弧基线 16% + vh(6) 上推）再留 ~6vh 喘息
+  node.style.transform = `translateX(-50%) translateY(${u(28)}px)`;
+  bubbleZone.appendChild(node);
+  await rafP();
+  node.classList.add('visible');
+  node.style.transform = 'translateX(-50%) translateY(0)';
+  await startTyper(node, text, TYPING_DIALOGUE);
+  return node;
+}
+
+// 角色气泡：压栈式累积，新条出现在锚点，旧条上移 + 透明度衰减一档；不再自动 drift
+const CHAR_PAD_OVERLAP = 10;         // 新旧气泡 padding 区允许重叠的像素（≤ 上下 padding 之和 20px，保文字不重叠）
+const CHAR_OPACITY_STEP = 0.35;      // 每多一条新气泡，旧气泡透明度衰减一档
+const CHAR_OPACITY_FLOOR = 0.2;      // 旧气泡透明度地板
+let _charStack = [];                 // 当前留存的角色气泡 DOM 列表（从老到新）
+
+async function showCharBubble(text, topPct) {
+  const node = document.createElement('div'); node.className = 'bubble bubble-char';
+  node.style.left = '50%';
+  node.style.top = `${topPct}%`;
+  node.style.zIndex = String(5 + _charStack.length);
+  bubbleZone.appendChild(node);
+  await rafP();
+
+  // 位移基准：栈顶旧气泡的真实高度（它的文字已经打完，offsetHeight 是最终高度），
+  // 不能用新气泡的 offsetHeight —— 此刻新气泡还没打字，只有空 padding 的高度。
+  const recentOld = _charStack[_charStack.length - 1];
+  const recentH = recentOld ? recentOld.offsetHeight : 0;
+  const shift = recentH ? (recentH - u(CHAR_PAD_OVERLAP)) : 0;
+  for (let i = 0; i < _charStack.length; i++) {
+    const prev = _charStack[i];
+    const cur = parseFloat(prev.dataset.stackShift || '0');
+    prev.dataset.stackShift = String(cur - shift);
+    prev.style.setProperty('--stack-shift', `${cur - shift}px`);
+    const step = (_charStack.length - i);   // 该气泡又被推了一次
+    const newOp = Math.max(CHAR_OPACITY_FLOOR, 1 - step * CHAR_OPACITY_STEP);
+    prev.style.opacity = String(newOp);
+  }
+
+  _charStack.push(node);
+  node.classList.add('visible');
+  // 下一帧再加 settled，触发 --enter-y 从 28px 过渡到 0
+  await rafP();
+  node.classList.add('settled');
+
+  await startTyper(node, text, TYPING_DIALOGUE);
+  // 不再 driftAway —— 留存到下一次交互（driftDimmedText / clearAllText）清场
+}
+
+function clearAllText() {
+  clearTextTimers();
+  _activeNarration = null; _narrCtrl = null;
+  _charStack = [];
+  [narrationZone, bubbleZone].forEach((z) => { if (z) z.innerHTML = ''; });
+}
+
+// 进打字态 / 长按语音：把旁白 + 角色气泡压暗一档（filter 与 inline opacity 相乘，栈衰减层级保留）
+function dimTextForRecording() {
+  if (_activeNarration) _activeNarration.classList.add('dimmed-for-recording');
+  _charStack.forEach((c) => c.classList.add('dimmed-for-recording'));
+}
+// 取消（点别处退出打字 / 录音不足 / 历史面板抢断）：摘掉 dimmed 类，filter 经 base transition 自然回到 none
+function restoreDimmedText() {
+  if (_activeNarration) _activeNarration.classList.remove('dimmed-for-recording');
+  _charStack.forEach((c) => c.classList.remove('dimmed-for-recording'));
+}
+// 发送（语音松手 / 打字提交）：旁白 + 角色气泡涟漪上飘（加速版，默认 500ms），同时清引用
+function driftDimmedText(dur = 500) {
+  if (_activeNarration) {
+    driftAway(_activeNarration, dur);
+    _activeNarration = null; _narrCtrl = null;
+  }
+  _charStack.forEach((c) => driftAway(c, dur));
+  _charStack = [];
+}
+
+// ---- 文字层演示脚本：两轮对话循环 ----
+const TEXT_SCRIPT = {
+  charTurns: [
+    {
+      action: '他靠在栏杆上，听见门响才转过头来。',
+      replies: ['你来了。', '我以为你不会来。'],            // R1：2 条气泡
+    },
+    {
+      action: '他笑了笑，下巴朝海面的方向抬了抬。',
+      replies: ['也没多久。', '你来的正好。', '你来得正好，再晚一会儿天就要黑透了，那点橘色就要散在海里了。'], // R2：3 条，末条 30 字压测（15×2 触顶）
+    },
+  ],
+  userReplies: ['等很久了？', '那就好。'],
+};
+
+let charTurnIdx = 0;     // 当前正在播 / 即将播的角色轮次下标
+
+// 角色发起：动作 + N 条气泡，按 charTurnIdx 取脚本；播完落到 arc-invite 让用户长按回复
+async function runCharTurn() {
+  if (mode !== 'text') return;
+  go('text-playing');  // 屏蔽 arc/fill 手势 + 隐藏底部提示，避免角色独白期间被打断
+  const turn = TEXT_SCRIPT.charTurns[charTurnIdx];
+  if (!turn) return;
+  await showAction(turn.action);
+  if (mode !== 'text') return;
+  await waitP(800);
+  for (let i = 0; i < turn.replies.length; i++) {
+    if (i > 0) await waitP(BUBBLE_HOLD);
+    await showCharBubble(turn.replies[i], 26);
+    if (mode !== 'text') return;
+  }
+  await waitP(400);
+  maybeRunOrPause(() => { if (mode === 'text') { go('arc-enter'); scheduleGo('arc-invite', 1000); } });
+}
+
+// 用户气泡发完之后推进下一轮：模运算 wrap，两轮对话无限循环（R1 ↔ R2 ↔ ...）
+function advanceToNextRound() {
+  if (mode !== 'text') return;
+  charTurnIdx = (charTurnIdx + 1) % TEXT_SCRIPT.charTurns.length;
+  maybeRunOrPause(() => { if (mode === 'text') runCharTurn(); });
+}
+
+// 用户长按松手回路：旧旁白+角色气泡涟漪上飘（500ms）→ 半程交叠时用户气泡升起 → 用户气泡 drift 收尾 → 下一轮
+async function runTextDialogue() {
+  if (mode !== 'text') return;
+  const userReply = TEXT_SCRIPT.userReplies[charTurnIdx] || '……';
+
+  // 录音期间它们一直以 dimmed 态留在屏幕上；松手瞬间一起涟漪上飘消失（加速版 500ms）
+  driftDimmedText(500);
+  // 半程（250ms）后用户气泡升起，跟上飘交叠入场，画面不留空白
+  await waitP(250);
+  if (mode !== 'text') return;
+  const userNode = await showUserBubble(userReply);
+  if (mode !== 'text') return;
+
+  // 用户气泡保留 drift 作为"句点"收尾
+  tSet(() => driftAway(userNode, 700), 600);
+  await waitP(1200);
+  advanceToNextRound();
+}
+
+// ============================================================
+// 新手引导
+// ============================================================
+let arcTutorialCount = 0, fillTutorialCount = 0, typingTutorialCount = 0;
+const arcTextEl = document.getElementById('tutorial-text-arc');
+const fillTextEl = document.getElementById('tutorial-text-fill');
+
+// 引导文字在「长按区域，语音输入」「点按区域，打字输入」之间交替；周期 2.1s，踩呼吸过零点。
+// 每个周期首尾 10% 区间做 crossfade（淡出→换文字→淡入），避免硬切。
+const HINT_SWAP_PERIOD = P.arcBreathPeriod / 2;  // 单位 s
+const HINT_TEXT_VOICE = '长按区域，语音输入';
+const HINT_TEXT_TYPE  = '点按区域，打字输入';
+function pickArcHint(now) {
+  const cyclePos = (now / 1000) / HINT_SWAP_PERIOD;
+  const cycleIdx = Math.floor(cyclePos);
+  const tInCycle = cyclePos - cycleIdx;
+  const arcDone = arcTutorialCount >= 2;
+  const typingDone = typingTutorialCount >= 2;
+  let text;
+  if (arcDone && typingDone) return { text:'', fade:0 };
+  else if (arcDone)   text = HINT_TEXT_TYPE;
+  else if (typingDone) text = HINT_TEXT_VOICE;
+  else text = (cycleIdx % 2 === 0) ? HINT_TEXT_VOICE : HINT_TEXT_TYPE;
+  let fade = 1;
+  if (!arcDone && !typingDone) {
+    if (tInCycle < 0.10)      fade = tInCycle / 0.10;
+    else if (tInCycle > 0.90) fade = (1 - tInCycle) / 0.10;
+  }
+  return { text, fade };
+}
+
+function drawArcTutorial(arcAlpha) {
+  if (mode === 'text') { arcTextEl.style.opacity = '0'; return; }
+  // 跟 updateStage 同一口径：长按语音 + 短按打字 合计 2 次算完成
+  const tutorialDone = (arcTutorialCount + typingTutorialCount) >= 2;
+  if (tutorialDone || arcAlpha < 0.005) { arcTextEl.style.opacity = '0'; return; }
+  const a = arcAlpha * 0.6;
+  ctxM.save(); ctxM.scale(dpr, dpr);
+  const top = H * 0.6;
+  const grad = ctxM.createLinearGradient(0, top, 0, top + vh(7));
+  grad.addColorStop(0, 'rgba(255,235,210,0)');
+  grad.addColorStop(1, `rgba(255,235,210,${a})`);
+  ctxM.fillStyle = grad; ctxM.fillRect(0, top, W, vh(7));
+  ctxM.fillStyle = `rgba(255,235,210,${a})`; ctxM.fillRect(0, top + vh(7), W, H - top - vh(7));
+  ctxM.restore();
+  // 注入呼吸节奏交替的文案 + 淡入淡出
+  const { text, fade } = pickArcHint(performance.now());
+  if (text && arcTextEl.textContent !== text) arcTextEl.textContent = text;
+  // 呼吸反相：亮池亮（arcAlpha 峰值 ~0.90）时字推到 1.0 全力撑出；亮池暗（arcAlpha 谷值 ~0.40）时字回退到 ~0.65 让位。
+  // 公式 arcAlpha*0.7 + 0.37 把 0.40→0.65、0.90→1.00 线性映射，swing 从原来的 0.23 拉到 0.35，呼吸更明显。
+  arcTextEl.style.opacity = String(Math.min(1.0, arcAlpha * 0.7 + 0.37) * fade);
+}
+
+function drawFillTutorial(fillAlpha, now) {
+  if (mode === 'text') { fillTextEl.style.opacity = '0'; return; }
+  if (fillTutorialCount >= 2) { fillTextEl.style.opacity = '0'; return; }
+  if (fillAlpha < 0.005) { fillTextEl.style.opacity = '0'; return; }
+  const r = vw(P.radiusVW), cycleDur = 3.0;
+  const raw = ((now / 1000) % cycleDur) / cycleDur;
+  const t = 1 - Math.pow(1 - raw, 2);
+  const startY = H + vh(5), endY = H / 3;
+  const arcTopY = startY + (endY - startY) * t;
+  const bandCy = arcTopY + r;
+  const fadeA = fillAlpha * (1 - t);
+  if (fadeA < 0.005) return;
+  ctxM.save(); ctxM.scale(dpr, dpr);
+  const { s, e } = arcAngles(W/2, bandCy, r);
+  ctxM.beginPath(); ctxM.arc(W/2, bandCy, r, s, e);
+  ctxM.lineTo(W/2 + r*Math.cos(e), H+40); ctxM.lineTo(W/2 + r*Math.cos(s), H+40); ctxM.closePath();
+  const feather = vh(5), gradTop = arcTopY - feather, gradBot = H + 20, gradH = gradBot - gradTop;
+  const peakStop = Math.min(0.4, feather / gradH);
+  const grad = ctxM.createLinearGradient(0, gradTop, 0, gradBot);
+  grad.addColorStop(0, 'rgba(255,235,210,0)');
+  grad.addColorStop(peakStop, `rgba(255,235,210,${fadeA})`);
+  grad.addColorStop(Math.min(0.6, peakStop + 0.2), `rgba(255,235,210,${fadeA * 0.3})`);
+  grad.addColorStop(1, 'rgba(255,235,210,0)');
+  ctxM.fillStyle = grad; ctxM.fill(); ctxM.restore();
+  fillTextEl.style.opacity = Math.min(0.9, fillAlpha * 2.5 + 0.45);
+}
+
+// ============================================================
+// 状态机
+// ============================================================
+let state = 'arc-enter', stateT = 0;
+
+function go(s) {
+  // history-exit 完成后的回调
+  if (s === '_exit-done') { _onExitDone(); return; }
+
+  state = s; stateT = performance.now(); rippleTimer = 0;
+
+  // 进 arc-record 立即定字「松手发送」；arc-enter/arc-invite 由 drawArcTutorial 随呼吸周期交替注入
+  if (s === 'arc-record' && arcTutorialCount < 2) { arcTextEl.textContent = '松手发送'; arcTextEl.style.opacity = '0.85'; }
+  else if (s !== 'arc-enter' && s !== 'arc-invite') arcTextEl.style.opacity = '0';
+  if (s !== 'fill-enter' && s !== 'fill-idle') fillTextEl.style.opacity = '0';
+  if (s === 'arc-record') { arcTutorialCount++; updateStage(); }
+  // text 模式下，进 arc-record 把描述+角色气泡压暗一档（保留可见，舞台焦点让给用户）
+  if (s === 'arc-record' && mode === 'text') dimTextForRecording();
+  if (s === 'fill-commit') { fillTutorialCount++; fillCommitCount++; updateStage(); }
+
+  if (s === 'history-idle') {
+    const _r = vw(P.radiusVW);
+    setMask(historyPanel, _r - u(7), W / 2, (H * 2 / 3 - _r + u(120)), 10);
+    historyPanel.style.pointerEvents = 'auto';
+  }
+
+  const tags = {
+    'fill-enter':'上滑色块 · 浮出','fill-idle':'上滑色块 · 就绪','fill-swipe':'上滑色块 · 拖动中',
+    'fill-commit':'上滑色块 · 推进','arc-enter':'回响弧 · 浮起','arc-invite':'回响弧 · 邀请',
+    'arc-record':'回响弧 · 录音','arc-close':'回响弧 · 收回',
+    'arc-typing-enter':'回响弧 · 伸直','arc-typing':'回响弧 · 打字','arc-typing-exit':'回响弧 · 复位',
+    'history-enter':'历史面板 · 入场','history-idle':'历史面板 · 就绪',
+    'history-exit':'历史面板 · 收回',
+    'text-idle':'文字层 · 演示',
+  };
+}
+
+// ============================================================
+// 打字层（短按弧→输入条→发送→气泡；外侧点击退出留草稿光点）
+// ============================================================
+const typingLayer = document.getElementById('typing-layer');
+const typingInput = document.getElementById('typing-input');
+const typingSend = document.getElementById('typing-send');
+let draftText = '';
+let hasDraft = false;
+
+function updateSendActive() {
+  if (typingInput.value.trim().length > 0) typingSend.classList.add('active');
+  else typingSend.classList.remove('active');
+}
+typingInput.addEventListener('input', updateSendActive);
+
+// Android Chrome 兜底：键盘开着时，用户点 input 区域外的画面，系统会"吃掉"这次点击用来关键盘，
+// pointerdown 不会冒到我们的 stage handler 上 → exit 流程不会跑。用 focusout 作为"用户想退出打字态"
+// 的等价信号把退出流程补上。
+// 三道防误触：
+//   1) 入场 350ms 内的 focusout 多半是 click 期间浏览器把焦点漂到 body 的副作用，跳过
+//   2) 焦点漂到自家发送按钮（typing-layer 内部）→ 是合法操作（点发送），跳过；否则点发送时这里会先摘
+//      .entered 让按钮 pointer-events:none，导致 click 不再派发到 sendTyping，气泡就发不出去
+//   3) 程序性 hideTypingUI 已经先摘掉 .entered → 第三道条件失败自然短路
+let typingFocusedAt = 0;
+typingInput.addEventListener('focusout', (e) => {
+  if (performance.now() - typingFocusedAt < 350) return;
+  if (e.relatedTarget && typingLayer.contains(e.relatedTarget)) return;
+  if (typingLayer.classList.contains('entered') &&
+      (state === 'arc-typing' || state === 'arc-typing-enter')) {
+    exitTypingToDraft();
+  }
+});
+
+function showTypingUI() {
+  // input 不能用 display:none 切显隐——iOS Safari 在刚 unhide 的 input 上 focus() 不弹键盘。
+  // 所以 input 始终在 layout 里，这里只翻 .entered 控显隐 + 同步 focus()。
+  typingInput.value = draftText || '';
+  updateSendActive();
+  // 关键顺序：先放开 pointer-events:none 再 focus()，否则 Android Chrome 认为 input 不可交互、跳过弹键盘
+  typingLayer.classList.add('entered');
+  // focus 必须在 pointerup 这条手势链路里同步触发；preventScroll 在 Android 上会跳过弹键盘所必需的内部路径，故不传
+  typingFocusedAt = performance.now();    // blur handler 用来判断"这次 blur 是不是入场副作用"
+  try { typingInput.focus(); } catch (_) {}
+  // 把光标移到末尾
+  const len = typingInput.value.length;
+  try { typingInput.setSelectionRange(len, len); } catch (_) {}
+}
+
+function hideTypingUI() {
+  typingLayer.classList.remove('entered');
+  try { typingInput.blur(); } catch (_) {}
+}
+
+function enterTypingMode() {
+  clearAllTimers();
+  resetGesture();
+  // 文字层下：进打字态把旁白 + 角色气泡压暗一档（保留可见，跟长按语音同款 dim）
+  if (mode === 'text') dimTextForRecording();
+  showTypingUI();
+  go('arc-typing-enter');
+  scheduleGo('arc-typing', 280);
+}
+
+function exitTypingToDraft() {
+  draftText = typingInput.value;
+  hasDraft = draftText.trim().length > 0;
+  hideTypingUI();
+  // 中途取消回到回响弧：旁白 + 角色气泡复原到正常亮度
+  if (mode === 'text') restoreDimmedText();
+  go('arc-typing-exit');
+  scheduleGo('arc-invite', 450);
+}
+
+async function sendTyping() {
+  const text = typingInput.value.trim();
+  if (!text) return;
+  draftText = '';
+  hasDraft = false;
+  typingInput.value = '';
+  updateSendActive();
+  hideTypingUI();
+  go('arc-typing-exit');
+  scheduleGo('arc-invite', 450);
+  typingTutorialCount++; updateStage();
+  pulseHistoryAnchor();
+  // 跟长按语音同节奏：旧旁白+角色气泡 500ms 涟漪上飘 → 半程交叠用户气泡升起 → hold + drift 收尾
+  if (mode === 'text') driftDimmedText(500);
+  await waitP(250);
+  const node = await showUserBubble(text);
+  await waitP(BUBBLE_HOLD);
+  await driftAway(node);
+  advanceToNextRound();
+}
+
+typingSend.addEventListener('click', (e) => { e.stopPropagation(); sendTyping(); });
+typingInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); sendTyping(); }
+  else if (e.key === 'Escape') { e.preventDefault(); exitTypingToDraft(); }
+});
+
+// ============================================================
+// 手势
+// ============================================================
+let down = null, swipeProgress = 0, commitFromProgress = 0, longPressTimer = null, pressing = false;
+let arcEnterAccel = false, arcEnterAccelStart = 0;
+
+document.addEventListener('contextmenu', e => e.preventDefault());
+function getLocalY(e) { return e.clientY - phone.getBoundingClientRect().top; }
+function getLocalX(e) { return e.clientX - phone.getBoundingClientRect().left; }
+
+// 录音最短时长：进 arc-record 后至少保持这么久，否则视为"没录上内容"回到 arc-invite
+const ARC_RECORD_MIN_MS = 700;
+function abortRecording() {
+  if (mode === 'text') restoreDimmedText();
+  go('arc-invite');
+}
+
+document.getElementById('stage').addEventListener('pointerdown', (e) => {
+  if (mode.startsWith('login')) return;
+  if (state.startsWith('history')) return;
+  if (e.target.closest('.history-anchor')) return;
+  // 打字态下：点输入框/发送按钮 → 让其自处理；点其它任何区域(含假键盘) → 退到草稿态
+  if (state === 'arc-typing' || state === 'arc-typing-enter') {
+    if (e.target.closest('.typing-input') || e.target.closest('.typing-send')) return;
+    exitTypingToDraft();
+    return;
+  }
+  // 输入框/发送按钮上的点击交给它们自己处理，避免误触发底层手势
+  if (e.target.closest('.typing-input') || e.target.closest('.typing-send')) return;
+  const ly = getLocalY(e), lx = getLocalX(e);
+  down = { x: lx, y: ly, t: performance.now() };
+  if (state === 'arc-invite' || state === 'arc-enter') {
+    if (ly < H * 2 / 3) return;
+    pressing = true;
+    if (state === 'arc-enter') {
+      clearAllTimers();
+      arcEnterAccel = true;
+      arcEnterAccelStart = Math.min(1, (performance.now() - stateT) / 1000);
+    }
+    longPressTimer = setTimeout(() => { if (pressing) { arcEnterAccel = false; go('arc-record'); rippleTimer = 400; } }, 250);
+  }
+});
+document.getElementById('stage').addEventListener('pointermove', (e) => {
+  if (mode.startsWith('login')) return;
+  if (!down || state.startsWith('history')) return;
+  const ly = getLocalY(e);
+  if (state === 'fill-idle' || state === 'fill-swipe') {
+    swipeProgress = Math.max(0, Math.min(1.3, -(ly - down.y) / 40));
+    if (swipeProgress > 0.05 && state === 'fill-idle') state = 'fill-swipe';
+  }
+});
+document.getElementById('stage').addEventListener('pointerup', (e) => {
+  if (mode.startsWith('login')) { down = null; pressing = false; return; }
+  if (!down || state.startsWith('history')) { down = null; pressing = false; return; }
+  const ly = getLocalY(e), dy = ly - down.y, dt = performance.now() - down.t, vy = dy / Math.max(1, dt);
+  if (state === 'fill-swipe' || state === 'fill-idle') {
+    if (dy <= -40 || vy <= -0.25) {
+      commitFromProgress = Math.min(1, swipeProgress); go('fill-commit');
+      // 文字层下 fill-* 永远不会进入（脚本不再有"上滑推进旁白"那条路），所以只剩 fill 模式分支
+      scheduleGo('fill-enter', 500); scheduleGo('fill-idle', 2100);
+    } else { swipeProgress = 0; go('fill-idle'); }
+  } else if (state === 'arc-record') {
+    const recordDur = performance.now() - stateT;
+    if (recordDur < ARC_RECORD_MIN_MS) {
+      // 录音时长不足：视为没录上内容，回 arc-invite 并恢复描述+角色气泡
+      abortRecording();
+    } else {
+      go('arc-close');
+      if (mode === 'text') {
+        runTextDialogue();
+        pulseHistoryAnchor();
+      } else {
+        scheduleGo('arc-enter', 550);
+        scheduleGo('arc-invite', 1550);
+        // 长按语音流程：松手后弹出占位气泡，跟"打字发送"对称
+        (async () => {
+          const node = await showUserBubble('长按语音输入内容');
+          await waitP(BUBBLE_HOLD);
+          await driftAway(node);
+        })();
+      }
+    }
+  } else if ((state === 'arc-invite' || state === 'arc-enter') && pressing) {
+    // 短按（250ms 内松手，位移很小）→ 进打字态
+    const movedSq = (getLocalX(e) - down.x) ** 2 + (ly - down.y) ** 2;
+    if (dt < 250 && movedSq < 64) {
+      if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+      pressing = false; down = null;
+      enterTypingMode();
+      return;
+    }
+  }
+  if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+  pressing = false; down = null;
+});
+document.getElementById('stage').addEventListener('pointercancel', () => {
+  if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+  pressing = false; down = null; swipeProgress = 0;
+  if (state === 'fill-swipe') go('fill-idle');
+  // 录音中途被打断（如系统手势接管）→ 回 arc-invite 并恢复描述+角色气泡
+  if (state === 'arc-record') abortRecording();
+});
+
+// ============================================================
+// 绘制
+// ============================================================
+
+// 弧顶角度（回响弧 / 上滑色块用）
+function arcAngles(cx, cy, r) {
+  const m = vw(20);
+  const a0 = Math.asin(Math.max(-1, Math.min(1, (cx-(W+m))/r)));
+  const a1 = Math.asin(Math.max(-1, Math.min(1, (cx-(-m))/r)));
+  return { s: -Math.PI/2+a0, e: -Math.PI/2+a1 };
+}
+
+// 弧底角度（历史面板用：向下凸的弧）
+function arcAnglesDown(cx, cy, r) {
+  const m = vw(20);
+  const cosR = Math.max(-1, Math.min(1, (W + m - cx) / r));
+  const cosL = Math.max(-1, Math.min(1, (-m - cx) / r));
+  return { s: Math.acos(cosR), e: Math.acos(cosL) };
+}
+
+function drawStroke(cx, cy, r, sw, alpha, glowAlpha) {
+  // sw 是设计稿 pt，u() 转成当前 phone-frame 下的实际像素
+  const { s, e } = arcAngles(cx, cy, r);
+  if (alpha > 0.005) {
+    ctxM.save(); ctxM.scale(dpr, dpr);
+    ctxM.beginPath(); ctxM.arc(cx, cy, r, s, e);
+    ctxM.strokeStyle = `rgba(255,235,210,${alpha})`; ctxM.lineWidth = u(sw); ctxM.lineCap = 'round'; ctxM.stroke();
+    ctxM.restore();
+  }
+  if (glowAlpha > 0.005) {
+    ctxG.save(); ctxG.scale(dpr, dpr);
+    ctxG.beginPath(); ctxG.arc(cx, cy, r, s, e);
+    ctxG.strokeStyle = `rgba(255,235,210,${glowAlpha})`; ctxG.lineWidth = u(sw + 6); ctxG.lineCap = 'round'; ctxG.stroke();
+    ctxG.restore();
+  }
+}
+
+function drawFill(cx, cy, r, alpha) {
+  if (alpha < 0.005) return;
+  ctxM.save(); ctxM.scale(dpr, dpr);
+  const { s, e } = arcAngles(cx, cy, r);
+  ctxM.beginPath(); ctxM.arc(cx, cy, r, s, e);
+  ctxM.lineTo(cx + r*Math.cos(e), H+40); ctxM.lineTo(cx + r*Math.cos(s), H+40); ctxM.closePath();
+  const grad = ctxM.createLinearGradient(0, cy-r, 0, H+20);
+  grad.addColorStop(0, `rgba(255,235,210,${alpha})`);
+  grad.addColorStop(0.5, `rgba(255,235,210,${alpha*0.35})`);
+  grad.addColorStop(1, 'rgba(255,235,210,0)');
+  ctxM.fillStyle = grad; ctxM.fill();
+  ctxM.beginPath(); ctxM.arc(cx, cy, r, s, e);
+  ctxM.strokeStyle = `rgba(255,235,210,${Math.min(0.3,alpha*1.2)})`; ctxM.lineWidth = 1; ctxM.stroke();
+  ctxM.restore();
+}
+
+// ---- 历史面板：向下凸弧，圆心在弧线上方 ----
+function drawHistoryPanelFill(cx, cy, r, alpha) {
+  if (alpha < 0.005) return;
+  const { s, e } = arcAnglesDown(cx, cy, r);
+
+  // 遮罩：压暗整个舞台
+  ctxM.save(); ctxM.scale(dpr, dpr);
+  ctxM.fillStyle = `rgba(7,8,17,${alpha * 0.55})`;
+  ctxM.fillRect(0, 0, W, H);
+  ctxM.restore();
+
+  // 面板填充：弧以上区域
+  ctxM.save(); ctxM.scale(dpr, dpr);
+  ctxM.beginPath();
+  ctxM.moveTo(-40, -40);
+  ctxM.lineTo(W + 40, -40);
+  ctxM.lineTo(cx + r * Math.cos(s), cy + r * Math.sin(s));
+  ctxM.arc(cx, cy, r, s, e);
+  ctxM.closePath();
+  ctxM.fillStyle = `rgba(22, 20, 16, ${alpha})`;
+  ctxM.fill();
+  ctxM.restore();
+
+  // 弧底边描边
+  ctxM.save(); ctxM.scale(dpr, dpr);
+  ctxM.beginPath(); ctxM.arc(cx, cy, r, s, e);
+  ctxM.strokeStyle = `rgba(255,235,210,${alpha * 0.2})`; ctxM.lineWidth = 1; ctxM.stroke();
+  ctxM.restore();
+
+  // 弧光晕
+  if (alpha > 0.1) {
+    ctxG.save(); ctxG.scale(dpr, dpr);
+    ctxG.beginPath(); ctxG.arc(cx, cy, r, s, e);
+    ctxG.strokeStyle = `rgba(255,235,210,${alpha * 0.08})`; ctxG.lineWidth = u(8); ctxG.stroke();
+    ctxG.restore();
+  }
+}
+
+const ripples = [];
+let rippleTimer = 0;
+function spawnRipple(cx, cy, r) { ripples.push({ cx, cy, r, t: 0 }); }
+function tickRipples(dt) {
+  if (!ripples.length) return;
+  ctxM.save(); ctxM.scale(dpr, dpr);
+  for (let i = ripples.length-1; i >= 0; i--) {
+    const rp = ripples[i]; rp.t += dt;
+    if (rp.t > 1800) { ripples.splice(i,1); continue; }
+    const p = rp.t/1800, a = (1-p)*0.55;
+    ctxM.beginPath(); ctxM.arc(rp.cx, rp.cy - p*vh(22), rp.r + p*vh(4),
+      ...Object.values(arcAngles(rp.cx, rp.cy - p*vh(22), rp.r + p*vh(4))));
+    ctxM.strokeStyle = `rgba(255,235,210,${a})`; ctxM.lineWidth = u(1.5); ctxM.stroke();
+  }
+  ctxM.restore();
+}
+
+// ============================================================
+// 动画主循环
+// ============================================================
+let lastT = 0;
+
+function tick(now) {
+  const dt = lastT ? Math.min(50, now-lastT) : 16; lastT = now;
+  ctxM.clearRect(0, 0, cMain.width, cMain.height);
+  ctxG.clearRect(0, 0, cGlow.width, cGlow.height);
+  cGlow.style.filter = `blur(${u(P.glowBlur)}px)`;
+  // 登录模式（方案 Y）：底部只画一条真回响弧（暖白、呼吸，跟 arc-invite idle 同源）
+  // 弧在纸面外，构成"光与纸"的对比；纸面承载文字与输入框
+  if (mode.startsWith('login')) {
+    const _r = vw(P.radiusVW), _cx = W/2;
+    const _baseCy = H + _r - vh(P.arcPeekVH);
+    const _b = Math.sin(now / 1000 / P.arcBreathPeriod * Math.PI*2);
+    drawStroke(_cx, _baseCy - vh(P.arcBreathAmp)*_b*0.5, _r, P.strokeWidth, 0.7 + 0.2*_b, 0.15 + 0.1*_b);
+    requestAnimationFrame(tick);
+    return;
+  }
+
+  const r = vw(P.radiusVW), cx = W/2;
+  const elapsed = (now - stateT) / 1000;
+
+  // ---- 上滑色块 ----
+  if (state === 'fill-enter') {
+    const preDur = 1.0;
+    if (elapsed < preDur) {
+      const p = elapsed / preDur;
+      const pulse = Math.pow(Math.max(0, Math.sin(p * Math.PI)), 1.6);
+      ctxM.save(); ctxM.scale(dpr, dpr);
+      ctxM.translate(W/2, H); ctxM.scale(1, 0.25); ctxM.translate(-W/2, -H);
+      const grad = ctxM.createRadialGradient(W/2, H, 0, W/2, H, W*0.5);
+      grad.addColorStop(0, `rgba(255,235,210,${pulse*0.6})`);
+      grad.addColorStop(0.15, `rgba(255,235,210,${pulse*0.35})`);
+      grad.addColorStop(0.4, `rgba(255,235,210,${pulse*0.12})`);
+      grad.addColorStop(1, 'rgba(255,235,210,0)');
+      ctxM.fillStyle = grad; ctxM.fillRect(0, H - W*0.5, W, W*0.5);
+      ctxM.restore();
+    }
+    if (elapsed > 0.6) {
+      const toCy = H + r - vh(P.fillPeekVH), fromCy = toCy + vh(P.fillPeekVH + 3);
+      const t = Math.min(1, (elapsed - 0.6) / 1.0), e = 1 - Math.pow(1-t, 2.5);
+      drawFillTutorial(P.fillAlpha * e, now);
+      drawFill(cx, fromCy + (toCy-fromCy)*e, r, P.fillAlpha * e);
+    }
+  }
+  else if (state === 'fill-idle') {
+    const baseCy = H + r - vh(P.fillPeekVH), b = Math.sin(elapsed / P.fillBreathPeriod * Math.PI*2);
+    const fillA = P.fillAlpha * (1+0.2*b);
+    drawFillTutorial(fillA, now);
+    drawFill(cx, baseCy - vh(P.fillBreathAmp)*b*0.5, r, fillA);
+  }
+  else if (state === 'fill-swipe') {
+    const baseCy = H + r - vh(P.fillPeekVH), p = Math.min(1, swipeProgress);
+    drawFill(cx, baseCy - vh(8)*p, r, P.fillAlpha + 0.1*p);
+  }
+  else if (state === 'fill-commit') {
+    const baseCy = H + r - vh(P.fillPeekVH), startOff = vh(8) * commitFromProgress;
+    const t = Math.min(1, elapsed / 0.5), e = 1 - Math.pow(1-t, 3);
+    drawFill(cx, baseCy - (startOff + (vh(14)-startOff)*e), r, (P.fillAlpha+0.1*commitFromProgress)*(1-e));
+  }
+
+  // ---- 回响弧 ----
+  else if (state === 'arc-enter') {
+    const toCy = H + r - vh(P.arcPeekVH), fromCy = toCy + vh(5);
+    let t;
+    if (arcEnterAccel) { const ae = elapsed - arcEnterAccelStart; t = Math.min(1, arcEnterAccelStart + (1-arcEnterAccelStart)*Math.min(1, ae/0.15)); }
+    else t = Math.min(1, elapsed / 1.0);
+    const e = 1 - Math.pow(1-t, 2.5), cy = fromCy + (toCy-fromCy)*e;
+    drawArcTutorial(0.7 * e);
+    drawStroke(cx, cy, r, P.strokeWidth, 0.7 * e, 0.15 * e);
+  }
+  else if (state === 'arc-invite') {
+    const baseCy = H + r - vh(P.arcPeekVH), b = Math.sin(elapsed / P.arcBreathPeriod * Math.PI*2);
+    drawArcTutorial(0.65 + 0.25*b);   // 光池呼吸：波峰保持，波谷拉低 → 振幅 0.2 → 0.25，沉得更深
+    drawStroke(cx, baseCy - vh(P.arcBreathAmp)*b*0.5, r, P.strokeWidth, 0.7 + 0.2*b, 0.15+0.1*b);
+  }
+  else if (state === 'arc-record') {
+    const baseCy = H + r - vh(P.arcPeekVH), t = Math.min(1, elapsed / 0.4), e = 1 - Math.pow(1-t, 3);
+    drawStroke(cx, baseCy - vh(6)*e, r, P.strokeWidth*1.4, 0.95, 0.15+0.85*e);
+    rippleTimer += dt;
+    if (rippleTimer > 600) { rippleTimer = 0; spawnRipple(cx, baseCy - vh(6)*e, r); }
+  }
+  else if (state === 'arc-close') {
+    const raisedCy = H + r - vh(P.arcPeekVH) - vh(6), restCy = H + r - vh(P.fillPeekVH);
+    const t = Math.min(1, elapsed / 0.45), e = 1 - Math.pow(1-t, 2), cy = raisedCy + (restCy-raisedCy)*e;
+    let ga = 0; if (elapsed < 0.35) ga = 0.6 * Math.sin(elapsed/0.35*Math.PI);
+    drawStroke(cx, cy, r, P.strokeWidth, 0.8*(1-e), ga);
+  }
+
+  // ---- 打字态：底部回响弧淡出/淡入；键盘上方不再画下划线，输入条裸放在键盘上方 ----
+  else if (state === 'arc-typing-enter') {
+    const baseCy = H + r - vh(P.arcPeekVH);
+    const t = Math.min(1, elapsed / 0.28), e = 1 - Math.pow(1 - t, 3);
+    drawStroke(cx, baseCy, r, P.strokeWidth, 0.85 * (1 - e), 0.15 * (1 - e));
+  }
+  else if (state === 'arc-typing') {
+    // 稳态：弧已隐去，画面只剩 DOM 元素（输入框 / 发送按钮 / 假键盘）
+  }
+  else if (state === 'arc-typing-exit') {
+    const baseCy = H + r - vh(P.arcPeekVH);
+    const t = Math.min(1, elapsed / 0.45), e = 1 - Math.pow(1 - t, 3);
+    drawStroke(cx, baseCy, r, P.strokeWidth, 0.85 * e, 0.15 * e);
+  }
+
+  // ---- 历史面板（圆心在弧线上方，弧向下凸） ----
+  else if (state === 'history-enter') {
+    const dur = 0.5, t = Math.min(1, elapsed / dur), ease = 1 - Math.pow(1-t, 2.5);
+
+    const endCx = W / 2;
+    const endCy = (H * 2 / 3 - r + u(120));
+    const startCx = W * 0.15;
+    const startCy = -(r * 1.1);
+
+    const aCx = startCx + (endCx - startCx) * ease;
+    const aCy = startCy + (endCy - startCy) * ease;
+
+    drawHistoryPanelFill(aCx, aCy, r, ease * 0.97);
+
+    const { s: ds, e: de } = arcAnglesDown(aCx, aCy, r);
+    ctxM.save(); ctxM.scale(dpr, dpr);
+    ctxM.beginPath(); ctxM.arc(aCx, aCy, r, ds, de);
+    ctxM.strokeStyle = `rgba(255,235,210,${ease * 0.55})`;
+    ctxM.lineWidth = u(2); ctxM.stroke();
+    ctxM.restore();
+    ctxG.save(); ctxG.scale(dpr, dpr);
+    ctxG.beginPath(); ctxG.arc(aCx, aCy, r, ds, de);
+    ctxG.strokeStyle = `rgba(255,235,210,${ease * 0.25})`;
+    ctxG.lineWidth = u(12); ctxG.stroke();
+    ctxG.restore();
+
+    // 文字跟随弧线落位，边缘渐隐
+    setMask(historyPanel, r - u(7), aCx, aCy, 10);
+  }
+  else if (state === 'history-idle') {
+    const endCy = (H * 2 / 3 - r + u(120));
+    const b = Math.sin(elapsed / 6 * Math.PI * 2);
+    drawHistoryPanelFill(W / 2, endCy, r, 0.97);
+
+    const settle = Math.min(1, elapsed / 0.4);
+    const sw = 2 - settle * 1;
+    const sa = 0.55 - settle * (0.55 - 0.15) + 0.04 * b * settle;
+    const ga = 0.25 * (1 - settle);
+
+    const { s, e } = arcAnglesDown(W/2, endCy, r);
+    ctxM.save(); ctxM.scale(dpr, dpr);
+    ctxM.beginPath(); ctxM.arc(W/2, endCy, r, s, e);
+    ctxM.strokeStyle = `rgba(255,235,210,${sa})`; ctxM.lineWidth = u(sw); ctxM.stroke();
+    ctxM.restore();
+    if (ga > 0.005) {
+      ctxG.save(); ctxG.scale(dpr, dpr);
+      ctxG.beginPath(); ctxG.arc(W/2, endCy, r, s, e);
+      ctxG.strokeStyle = `rgba(255,235,210,${ga})`; ctxG.lineWidth = u(12); ctxG.stroke();
+      ctxG.restore();
+    }
+  }
+  else if (state === 'history-exit') {
+    const dur = 0.35, t = Math.min(1, elapsed / dur), ease = 1 - Math.pow(1-t, 2);
+    const progress = 1 - ease;
+
+    const endCx = W / 2;
+    const endCy = (H * 2 / 3 - r + u(120));
+    const exitCx = W * 0.15;
+    const exitCy = -(r * 1.1);
+
+    const aCx = endCx + (exitCx - endCx) * ease;
+    const aCy = endCy + (exitCy - endCy) * ease;
+
+    drawHistoryPanelFill(aCx, aCy, r, progress * 0.97);
+
+    const { s: ds, e: de } = arcAnglesDown(aCx, aCy, r);
+    ctxM.save(); ctxM.scale(dpr, dpr);
+    ctxM.beginPath(); ctxM.arc(aCx, aCy, r, ds, de);
+    ctxM.strokeStyle = `rgba(255,235,210,${progress * 0.4})`;
+    ctxM.lineWidth = u(2); ctxM.stroke();
+
+    // 文字跟随弧线收回，边缘渐隐
+    setMask(historyPanel, r - u(7), aCx, aCy, 10);
+    ctxM.restore();
+    ctxG.save(); ctxG.scale(dpr, dpr);
+    ctxG.beginPath(); ctxG.arc(aCx, aCy, r, ds, de);
+    ctxG.strokeStyle = `rgba(255,235,210,${progress * 0.15})`;
+    ctxG.lineWidth = u(10); ctxG.stroke();
+    ctxG.restore();
+
+  }
+
+  tickRipples(dt);
+  requestAnimationFrame(tick);
+}
+
+// ============================================================
+// 登录板块：子页切换 + 按钮反馈 + 演示验证
+// ============================================================
+const loginLayer = document.getElementById('login-layer');
+const loginPages = Array.from(loginLayer.querySelectorAll('.login-page'));
+const loginBtns  = Array.from(loginLayer.querySelectorAll('.login-btn'));
+
+// 展示登录层 + 切到指定子页
+function showLoginMode(m) {
+  loginLayer.classList.add('visible');
+  switchLoginPage(m);
+}
+function hideLoginLayer() {
+  loginLayer.classList.remove('visible');
+}
+
+// 子页切换：旧页淡出 0.25s → 摘 active → 新页 active → 下帧加 entered 触发淡入
+let _loginSwitching = false;
+function switchLoginPage(target) {
+  const targetEl = loginPages.find(p => p.dataset.page === target);
+  if (!targetEl) return;
+  const currentEl = loginPages.find(p => p.classList.contains('active'));
+  if (currentEl === targetEl) {
+    // 启动期：首次直接亮起，跳过淡出
+    if (!currentEl.classList.contains('entered')) {
+      requestAnimationFrame(() => currentEl.classList.add('entered'));
+    }
+    return;
+  }
+  if (_loginSwitching) return;
+  _loginSwitching = true;
+  if (currentEl) {
+    currentEl.classList.remove('entered');                  // 触发淡出
+    setTimeout(() => {
+      currentEl.classList.remove('active');
+      targetEl.classList.add('active');
+      requestAnimationFrame(() => {
+        targetEl.classList.add('entered');
+        _loginSwitching = false;
+      });
+    }, 260);
+  } else {
+    targetEl.classList.add('active');
+    requestAnimationFrame(() => { targetEl.classList.add('entered'); _loginSwitching = false; });
+  }
+  // 清掉错误提示 + 输入框抖动残留
+  loginLayer.querySelectorAll('.login-error.visible').forEach(e => e.classList.remove('visible'));
+  loginLayer.querySelectorAll('.login-input.shake').forEach(e => e.classList.remove('shake'));
+}
+
+// 输入框值变化 → 主按钮 .active；同一页里所有 input 都非空才亮
+loginPages.forEach(page => {
+  const inputs = Array.from(page.querySelectorAll('.login-input'));
+  const btn = page.querySelector('.login-btn');
+  if (!inputs.length || !btn) return;
+  const sync = () => {
+    const allFilled = inputs.every(i => i.value.trim().length > 0);
+    btn.classList.toggle('active', allFilled);
+  };
+  inputs.forEach(i => i.addEventListener('input', sync));
+});
+
+// 按钮亮起反馈：中心光发散一圈
+function flareButton(btn) {
+  btn.classList.remove('flaring');
+  void btn.offsetWidth;
+  btn.classList.add('flaring');
+  setTimeout(() => btn.classList.remove('flaring'), 600);
+}
+
+// 邀请码：空 → 抖动+错误；非空 → 亮起+切手机号页
+const inviteInput = document.getElementById('login-invite-input');
+const inviteBtn   = document.getElementById('login-invite-btn');
+const inviteError = document.getElementById('login-invite-error');
+function submitInvite() {
+  const v = inviteInput.value.trim();
+  if (!v) {
+    inviteInput.classList.remove('shake');
+    void inviteInput.offsetWidth;
+    inviteInput.classList.add('shake');
+    inviteError.classList.add('visible');
+    setTimeout(() => inviteError.classList.remove('visible'), 1600);
+    return;
+  }
+  flareButton(inviteBtn);
+  setTimeout(() => switchMode('login-phone'), 360);
+}
+inviteBtn.addEventListener('click', submitInvite);
+inviteInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); submitInvite(); } });
+
+// 手机号 / 账号密码：演示按钮亮起反馈，不串后续
+const phoneBtn    = document.getElementById('login-phone-btn');
+const passwordBtn = document.getElementById('login-password-btn');
+phoneBtn.addEventListener('click', () => flareButton(phoneBtn));
+passwordBtn.addEventListener('click', () => flareButton(passwordBtn));
+
+// 获取验证码：2 秒倒计时演示
+const codeBtn = document.getElementById('login-code-btn');
+let codeTimer = null;
+codeBtn.addEventListener('click', () => {
+  if (codeBtn.disabled) return;
+  const phoneVal = document.getElementById('login-phone-input').value.trim();
+  if (!phoneVal) {
+    const phoneEl = document.getElementById('login-phone-input');
+    phoneEl.classList.remove('shake'); void phoneEl.offsetWidth; phoneEl.classList.add('shake');
+    return;
+  }
+  let remain = 2;                                 // demo：跑 2 秒就放回去
+  codeBtn.disabled = true;
+  codeBtn.textContent = `${remain}s`;
+  if (codeTimer) clearInterval(codeTimer);
+  codeTimer = setInterval(() => {
+    remain--;
+    if (remain <= 0) {
+      clearInterval(codeTimer); codeTimer = null;
+      codeBtn.disabled = false;
+      codeBtn.textContent = '获取验证码';
+    } else {
+      codeBtn.textContent = `${remain}s`;
+    }
+  }, 1000);
+});
+
+// 底部链接：手机号 ↔ 账号密码 互切
+loginLayer.querySelectorAll('.login-link').forEach(link => {
+  link.addEventListener('click', () => switchMode(link.dataset.switch));
+});
+
+// 启动：默认进登录板块的「邀请码」页
+showLoginMode(mode);
+updateStage();
+requestAnimationFrame(tick);
+
+window.addEventListener('message', (e) => {
+  if (e.data === 'arc') document.querySelector('[data-page="arc"]').click();
+  else if (e.data === 'fill') document.querySelector('[data-page="fill"]').click();
+  else if (e.data === 'history') document.querySelector('[data-page="history"]').click();
+  else if (e.data === 'reset') document.querySelector('[data-action="reset"]').click();
+});
+</script>
+</body>
+</html>
