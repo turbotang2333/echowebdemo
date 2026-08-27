@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import * as questionnaireModel from "../src/questionnaire-model.js";
 import { NEW_USER_TYPES, getPreviousQuestionnaireScreen, getQuestionnaireFeedbackGroups, getReferralSlots, getReferralSummary, resolveResultScreen, validateFinalStep, validateGroupStep, validateProfileStep, validateSharedStep } from "../src/questionnaire-model.js";
 import { buildApplicationRequest, buildReferralLink, createRecruitmentApi, getQuestionnaireDeviceSn, getReferralToken, normaliseRecruitmentResult } from "../src/recruitment-api.js";
 
@@ -119,6 +120,17 @@ test("questionnaire back navigation returns each step to its immediate predecess
   assert.equal(getPreviousQuestionnaireScreen("expectation"), "profile");
   assert.equal(getPreviousQuestionnaireScreen("phone"), "expectation");
   assert.equal(getPreviousQuestionnaireScreen("success"), "success");
+});
+
+test("repeated submission waits for confirmation before leaving the filled questionnaire", () => {
+  assert.deepEqual(
+    questionnaireModel.resolveSubmissionTransition?.({ status: "success", alreadySubmitted: true }, "phone"),
+    { screen: "phone", requiresConfirmation: true },
+  );
+  assert.deepEqual(
+    questionnaireModel.resolveSubmissionTransition?.({ status: "granted", alreadySubmitted: false }, "phone"),
+    { screen: "granted", requiresConfirmation: false },
+  );
 });
 
 test("shared questionnaire link keeps only a valid referral token", () => {

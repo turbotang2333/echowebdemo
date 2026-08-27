@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { DISCOVERY_CHANNELS, EXPECTATIONS, MOTIVATIONS, NEW_USER_TYPES, OTHER_EXPECTATION, OTHER_FEEDBACK_OPTION, PRODUCT_OPTIONS_BY_TYPE, getPreviousQuestionnaireScreen, getQuestionnaireFeedbackGroups, getReferralSlots, resolveResultScreen, validateFinalStep, validateProfileStep, validateSharedStep } from './questionnaire-model.js';
+import { DISCOVERY_CHANNELS, EXPECTATIONS, MOTIVATIONS, NEW_USER_TYPES, OTHER_EXPECTATION, OTHER_FEEDBACK_OPTION, PRODUCT_OPTIONS_BY_TYPE, getPreviousQuestionnaireScreen, getQuestionnaireFeedbackGroups, getReferralSlots, resolveResultScreen, resolveSubmissionTransition, validateFinalStep, validateProfileStep, validateSharedStep } from './questionnaire-model.js';
 import { buildApplicationRequest, buildReferralLink, createRecruitmentApi, getReferralToken, normaliseRecruitmentResult } from './recruitment-api.js';
 
 const DEMO_INVITEE_RECORDS = ['回响玩家 A**', '回响玩家 B**'];
@@ -79,6 +79,7 @@ export function App() {
   const [codeSent, setCodeSent] = useState(false);
   const [errors, setErrors] = useState([]);
   const [toast, setToast] = useState('');
+  const [repeatSubmissionResult, setRepeatSubmissionResult] = useState(null);
   const [groupMenuOpen, setGroupMenuOpen] = useState(false);
   const referralToken = useMemo(() => getReferralToken(window.location.search), []);
   const recruitmentApi = useMemo(() => REMOTE_RECRUITMENT_API_BASE_URL ? createRecruitmentApi(REMOTE_RECRUITMENT_API_BASE_URL) : null, []);
@@ -141,6 +142,11 @@ export function App() {
       setErrors([error.message]);
     }
   };
+  const openQuestionnaireResult = (result, resultPhone) => {
+    window.localStorage.setItem(DEMO_QUESTIONNAIRE_SESSION_KEY, resultPhone);
+    setQuestionnairePhone(resultPhone); setQuestionnaireResult({ ...result, phoneTail: result.phoneTail || resultPhone.slice(-4) });
+    setScreen(result.status);
+  };
   const submit = async () => {
     const nextErrors = validateFinalStep({ phone, code, consent, identity, firstPhasePhone });
     if (nextErrors.length) return setErrors(nextErrors);
@@ -148,9 +154,13 @@ export function App() {
     if (recruitmentApi) {
       try {
         const result = normaliseRecruitmentResult(await recruitmentApi.submitApplication(submission));
-        window.localStorage.setItem(DEMO_QUESTIONNAIRE_SESSION_KEY, phone);
-        setQuestionnairePhone(phone); setQuestionnaireResult({ ...result, phoneTail: result.phoneTail || phone.slice(-4) });
-        setErrors([]); if (result.alreadySubmitted) showToast('此前已提交，已为你打开结果'); setScreen(result.status);
+        const transition = resolveSubmissionTransition(result, screen);
+        setErrors([]);
+        if (transition.requiresConfirmation) {
+          setRepeatSubmissionResult(result);
+          return;
+        }
+        openQuestionnaireResult(result, phone);
       } catch (error) {
         setErrors([error.message]);
       }
@@ -286,5 +296,5 @@ export function App() {
     {screen === 'profile' && <div className="content">{isOldUser ? <><h2>第一阶段体验回顾</h2><Field label="Q2．第一阶段注册账号的手机号" required><input value={firstPhasePhone} onChange={(event) => setFirstPhasePhone(normalizePhone(event.target.value))} placeholder="用于匹配第一阶段体验记录" inputMode="numeric" /></Field><Field label="Q3．第一阶段中，最让你印象深刻的角色内容、剧情或互动是什么？为什么？" required><textarea value={firstPhaseHighlight} onChange={(event) => setFirstPhaseHighlight(event.target.value)} placeholder="请根据第一印象填写真实感受～" /></Field><Field label="Q4．第一阶段中，你认为最需要改进的部分是什么？" required hint="如有具体场景或建议，请一并说明"><textarea value={firstPhaseImprovement} onChange={(event) => setFirstPhaseImprovement(event.target.value)} placeholder="可以狠狠吐槽，小皮鞭抽起来～" /></Field></> : renderNewUserQuestions()}<ErrorList errors={errors} /><StepActions onBack={goBack} onNext={goNext} nextLabel="下一步" /></div>}
     {screen === 'expectation' && <div className="content"><h2>你对第二阶段的期待</h2><Field label={`${sharedQuestionNumber}．第二阶段中，你最期待在「回响」中体验到哪些内容？`} required hint="多选">{EXPECTATIONS.map((item) => <Choice key={item} multi active={expectations.includes(item)} onClick={() => toggle(item, expectations, setExpectations)}>{item}</Choice>)}{expectations.includes(OTHER_EXPECTATION) && <input value={otherExpectation} onChange={(event) => setOtherExpectation(event.target.value)} placeholder="请填写其他期待内容（选填）" />}</Field><ErrorList errors={errors} /><StepActions onBack={goBack} onNext={goNext} nextLabel="下一步" /></div>}
     {screen === 'phone' && <div className="content"><h2>验证资源绑定手机号</h2><p className="muted">此处手机号将用于招募筛选、结果通知与资源绑定。若与当前游戏账号不同，资源将归属至该手机号对应的账号。</p><Field label="手机号" required><input value={phone} onChange={(event) => setPhone(normalizePhone(event.target.value))} placeholder="请输入 11 位手机号" inputMode="numeric" /></Field><Field label="短信验证码" required><div className="code-row"><input value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="请输入 4 位验证码" inputMode="numeric" /><button type="button" className="code-button" onClick={sendCode}>{codeSent ? '重新发送' : '获取验证码'}</button></div></Field><label className="consent"><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} />我已知悉上述信息用于招募筛选、结果通知与资源绑定使用。<em className="required">必填</em></label><ErrorList errors={errors} /><StepActions onBack={goBack} onNext={submit} nextLabel="提交问卷" /></div>}
-  </section>{toast && <div className="toast">{toast}</div>}</main>;
+  </section>{repeatSubmissionResult && <div className="poster-modal" role="dialog" aria-modal="true" aria-labelledby="repeat-submission-title"><section className="poster-dialog repeat-submission-dialog"><p className="eyebrow">问卷提交提醒</p><h2 id="repeat-submission-title">此前已提交</h2><p>此次提交无效。将为你跳转结果页。</p><div className="repeat-submission-actions"><button type="button" className="secondary" onClick={() => setRepeatSubmissionResult(null)}>返回</button><button type="button" className="primary" onClick={() => { const result = repeatSubmissionResult; setRepeatSubmissionResult(null); openQuestionnaireResult(result, phone); }}>确认</button></div></section></div>}{toast && <div className="toast">{toast}</div>}</main>;
 }

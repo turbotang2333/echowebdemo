@@ -39,6 +39,11 @@ export function getPreviousQuestionnaireScreen(screen) {
   return { identity: "intro", profile: "identity", expectation: "profile", phone: "expectation" }[screen] || screen;
 }
 
+export function resolveSubmissionTransition(result = {}, currentScreen) {
+  if (result.alreadySubmitted === true) return { screen: currentScreen, requiresConfirmation: true };
+  return { screen: result.status === "granted" ? "granted" : "success", requiresConfirmation: false };
+}
+
 export function getQuestionnaireFeedbackGroups(types = []) {
   return types.map((type) => ({ type, ...QUESTIONNAIRE_FEEDBACK[type] })).filter((group) => group.positiveOptions);
 }
