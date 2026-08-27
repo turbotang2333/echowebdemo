@@ -71,6 +71,7 @@ export function normaliseRecruitmentResult(result = {}) {
   return {
     phoneTail: /^\d{4}$/.test(result.phoneTail || "") ? result.phoneTail : "",
     status: result.status === "granted" ? "granted" : "success",
+    alreadySubmitted: result.alreadySubmitted === true,
     referralLink: typeof result.referralLink === "string" ? result.referralLink : "",
     referralRecords,
     successfulInvites,

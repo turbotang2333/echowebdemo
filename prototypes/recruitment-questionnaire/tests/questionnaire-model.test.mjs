@@ -212,6 +212,7 @@ test("server recruitment result becomes safe data for the existing referral card
     normaliseRecruitmentResult({
       phoneTail: "0000",
       status: "success",
+      alreadySubmitted: true,
       referralLink: "https://survey.example.test/?ref=7xKp9mQ2",
       referralRecords: [{ name: "回响玩家 A**" }, { name: "回响玩家 B**" }],
       successfulInvites: 2,
@@ -220,6 +221,7 @@ test("server recruitment result becomes safe data for the existing referral card
     {
       phoneTail: "0000",
       status: "success",
+      alreadySubmitted: true,
       referralLink: "https://survey.example.test/?ref=7xKp9mQ2",
       referralRecords: ["回响玩家 A**", "回响玩家 B**"],
       successfulInvites: 2,
