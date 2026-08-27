@@ -82,7 +82,7 @@ export function validateSharedStep(data) {
 export function validateFinalStep(data) {
   const errors = [];
   if (!/^1\d{10}$/.test(data.phone || "")) errors.push("请输入正确的 11 位手机号码");
-  if (!/^\d{6}$/.test(data.code || "")) errors.push("请输入 6 位验证码");
+  if (!/^\d{4}$/.test(data.code || "")) errors.push("请输入 4 位验证码");
   if (!data.consent) errors.push("请先同意信息使用说明");
   return errors;
 }

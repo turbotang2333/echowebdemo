@@ -29,15 +29,15 @@ test("shared step requires an expectation but does not require text when other i
   assert.deepEqual(validateSharedStep({ expectations: ["其他你的期待"], otherExpectation: "" }), []);
 });
 
-test("final step requires a verified-format phone, six-digit code, and consent", () => {
+test("final step requires a verified-format phone, four-digit code, and consent", () => {
   assert.deepEqual(
     validateFinalStep({ phone: "1380000000", code: "12", consent: false, identity: "否", firstPhasePhone: "" }),
-    ["请输入正确的 11 位手机号码", "请输入 6 位验证码", "请先同意信息使用说明"],
+    ["请输入正确的 11 位手机号码", "请输入 4 位验证码", "请先同意信息使用说明"],
   );
 });
 
 test("resource binding can use a phone different from the first-phase record", () => {
-  assert.deepEqual(validateFinalStep({ phone: "13900000000", code: "123456", consent: true, identity: "是", firstPhasePhone: "13800000000" }), []);
+  assert.deepEqual(validateFinalStep({ phone: "13900000000", code: "1234", consent: true, identity: "是", firstPhasePhone: "13800000000" }), []);
 });
 
 test("group guidance requires confirmation for both official groups", () => {
@@ -135,13 +135,13 @@ test("submission request keeps verified phone, SMS code, answers and shared refe
   assert.deepEqual(
     buildApplicationRequest({
       mobileNum: "13800000000",
-      smsCode: "123456",
+      smsCode: "1234",
       answers: { identity: "否", expectations: ["有趣的小游戏体验"] },
       referralToken: "7xKp9mQ2",
     }),
     {
       mobileNum: "13800000000",
-      smsCode: "123456",
+      smsCode: "1234",
       answers: { identity: "否", expectations: ["有趣的小游戏体验"] },
       referralToken: "7xKp9mQ2",
     },
@@ -183,7 +183,7 @@ test("recruitment client posts the questionnaire payload and returns the server 
 
   const result = await api.submitApplication({
     mobileNum: "13800000000",
-    smsCode: "123456",
+    smsCode: "1234",
     answers: { identity: "否" },
     referralToken: "7xKp9mQ2",
   });
@@ -200,7 +200,7 @@ test("recruitment client posts the questionnaire payload and returns the server 
   assert.equal(requests[0].url, "https://recruitment.example.test/api/recruitment/applications");
   assert.deepEqual(JSON.parse(requests[0].options.body), {
     mobileNum: "13800000000",
-    smsCode: "123456",
+    smsCode: "1234",
     deviceSn: "questionnaire-test-device",
     answers: { identity: "否" },
     referralToken: "7xKp9mQ2",

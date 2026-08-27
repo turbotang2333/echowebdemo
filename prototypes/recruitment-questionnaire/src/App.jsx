@@ -131,7 +131,7 @@ export function App() {
     if (!/^1\d{10}$/.test(phone)) return setErrors(['请输入正确的 11 位手机号码后再获取验证码']);
     setErrors([]);
     if (!recruitmentApi) {
-      setCodeSent(true); showToast('验证码已发送（演示版可输入任意 6 位数字）');
+      setCodeSent(true); showToast('验证码已发送（演示版可输入任意 4 位数字）');
       return;
     }
     try {
@@ -166,7 +166,7 @@ export function App() {
     if (!/^1\d{10}$/.test(recoveryPhone)) return setErrors(['请输入正确的 11 位手机号码后再获取验证码']);
     setErrors([]);
     if (!recruitmentApi) {
-      setRecoveryCodeSent(true); showToast('验证码已发送（演示版可输入任意 6 位数字）');
+      setRecoveryCodeSent(true); showToast('验证码已发送（演示版可输入任意 4 位数字）');
       return;
     }
     try {
@@ -178,7 +178,7 @@ export function App() {
   };
   const recoverQuestionnaire = async () => {
     if (!/^1\d{10}$/.test(recoveryPhone)) return setErrors(['请输入正确的 11 位手机号码']);
-    if (!/^\d{6}$/.test(recoveryCode)) return setErrors(['请输入 6 位验证码']);
+    if (!/^\d{4}$/.test(recoveryCode)) return setErrors(['请输入 4 位验证码']);
     if (recruitmentApi) {
       try {
         const result = normaliseRecruitmentResult(await recruitmentApi.recoverResult({ mobileNum: recoveryPhone, smsCode: recoveryCode }));
@@ -201,11 +201,11 @@ export function App() {
   };
   const sendGameCode = () => {
     if (!/^1\d{10}$/.test(gamePhone)) return setErrors(['请输入正确的 11 位手机号码后再获取验证码']);
-    setErrors([]); setGameCodeSent(true); showToast('验证码已发送（演示版可输入任意 6 位数字）');
+    setErrors([]); setGameCodeSent(true); showToast('验证码已发送（演示版可输入任意 4 位数字）');
   };
   const loginToGame = () => {
     if (!/^1\d{10}$/.test(gamePhone)) return setErrors(['请输入正确的 11 位手机号码']);
-    if (!/^\d{6}$/.test(gameCode)) return setErrors(['请输入 6 位验证码']);
+    if (!/^\d{4}$/.test(gameCode)) return setErrors(['请输入 4 位验证码']);
     const accounts = loadStoredJson(DEMO_GAME_ACCOUNTS_STORAGE_KEY, []);
     const nextAccounts = Array.isArray(accounts) && accounts.includes(gamePhone) ? accounts : [...(Array.isArray(accounts) ? accounts : []), gamePhone];
     window.localStorage.setItem(DEMO_GAME_ACCOUNTS_STORAGE_KEY, JSON.stringify(nextAccounts));
@@ -231,14 +231,14 @@ export function App() {
   const copyGroup = (type) => copyText(type === 'QQ' ? '回响官方 QQ 群：123456789' : '回响小助手微信：hui-xiang-demo', `${type} 信息已复制`);
 
   if (screen === 'questionnaire-recovery') {
-    return <main className="app-shell"><section className="page questionnaire"><header className="brand"><span>PROJECT</span><b>第二阶段体验招募</b></header><div className="content recovery-content"><p className="eyebrow">已提交用户</p><h2>验证手机号<br />查看结果</h2><p className="muted">问卷记录保存在服务端。即使清除浏览器缓存，也可通过提交时的手机号找回。</p><Field label="手机号"><input value={recoveryPhone} onChange={(event) => setRecoveryPhone(normalizePhone(event.target.value))} placeholder="请输入提交问卷时的手机号" inputMode="numeric" /></Field><Field label="短信验证码"><div className="code-row"><input value={recoveryCode} onChange={(event) => setRecoveryCode(event.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="请输入 6 位验证码" inputMode="numeric" /><button type="button" className="code-button" onClick={sendRecoveryCode}>{recoveryCodeSent ? '重新发送' : '获取验证码'}</button></div></Field><ErrorList errors={errors} /><div className="step-actions"><button type="button" className="step-back" onClick={() => { setErrors([]); setScreen('intro'); }}>返回</button><button type="button" className="primary" onClick={recoverQuestionnaire}>查看结果</button></div></div></section>{toast && <div className="toast">{toast}</div>}</main>;
+    return <main className="app-shell"><section className="page questionnaire"><header className="brand"><span>PROJECT</span><b>第二阶段体验招募</b></header><div className="content recovery-content"><p className="eyebrow">已提交用户</p><h2>验证手机号<br />查看结果</h2><p className="muted">问卷记录保存在服务端。即使清除浏览器缓存，也可通过提交时的手机号找回。</p><Field label="手机号"><input value={recoveryPhone} onChange={(event) => setRecoveryPhone(normalizePhone(event.target.value))} placeholder="请输入提交问卷时的手机号" inputMode="numeric" /></Field><Field label="短信验证码"><div className="code-row"><input value={recoveryCode} onChange={(event) => setRecoveryCode(event.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="请输入 4 位验证码" inputMode="numeric" /><button type="button" className="code-button" onClick={sendRecoveryCode}>{recoveryCodeSent ? '重新发送' : '获取验证码'}</button></div></Field><ErrorList errors={errors} /><div className="step-actions"><button type="button" className="step-back" onClick={() => { setErrors([]); setScreen('intro'); }}>返回</button><button type="button" className="primary" onClick={recoverQuestionnaire}>查看结果</button></div></div></section>{toast && <div className="toast">{toast}</div>}</main>;
   }
 
   if (screen === 'game-login' || screen === 'game-activate') {
     const isActivate = screen === 'game-activate';
     return <main className="app-shell game-shell"><section className="page game-page">
       <header className="game-brand"><span>回响</span><small>超前体验</small></header>
-      {isActivate && gameSessionPhone ? <div className="game-stage"><div className="game-status"><span>尾号 {gameTail} 用户</span><i>游戏已登录</i><button type="button" onClick={exitGame}>退出</button></div><section className="activation-dialog"><p className="eyebrow">体验资格验证</p><h1>输入邀请码<br />进入体验</h1><p>邀请码绑定后，将为当前游戏账号开启超前体验资格。</p><input value={inviteCode} onChange={(event) => setInviteCode(event.target.value.toUpperCase())} placeholder="请输入邀请码" autoCapitalize="characters" /><button type="button" className="primary" onClick={activateInviteCode}>激活并进入体验</button><button type="button" className="get-invite-link" onClick={openQuestionnaireFromGame}>没有邀请码？<b>获取邀请码</b></button></section></div> : isActivate ? <div className="game-stage"><section className="game-login-card game-login-required"><p className="eyebrow">体验资格验证</p><h1>请先登录<br />游戏账号</h1><p>邀请码会激活到当前登录的游戏账号。</p><button type="button" className="primary" onClick={() => setScreen('game-login')}>去登录</button></section></div> : <div className="game-stage"><section className="game-login-card"><p className="eyebrow">欢迎来到回响</p><h1>登录／注册账号<br />继续体验</h1><p>首次使用该手机号会自动创建游戏账号；无需先填写问卷。</p><Field label="手机号"><input value={gamePhone} onChange={(event) => setGamePhone(normalizePhone(event.target.value))} placeholder="请输入 11 位手机号" inputMode="numeric" /></Field><Field label="短信验证码"><div className="code-row"><input value={gameCode} onChange={(event) => setGameCode(event.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="请输入 6 位验证码" inputMode="numeric" /><button type="button" className="code-button" onClick={sendGameCode}>{gameCodeSent ? '重新发送' : '获取验证码'}</button></div></Field><ErrorList errors={errors} /><button type="button" className="primary game-login-button" onClick={loginToGame}>登录／注册</button></section></div>}
+      {isActivate && gameSessionPhone ? <div className="game-stage"><div className="game-status"><span>尾号 {gameTail} 用户</span><i>游戏已登录</i><button type="button" onClick={exitGame}>退出</button></div><section className="activation-dialog"><p className="eyebrow">体验资格验证</p><h1>输入邀请码<br />进入体验</h1><p>邀请码绑定后，将为当前游戏账号开启超前体验资格。</p><input value={inviteCode} onChange={(event) => setInviteCode(event.target.value.toUpperCase())} placeholder="请输入邀请码" autoCapitalize="characters" /><button type="button" className="primary" onClick={activateInviteCode}>激活并进入体验</button><button type="button" className="get-invite-link" onClick={openQuestionnaireFromGame}>没有邀请码？<b>获取邀请码</b></button></section></div> : isActivate ? <div className="game-stage"><section className="game-login-card game-login-required"><p className="eyebrow">体验资格验证</p><h1>请先登录<br />游戏账号</h1><p>邀请码会激活到当前登录的游戏账号。</p><button type="button" className="primary" onClick={() => setScreen('game-login')}>去登录</button></section></div> : <div className="game-stage"><section className="game-login-card"><p className="eyebrow">欢迎来到回响</p><h1>登录／注册账号<br />继续体验</h1><p>首次使用该手机号会自动创建游戏账号；无需先填写问卷。</p><Field label="手机号"><input value={gamePhone} onChange={(event) => setGamePhone(normalizePhone(event.target.value))} placeholder="请输入 11 位手机号" inputMode="numeric" /></Field><Field label="短信验证码"><div className="code-row"><input value={gameCode} onChange={(event) => setGameCode(event.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="请输入 4 位验证码" inputMode="numeric" /><button type="button" className="code-button" onClick={sendGameCode}>{gameCodeSent ? '重新发送' : '获取验证码'}</button></div></Field><ErrorList errors={errors} /><button type="button" className="primary game-login-button" onClick={loginToGame}>登录／注册</button></section></div>}
       {isActivate && <ErrorList errors={errors} />}
     </section>{toast && <div className="toast">{toast}</div>}</main>;
   }
@@ -285,6 +285,6 @@ export function App() {
     {screen === 'identity' && <div className="content"><h2>你是否参与过第一阶段超前体验？</h2><p className="muted">必填 · 选择后将展示对应的问题。</p>{['是', '否', '不确定／记不清'].map((item) => <Choice key={item} active={identity === item} onClick={() => setIdentity(item)}>{item}</Choice>)}<ErrorList errors={errors} /><StepActions onBack={goBack} onNext={goNext} nextLabel="下一步" /></div>}
     {screen === 'profile' && <div className="content">{isOldUser ? <><h2>第一阶段体验回顾</h2><Field label="Q2．第一阶段注册账号的手机号" required><input value={firstPhasePhone} onChange={(event) => setFirstPhasePhone(normalizePhone(event.target.value))} placeholder="用于匹配第一阶段体验记录" inputMode="numeric" /></Field><Field label="Q3．第一阶段中，最让你印象深刻的角色内容、剧情或互动是什么？为什么？" required><textarea value={firstPhaseHighlight} onChange={(event) => setFirstPhaseHighlight(event.target.value)} placeholder="请根据第一印象填写真实感受～" /></Field><Field label="Q4．第一阶段中，你认为最需要改进的部分是什么？" required hint="如有具体场景或建议，请一并说明"><textarea value={firstPhaseImprovement} onChange={(event) => setFirstPhaseImprovement(event.target.value)} placeholder="可以狠狠吐槽，小皮鞭抽起来～" /></Field></> : renderNewUserQuestions()}<ErrorList errors={errors} /><StepActions onBack={goBack} onNext={goNext} nextLabel="下一步" /></div>}
     {screen === 'expectation' && <div className="content"><h2>你对第二阶段的期待</h2><Field label={`${sharedQuestionNumber}．第二阶段中，你最期待在「回响」中体验到哪些内容？`} required hint="多选">{EXPECTATIONS.map((item) => <Choice key={item} multi active={expectations.includes(item)} onClick={() => toggle(item, expectations, setExpectations)}>{item}</Choice>)}{expectations.includes(OTHER_EXPECTATION) && <input value={otherExpectation} onChange={(event) => setOtherExpectation(event.target.value)} placeholder="请填写其他期待内容（选填）" />}</Field><ErrorList errors={errors} /><StepActions onBack={goBack} onNext={goNext} nextLabel="下一步" /></div>}
-    {screen === 'phone' && <div className="content"><h2>验证资源绑定手机号</h2><p className="muted">此处手机号将用于招募筛选、结果通知与资源绑定。若与当前游戏账号不同，资源将归属至该手机号对应的账号。</p><Field label="手机号" required><input value={phone} onChange={(event) => setPhone(normalizePhone(event.target.value))} placeholder="请输入 11 位手机号" inputMode="numeric" /></Field><Field label="短信验证码" required><div className="code-row"><input value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="请输入 6 位验证码" inputMode="numeric" /><button type="button" className="code-button" onClick={sendCode}>{codeSent ? '重新发送' : '获取验证码'}</button></div></Field><label className="consent"><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} />我已知悉上述信息用于招募筛选、结果通知与资源绑定使用。<em className="required">必填</em></label><ErrorList errors={errors} /><StepActions onBack={goBack} onNext={submit} nextLabel="提交问卷" /></div>}
+    {screen === 'phone' && <div className="content"><h2>验证资源绑定手机号</h2><p className="muted">此处手机号将用于招募筛选、结果通知与资源绑定。若与当前游戏账号不同，资源将归属至该手机号对应的账号。</p><Field label="手机号" required><input value={phone} onChange={(event) => setPhone(normalizePhone(event.target.value))} placeholder="请输入 11 位手机号" inputMode="numeric" /></Field><Field label="短信验证码" required><div className="code-row"><input value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="请输入 4 位验证码" inputMode="numeric" /><button type="button" className="code-button" onClick={sendCode}>{codeSent ? '重新发送' : '获取验证码'}</button></div></Field><label className="consent"><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} />我已知悉上述信息用于招募筛选、结果通知与资源绑定使用。<em className="required">必填</em></label><ErrorList errors={errors} /><StepActions onBack={goBack} onNext={submit} nextLabel="提交问卷" /></div>}
   </section>{toast && <div className="toast">{toast}</div>}</main>;
 }
