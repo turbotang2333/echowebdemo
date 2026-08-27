@@ -11,6 +11,12 @@ export default defineConfig({
   server: {
     host: "0.0.0.0",
     allowedHosts: ["terminal.local", "tangchenyiludemacbook-air-1.tail352bbc.ts.net"],
+    proxy: {
+      "/api/recruitment": {
+        target: "http://127.0.0.1:7777",
+        changeOrigin: true,
+      },
+    },
     warmup: {
       clientFiles: ["./src/main.jsx"],
     },
