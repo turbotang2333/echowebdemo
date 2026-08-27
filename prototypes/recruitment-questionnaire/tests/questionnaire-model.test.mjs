@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { NEW_USER_TYPES, getPreviousQuestionnaireScreen, getQuestionnaireFeedbackGroups, getReferralSlots, getReferralSummary, resolveResultScreen, validateFinalStep, validateGroupStep, validateProfileStep, validateSharedStep } from "../src/questionnaire-model.js";
-import { buildApplicationRequest, buildReferralLink, createRecruitmentApi, getReferralToken, normaliseRecruitmentResult } from "../src/recruitment-api.js";
+import { buildApplicationRequest, buildReferralLink, createRecruitmentApi, getQuestionnaireDeviceSn, getReferralToken, normaliseRecruitmentResult } from "../src/recruitment-api.js";
 
 test("new user profile blocks every required answer that is missing", () => {
   assert.deepEqual(
@@ -148,6 +148,21 @@ test("submission request keeps verified phone, SMS code, answers and shared refe
   );
 });
 
+test("questionnaire device marker is generated once and recovered from browser storage", () => {
+  const values = new Map();
+  const storage = {
+    getItem: (key) => values.get(key) || null,
+    setItem: (key, value) => values.set(key, value),
+  };
+  const cryptoImpl = { randomUUID: () => "device-uuid" };
+
+  const first = getQuestionnaireDeviceSn(storage, cryptoImpl);
+  const second = getQuestionnaireDeviceSn(storage, { randomUUID: () => "another-uuid" });
+
+  assert.equal(first, "questionnaire-device-uuid");
+  assert.equal(second, first);
+});
+
 test("recruitment client posts the questionnaire payload and returns the server result", async () => {
   const requests = [];
   const api = createRecruitmentApi("https://recruitment.example.test", async (url, options) => {
@@ -164,7 +179,7 @@ test("recruitment client posts the questionnaire payload and returns the server 
         earnedHours: 0,
       },
     }), { status: 200, headers: { "content-type": "application/json" } });
-  });
+  }, { deviceSn: "questionnaire-test-device" });
 
   const result = await api.submitApplication({
     mobileNum: "13800000000",
@@ -186,6 +201,7 @@ test("recruitment client posts the questionnaire payload and returns the server 
   assert.deepEqual(JSON.parse(requests[0].options.body), {
     mobileNum: "13800000000",
     smsCode: "123456",
+    deviceSn: "questionnaire-test-device",
     answers: { identity: "否" },
     referralToken: "7xKp9mQ2",
   });

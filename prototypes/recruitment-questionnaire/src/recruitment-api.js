@@ -1,11 +1,12 @@
 const REFERRAL_TOKEN_PATTERN = /^[A-Za-z0-9_-]{6,96}$/;
+const QUESTIONNAIRE_DEVICE_SN_STORAGE_KEY = "recruitment-questionnaire-device-sn";
 
 function cleanBaseUrl(baseUrl) {
   return String(baseUrl || "").replace(/\/+$/, "");
 }
 
 function responseMessage(payload, fallback) {
-  return payload?.message || payload?.msg || fallback;
+  return payload?.message || payload?.msg || payload?.detail || fallback;
 }
 
 async function readJson(response) {
@@ -37,6 +38,29 @@ export function buildApplicationRequest({ mobileNum, smsCode, answers, referralT
   };
 }
 
+function getBrowserStorage() {
+  try {
+    return globalThis.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+export function getQuestionnaireDeviceSn(storage = getBrowserStorage(), cryptoImpl = globalThis.crypto) {
+  const saved = storage?.getItem?.(QUESTIONNAIRE_DEVICE_SN_STORAGE_KEY);
+  if (typeof saved === "string" && saved.length >= 1 && saved.length <= 128) return saved;
+
+  const randomId = cryptoImpl?.randomUUID?.()
+    || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  const deviceSn = `questionnaire-${randomId}`.slice(0, 128);
+  try {
+    storage?.setItem?.(QUESTIONNAIRE_DEVICE_SN_STORAGE_KEY, deviceSn);
+  } catch {
+    // 浏览器禁用存储时，当前页面仍可继续完成验证。
+  }
+  return deviceSn;
+}
+
 export function normaliseRecruitmentResult(result = {}) {
   const referralRecords = Array.isArray(result.referralRecords)
     ? result.referralRecords.map((record) => typeof record === "string" ? record : record?.name).filter(Boolean)
@@ -54,7 +78,7 @@ export function normaliseRecruitmentResult(result = {}) {
   };
 }
 
-export function createRecruitmentApi(baseUrl, fetchImpl = globalThis.fetch) {
+export function createRecruitmentApi(baseUrl, fetchImpl = globalThis.fetch, { deviceSn = getQuestionnaireDeviceSn() } = {}) {
   const base = cleanBaseUrl(baseUrl);
   if (!base) throw new Error("未配置招募服务地址");
   if (typeof fetchImpl !== "function") throw new Error("当前环境不支持网络请求");
@@ -72,7 +96,7 @@ export function createRecruitmentApi(baseUrl, fetchImpl = globalThis.fetch) {
 
   return {
     sendSmsCode: (mobileNum) => post("/api/recruitment/sms-code", { mobileNum }),
-    submitApplication: (data) => post("/api/recruitment/applications", buildApplicationRequest(data)),
-    recoverResult: ({ mobileNum, smsCode }) => post("/api/recruitment/result-session", { mobileNum, smsCode }),
+    submitApplication: (data) => post("/api/recruitment/applications", { ...buildApplicationRequest(data), deviceSn }),
+    recoverResult: ({ mobileNum, smsCode }) => post("/api/recruitment/result-session", { mobileNum, smsCode, deviceSn }),
   };
 }
