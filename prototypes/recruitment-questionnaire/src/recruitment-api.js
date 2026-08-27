@@ -37,6 +37,23 @@ export function buildApplicationRequest({ mobileNum, smsCode, answers, referralT
   };
 }
 
+export function normaliseRecruitmentResult(result = {}) {
+  const referralRecords = Array.isArray(result.referralRecords)
+    ? result.referralRecords.map((record) => typeof record === "string" ? record : record?.name).filter(Boolean)
+    : [];
+  const successfulInvites = Number.isFinite(result.successfulInvites) ? Math.max(0, result.successfulInvites) : referralRecords.length;
+  const earnedHours = Number.isFinite(result.earnedHours) ? Math.max(0, result.earnedHours) : successfulInvites;
+
+  return {
+    phoneTail: /^\d{4}$/.test(result.phoneTail || "") ? result.phoneTail : "",
+    status: result.status === "granted" ? "granted" : "success",
+    referralLink: typeof result.referralLink === "string" ? result.referralLink : "",
+    referralRecords,
+    successfulInvites,
+    earnedHours,
+  };
+}
+
 export function createRecruitmentApi(baseUrl, fetchImpl = globalThis.fetch) {
   const base = cleanBaseUrl(baseUrl);
   if (!base) throw new Error("未配置招募服务地址");

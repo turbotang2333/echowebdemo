@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1200" viewBox="0 0 900 1200" role="img" aria-labelledby="title desc">
+  <title id="title">回响第二阶段招募分享图</title>
+  <desc id="desc">邀请好友注册，预存更多聊天时长</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#30283a"/>
+      <stop offset="1" stop-color="#76607c"/>
+    </linearGradient>
+  </defs>
+  <rect width="900" height="1200" fill="url(#bg)"/>
+  <circle cx="765" cy="155" r="250" fill="#b9a0c3" opacity=".16"/>
+  <circle cx="110" cy="1060" r="280" fill="#d6afba" opacity=".12"/>
+  <text x="72" y="94" fill="#e9e1ee" font-size="30" font-family="Arial, PingFang SC, sans-serif" letter-spacing="8">回响 · 超前体验</text>
+  <line x1="72" y1="143" x2="828" y2="143" stroke="#e9e1ee" stroke-opacity=".35"/>
+  <text x="72" y="380" fill="#fff" font-size="76" font-weight="700" font-family="Arial, PingFang SC, sans-serif">邀请你来「回响」</text>
+  <text x="72" y="482" fill="#fff" font-size="76" font-weight="700" font-family="Arial, PingFang SC, sans-serif">解锁专属剧情体验</text>
+  <text x="72" y="570" fill="#e7ddea" font-size="36" font-family="Arial, PingFang SC, sans-serif">完成招募注册，一起提前攒聊天时长</text>
+  <rect x="72" y="712" width="756" height="1" fill="#e9e1ee" opacity=".35"/>
+  <text x="72" y="790" fill="#e7ddea" font-size="31" font-family="Arial, PingFang SC, sans-serif">第二阶段 · 限量招募中</text>
+  <rect x="628" y="838" width="200" height="200" rx="8" fill="#fff"/>
+  <path d="M651 861h42v42h-42zM763 861h42v42h-42zM651 973h42v42h-42zM711 861h24v24h-24zM711 909h42v42h-42zM763 925h42v26h-42zM711 973h26v42h-26zM755 973h50v42h-50z" fill="#30283a"/>
+  <text x="72" y="1095" fill="#e7ddea" font-size="27" font-family="Arial, PingFang SC, sans-serif">扫码进入招募页</text>
+</svg>

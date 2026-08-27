@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { NEW_USER_TYPES, getPreviousQuestionnaireScreen, getQuestionnaireFeedbackGroups, getReferralSlots, getReferralSummary, resolveResultScreen, validateFinalStep, validateGroupStep, validateProfileStep, validateSharedStep } from "../src/questionnaire-model.js";
-import { buildApplicationRequest, buildReferralLink, createRecruitmentApi, getReferralToken } from "../src/recruitment-api.js";
+import { buildApplicationRequest, buildReferralLink, createRecruitmentApi, getReferralToken, normaliseRecruitmentResult } from "../src/recruitment-api.js";
 
 test("new user profile blocks every required answer that is missing", () => {
   assert.deepEqual(
@@ -189,4 +189,25 @@ test("recruitment client posts the questionnaire payload and returns the server 
     answers: { identity: "否" },
     referralToken: "7xKp9mQ2",
   });
+});
+
+test("server recruitment result becomes safe data for the existing referral card", () => {
+  assert.deepEqual(
+    normaliseRecruitmentResult({
+      phoneTail: "0000",
+      status: "success",
+      referralLink: "https://survey.example.test/?ref=7xKp9mQ2",
+      referralRecords: [{ name: "回响玩家 A**" }, { name: "回响玩家 B**" }],
+      successfulInvites: 2,
+      earnedHours: 2,
+    }),
+    {
+      phoneTail: "0000",
+      status: "success",
+      referralLink: "https://survey.example.test/?ref=7xKp9mQ2",
+      referralRecords: ["回响玩家 A**", "回响玩家 B**"],
+      successfulInvites: 2,
+      earnedHours: 2,
+    },
+  );
 });
